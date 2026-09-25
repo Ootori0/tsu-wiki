@@ -12,7 +12,12 @@
   "dependencies": {
     "nuxt": "^4.5.2",
     "vue": "^3.5.43",
-    "vue-router": "^5.3.1"
+    "vue-router": "^5.3.1",
+    "vuetify": "^4.2.2"
   },
-  "packageManager": "yarn@4.5.0"
+  "packageManager": "yarn@4.5.0",
+  "devDependencies": {
+    "@mdi/font": "^7.4.47",
+    "vite-plugin-vuetify": "^2.1.3"
+  }
 }

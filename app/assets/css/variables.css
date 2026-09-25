@@ -1,0 +1,13 @@
+:root {
+  /* Colors */
+  --color-bg: #ffffff;
+  --color-accent: #ffd400;
+  --color-text: #000000;
+
+  /* Font */
+  --font-base: sans-serif;
+
+  /* Menu */
+  --menu-width: 80vw;
+  --menu-transition: 0.3s ease;
+}
