@@ -22,5 +22,16 @@ export default defineNuxtConfig({
       noExternal: ['vuetify'],
     },
   },
+  app: {
+    head: {
+      link: [
+        {
+          rel: 'stylesheet',
+          href: 'https://fonts.googleapis.com/css2?family=Yuji+Syuku&display=swap',
+        },
+      ],
+    },
+  },
+  
 })
 

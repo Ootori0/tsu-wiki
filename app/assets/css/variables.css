@@ -7,6 +7,10 @@
   /* Font */
   --font-base: sans-serif;
 
+
+  /* タイトル用縦書きフォント */
+  --font-title: 'Yuji Syuku', serif;
+
   /* Menu */
   --menu-width: 80vw;
   --menu-transition: 0.3s ease;
