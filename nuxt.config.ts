@@ -24,6 +24,20 @@ export default defineNuxtConfig({
   },
   app: {
     head: {
+            title: 'tsu-wiki',
+      meta: [
+        { name: 'description', content: 'ツラトゥストラはかく語りきwiki' },
+
+        // OGP
+        { property: 'og:title', content: 'tsu-wiki' },
+        { property: 'og:description', content: 'ツラトゥストラはかく語りきwiki' },
+        { property: 'og:type', content: 'website' },
+        { property: 'og:url', content: 'https://tsu.inami0.com' },
+        { property: 'og:image', content: 'https://tsu.inami0.com/ogp.png' },
+        { property: 'og:site_name', content: 'tsu-wiki' },
+        { name: 'theme-color', content: '#ffd400' },
+      ],
+      
       link: [
         {
           rel: 'stylesheet',

@@ -15,7 +15,7 @@ const pages = [
     <!-- タイトル -->
     <header class="title-block">
       <div class="title-frame">
-        <h1 class="title">ツラトゥストラはかく語りき</h1>
+        <h1 class="title">ツラトゥストラは<br>かく語りき</h1>
       </div>
     </header>
 
