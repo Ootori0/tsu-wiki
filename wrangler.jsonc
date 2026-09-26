@@ -1,4 +1,11 @@
 {
-  "name": "tsu-wiki",
-  "compatibility_date": "2026-09-25"
+	"name": "tsu-wiki",
+	"compatibility_date": "2026-09-25",
+	"d1_databases": [
+		{
+			"binding": "tsu_wiki_db",
+			"database_name": "tsu-wiki-db",
+			"database_id": "41151fde-1c31-4905-8e78-9b51b258d600"
+		}
+	]
 }

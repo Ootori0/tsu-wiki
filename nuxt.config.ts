@@ -15,6 +15,7 @@ export default defineNuxtConfig({
         config.plugins.push(vuetify({ autoImport: true }))
       })
     },
+    'nitro-cloudflare-dev',
   ],
 
   vite: {
@@ -33,7 +34,7 @@ export default defineNuxtConfig({
         { property: 'og:description', content: 'ツラトゥストラはかく語りきwiki' },
         { property: 'og:type', content: 'website' },
         { property: 'og:url', content: 'https://tsu.inami0.com' },
-        { property: 'og:image', content: 'https://tsu.inami0.com/ogp.png' },
+        //{ property: 'og:image', content: 'https://tsu.inami0.com/ogp.png' },
         { property: 'og:site_name', content: 'tsu-wiki' },
         { name: 'theme-color', content: '#ffd400' },
       ],
@@ -45,6 +46,10 @@ export default defineNuxtConfig({
         },
       ],
     },
+  },
+
+  nitro: {
+    preset: 'cloudflare-module',
   },
   
 })
