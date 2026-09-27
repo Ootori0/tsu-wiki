@@ -9,6 +9,7 @@ const links = [
   { to: '/magic/tool', label: '魔道具', icon: 'mdi-flask' },
   { to: '/magic/other', label: '魔術、その他', icon: 'mdi-star-four-points' },
   { to: '/magic-guide', label: '魔法作成のすゝめ', icon: 'mdi-book-open-variant' },
+  { to: '/setting', label: '背景設定集', icon: 'mdi-book-open-page-variant' },
   { to: '/faq', label: 'よくある質問,裁定', icon: 'mdi-help-circle-outline' },
 ]
 

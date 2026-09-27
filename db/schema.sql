@@ -12,3 +12,12 @@ CREATE TABLE spells (
 );
 
 CREATE INDEX idx_spells_category ON spells(category);
+
+CREATE TABLE setting_items (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  title TEXT NOT NULL,
+  body TEXT,
+  sort_order INTEGER DEFAULT 0,
+  created_at TEXT DEFAULT (datetime('now')),
+  updated_at TEXT DEFAULT (datetime('now'))
+);

@@ -6,43 +6,40 @@ defineProps({
   },
 })
 
-const selected = ref(null)
+const openId = ref(null)
 
-const open = (item) => {
-  selected.value = item
-}
-
-const close = () => {
-  selected.value = null
+const toggle = (id) => {
+  openId.value = openId.value === id ? null : id
 }
 </script>
 
 <template>
   <div class="spell-list">
     <div v-for="item in items" :key="item.id" class="spell-item">
-      <span class="spell-name">{{ item.name }}</span>
-      <button class="detail-btn" @click="open(item)">詳細</button>
-    </div>
+      <div class="spell-row">
+        <span class="spell-name">{{ item.name }}</span>
+        <button class="detail-btn" @click="toggle(item.id)">
+          {{ openId === item.id ? '閉じる' : '詳細' }}
+        </button>
+      </div>
 
-    <!-- モーダル -->
-    <div v-if="selected" class="modal-overlay" @click.self="close">
-      <div class="modal-box">
-        <button class="close-btn" @click="close">×</button>
-        <h2 class="modal-title">{{ selected.name }}</h2>
+      <!-- grid-template-rowsで開閉 -->
+      <div class="detail-outer" :class="{ open: openId === item.id }">
+        <div class="detail-inner">
+          <dl class="modal-detail">
+            <dt>コスト</dt>
+            <dd>{{ item.cost }}</dd>
 
-        <dl class="modal-detail">
-          <dt>コスト</dt>
-          <dd>{{ selected.cost }}</dd>
+            <dt>発動条件</dt>
+            <dd>{{ item.condition }}</dd>
 
-          <dt>発動条件</dt>
-          <dd>{{ selected.condition }}</dd>
+            <dt>ダメージ</dt>
+            <dd>{{ item.damage }}</dd>
 
-          <dt>ダメージ</dt>
-          <dd>{{ selected.damage }}</dd>
-
-          <dt>効果</dt>
-          <dd>{{ selected.effect }}</dd>
-        </dl>
+            <dt>効果</dt>
+            <dd>{{ item.effect }}</dd>
+          </dl>
+        </div>
       </div>
     </div>
   </div>
@@ -56,12 +53,15 @@ const close = () => {
 }
 
 .spell-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
   border: 1px solid var(--color-text, #000);
   border-left: 6px solid var(--color-accent, #ffd400);
   background: var(--color-bg, #fff);
+}
+
+.spell-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   padding: 12px 14px;
 }
 
@@ -78,49 +78,27 @@ const close = () => {
   font-size: 0.8rem;
   padding: 4px 10px;
   cursor: pointer;
+  flex-shrink: 0;
 }
 
-/* オーバーレイ */
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-  padding: 16px;
+/* grid-template-rowsで実際の高さに追従したスムーズな開閉 */
+.detail-outer {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.3s ease;
 }
 
-/* モーダル本体:背景を確実に不透明white指定 */
-.modal-box {
-  position: relative;
-  width: 100%;
-  max-width: 400px;
-  background-color: var(--color-bg, #ffffff);
-  opacity: 1;
-  border: 2px solid var(--color-text, #000);
-  box-shadow: 4px 4px 0 var(--color-text, #000);
-  padding: 24px 18px 18px;
+.detail-outer.open {
+  grid-template-rows: 1fr;
 }
 
-.close-btn {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  background: none;
-  border: none;
-  font-size: 1.4rem;
-  color: var(--color-text, #000);
-  cursor: pointer;
+.detail-inner {
+  overflow: hidden;
+  min-height: 0;
 }
 
-.modal-title {
-  margin: 0 0 16px;
-  font-size: 1.2rem;
-  color: var(--color-text, #000);
-  border-bottom: 2px solid var(--color-accent, #ffd400);
-  padding-bottom: 8px;
+.detail-outer.open .detail-inner {
+  border-top: 1px dashed var(--color-text, #000);
 }
 
 .modal-detail {
@@ -129,6 +107,7 @@ const close = () => {
   row-gap: 10px;
   column-gap: 12px;
   margin: 0;
+  padding: 14px;
 }
 
 .modal-detail dt {
