@@ -1,6 +1,7 @@
 <script setup>
-const { data: fetchedItems, refresh } = await useFetch('/api/faqs')
+const { data: fetchedItems, refresh } = await useFetch('/api/settings')
 
+// ローカルの並び替え用配列(APIから取得したデータのコピー)
 const localItems = ref([])
 
 watch(
@@ -12,10 +13,9 @@ watch(
 )
 
 const isOrderChanged = ref(false)
-const searchQuery = ref('')
 
 const editingId = ref(null)
-const editForm = ref({ question: '', answer: '' })
+const editForm = ref({ title: '', body: '' })
 const saving = ref(false)
 const deleting = ref(false)
 const applyingOrder = ref(false)
@@ -24,11 +24,11 @@ const showConfirm = ref(false)
 const pendingDeleteId = ref(null)
 
 const creating = ref(false)
-const newForm = ref({ question: '', answer: '' })
+const newForm = ref({ title: '', body: '' })
 
 const startEdit = (item) => {
   editingId.value = item.id
-  editForm.value = { question: item.question, answer: item.answer }
+  editForm.value = { title: item.title, body: item.body }
 }
 
 const cancelEdit = () => {
@@ -38,11 +38,11 @@ const cancelEdit = () => {
 const saveEdit = async (id) => {
   saving.value = true
   try {
-    await $fetch(`/api/faqs/${id}`, {
+    await $fetch(`/api/settings/${id}`, {
       method: 'PUT',
       body: {
-        question: editForm.value.question,
-        answer: editForm.value.answer,
+        title: editForm.value.title,
+        content: editForm.value.body,
       },
     })
     editingId.value = null
@@ -61,7 +61,7 @@ const confirmDelete = async () => {
   if (!pendingDeleteId.value) return
   deleting.value = true
   try {
-    await $fetch(`/api/faqs/${pendingDeleteId.value}`, { method: 'DELETE' })
+    await $fetch(`/api/settings/${pendingDeleteId.value}`, { method: 'DELETE' })
     editingId.value = null
     await refresh()
   } finally {
@@ -70,6 +70,7 @@ const confirmDelete = async () => {
   }
 }
 
+// ↑↓:ローカル配列内の並び替えのみ(API未呼び出し)
 const moveLocal = (id, direction) => {
   const idx = localItems.value.findIndex((i) => i.id === id)
   const targetIdx = direction === 'up' ? idx - 1 : idx + 1
@@ -81,6 +82,7 @@ const moveLocal = (id, direction) => {
   isOrderChanged.value = true
 }
 
+// 「並び順を反映」ボタン:ここで初めてAPIを1回呼ぶ
 const applyOrder = async () => {
   applyingOrder.value = true
   try {
@@ -88,7 +90,7 @@ const applyOrder = async () => {
       id: item.id,
       sortOrder: index + 1,
     }))
-    await $fetch('/api/faqs/reorder', {
+    await $fetch('/api/settings/reorder', {
       method: 'POST',
       body: { order },
     })
@@ -102,6 +104,7 @@ const applyOrder = async () => {
   }
 }
 
+// 「反映キャンセル」ボタン:ローカルの並び替えを元に戻す
 const cancelOrder = () => {
   localItems.value = fetchedItems.value
     ? [...fetchedItems.value].sort((a, b) => a.sort_order - b.sort_order)
@@ -111,7 +114,7 @@ const cancelOrder = () => {
 
 const startCreate = () => {
   creating.value = true
-  newForm.value = { question: '', answer: '' }
+  newForm.value = { title: '', body: '' }
 }
 
 const cancelCreate = () => {
@@ -119,15 +122,15 @@ const cancelCreate = () => {
 }
 
 const saveCreate = async () => {
-  if (!newForm.value.question) return
+  if (!newForm.value.title) return
   saving.value = true
   try {
     const maxOrder = Math.max(0, ...localItems.value.map((i) => i.sort_order ?? 0))
-    await $fetch('/api/faqs', {
+    await $fetch('/api/settings', {
       method: 'POST',
       body: {
-        question: newForm.value.question,
-        answer: newForm.value.answer,
+        title: newForm.value.title,
+        content: newForm.value.body,
         sortOrder: maxOrder + 1,
       },
     })
@@ -141,30 +144,20 @@ const saveCreate = async () => {
 
 <template>
   <div class="page">
-    <h1 class="page-title">よくある質問,裁定</h1>
-
-    <!-- ページ内検索ボックス(外形のみ、フィルタ未実装) -->
-    <div class="search-box">
-      <input
-        v-model="searchQuery"
-        type="text"
-        placeholder="キーワードで検索(未完成)"
-        class="search-input"
-      />
-    </div>
+    <h1 class="page-title">背景設定集</h1>
 
     <AccordionList
       :items="localItems"
-      title-key="question"
-      body-key="answer"
+      title-key="title"
+      body-key="body"
     >
       <template #detail="{ item }">
         <div v-if="editingId === item.id" class="edit-form">
-          <label class="edit-label">質問(タイトル)</label>
-          <input v-model="editForm.question" class="edit-input" />
+          <label class="edit-label">タイトル</label>
+          <input v-model="editForm.title" class="edit-input" />
 
-          <label class="edit-label">回答</label>
-          <textarea v-model="editForm.answer" class="edit-textarea" rows="4" />
+          <label class="edit-label">本文</label>
+          <textarea v-model="editForm.body" class="edit-textarea" rows="4" />
 
           <div class="edit-actions">
             <button class="save-btn" :disabled="saving" @click="saveEdit(item.id)">
@@ -182,7 +175,7 @@ const saveCreate = async () => {
             </button>
           </div>
 
-          <!-- 並び順反映ボタン -->
+          <!-- 並び順反映ボタン(矢印ボタンの下、枠内、小サイズ) -->
           <div v-if="isOrderChanged" class="apply-order-row">
             <button class="apply-order-btn-sm" :disabled="applyingOrder" @click="applyOrder">
               並び順を反映する
@@ -194,7 +187,7 @@ const saveCreate = async () => {
         </div>
 
         <div v-else class="view-mode">
-          <p class="accordion-body">{{ item.answer }}</p>
+          <p class="accordion-body">{{ item.body }}</p>
           <button class="edit-btn" @click="startEdit(item)">編集</button>
         </div>
       </template>
@@ -207,14 +200,14 @@ const saveCreate = async () => {
       </button>
 
       <div v-else class="edit-form">
-        <label class="edit-label">質問(タイトル)</label>
-        <input v-model="newForm.question" class="edit-input" placeholder="質問を入力" />
+        <label class="edit-label">タイトル</label>
+        <input v-model="newForm.title" class="edit-input" placeholder="タイトルを入力" />
 
-        <label class="edit-label">回答</label>
-        <textarea v-model="newForm.answer" class="edit-textarea" rows="4" placeholder="回答を入力" />
+        <label class="edit-label">本文</label>
+        <textarea v-model="newForm.body" class="edit-textarea" rows="4" placeholder="本文を入力" />
 
         <div class="edit-actions">
-          <button class="save-btn" :disabled="saving || !newForm.question" @click="saveCreate">
+          <button class="save-btn" :disabled="saving || !newForm.title" @click="saveCreate">
             保存
           </button>
           <button class="cancel-btn" @click="cancelCreate">キャンセル</button>
@@ -244,26 +237,6 @@ const saveCreate = async () => {
   border-left: 5px solid var(--color-accent);
   padding-left: 10px;
   margin-bottom: 20px;
-}
-
-.search-box {
-  margin-bottom: 20px;
-}
-
-.search-input {
-  width: 100%;
-  box-sizing: border-box;
-  border: 1px solid var(--color-text, #000);
-  border-left: 6px solid var(--color-accent, #ffd400);
-  background: var(--color-bg, #fff);
-  color: var(--color-text, #000);
-  padding: 10px 12px;
-  font-size: 0.9rem;
-}
-
-.search-input:focus {
-  outline: 2px solid var(--color-accent, #ffd400);
-  outline-offset: -2px;
 }
 
 /* 項目追加 */
@@ -395,7 +368,7 @@ const saveCreate = async () => {
   cursor: not-allowed;
 }
 
-/* 並び順反映ボタン */
+/* 並び順反映ボタン(小サイズ、枠内) */
 .apply-order-row {
   display: flex;
   gap: 8px;
