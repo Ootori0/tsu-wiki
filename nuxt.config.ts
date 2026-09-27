@@ -25,7 +25,7 @@ export default defineNuxtConfig({
   },
   app: {
     head: {
-            title: 'tsu-wiki',
+      title: 'tsu-wiki',
       meta: [
         { name: 'description', content: 'ツラトゥストラはかく語りきwiki' },
 
@@ -34,16 +34,23 @@ export default defineNuxtConfig({
         { property: 'og:description', content: 'ツラトゥストラはかく語りきwiki' },
         { property: 'og:type', content: 'website' },
         { property: 'og:url', content: 'https://tsu.inami0.com' },
-        //{ property: 'og:image', content: 'https://tsu.inami0.com/ogp.png' },
+        { property: 'og:image', content: 'https://tsu.inami0.com/icon.jpg' },
         { property: 'og:site_name', content: 'tsu-wiki' },
         { name: 'theme-color', content: '#ffd400' },
+
+        // Twitter Card
+        { name: 'twitter:card', content: 'summary_large_image' },
+        { name: 'twitter:title', content: 'tsu-wiki' },
+        { name: 'twitter:description', content: 'ツラトゥストラはかく語りきwiki' },
+        { name: 'twitter:image', content: 'https://tsu.inami0.com/icon.jpg' },
       ],
-      
+
       link: [
         {
           rel: 'stylesheet',
           href: 'https://fonts.googleapis.com/css2?family=Yuji+Syuku&display=swap',
         },
+        { rel: 'icon', type: 'image/jpeg', href: '/icon.jpg' },
       ],
     },
   },
@@ -51,6 +58,4 @@ export default defineNuxtConfig({
   nitro: {
     preset: 'cloudflare-module',
   },
-  
 })
-
