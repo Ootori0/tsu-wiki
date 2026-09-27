@@ -14,16 +14,13 @@ const toggle = (id) => {
 </script>
 
 <template>
-  <div class="spell-list">
-    <div v-for="item in items" :key="item.id" class="spell-item">
-      <div class="spell-row">
-        <span class="spell-name">{{ item.name }}</span>
-        <button class="detail-btn" @click="toggle(item.id)">
-          {{ openId === item.id ? '閉じる' : '詳細' }}
-        </button>
-      </div>
+  <div class="accordion-list">
+    <div v-for="item in items" :key="item.id" class="accordion-item">
+      <button class="accordion-header" @click="toggle(item.id)">
+        <span class="accordion-title">{{ item.name }}</span>
+        <span class="accordion-icon" :class="{ open: openId === item.id }">▶</span>
+      </button>
 
-      <!-- grid-template-rowsで開閉 -->
       <div class="detail-outer" :class="{ open: openId === item.id }">
         <div class="detail-inner">
           <dl class="modal-detail">
@@ -46,39 +43,45 @@ const toggle = (id) => {
 </template>
 
 <style scoped>
-.spell-list {
+.accordion-list {
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
 
-.spell-item {
+.accordion-item {
   border: 1px solid var(--color-text, #000);
   border-left: 6px solid var(--color-accent, #ffd400);
   background: var(--color-bg, #fff);
 }
 
-.spell-row {
+.accordion-header {
+  width: 100%;
   display: flex;
   align-items: center;
   justify-content: space-between;
+  background: none;
+  border: none;
   padding: 12px 14px;
+  cursor: pointer;
+  text-align: left;
 }
 
-.spell-name {
+.accordion-title {
   font-weight: bold;
   font-size: 1rem;
   color: var(--color-text, #000);
 }
 
-.detail-btn {
-  border: 1px solid var(--color-text, #000);
-  background: var(--color-accent, #ffd400);
-  color: var(--color-text, #000);
+.accordion-icon {
   font-size: 0.8rem;
-  padding: 4px 10px;
-  cursor: pointer;
+  color: var(--color-text, #000);
+  transition: transform 0.25s ease;
   flex-shrink: 0;
+}
+
+.accordion-icon.open {
+  transform: rotate(90deg);
 }
 
 /* grid-template-rowsで実際の高さに追従したスムーズな開閉 */

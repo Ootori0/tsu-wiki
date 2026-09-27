@@ -4,6 +4,14 @@ defineProps({
     type: Array,
     required: true,
   },
+  titleKey: {
+    type: String,
+    default: 'title',
+  },
+  bodyKey: {
+    type: String,
+    default: 'body',
+  },
 })
 
 const openId = ref(null)
@@ -17,14 +25,15 @@ const toggle = (id) => {
   <div class="accordion-list">
     <div v-for="item in items" :key="item.id" class="accordion-item">
       <button class="accordion-header" @click="toggle(item.id)">
-        <span class="accordion-title">{{ item.title }}</span>
+        <span class="accordion-title">{{ item[titleKey] }}</span>
         <span class="accordion-icon" :class="{ open: openId === item.id }">▶</span>
       </button>
 
-      <!-- transitionコンポーネントは使わず、CSSのgrid-template-rowsで開閉 -->
-      <div class="accordion-body-outer" :class="{ open: openId === item.id }">
-        <div class="accordion-body-inner">
-          <p class="accordion-body">{{ item.body }}</p>
+      <div class="detail-outer" :class="{ open: openId === item.id }">
+        <div class="detail-inner">
+          <slot name="detail" :item="item" :is-open="openId === item.id">
+            <p class="accordion-body">{{ item[bodyKey] }}</p>
+          </slot>
         </div>
       </div>
     </div>
@@ -73,23 +82,22 @@ const toggle = (id) => {
   transform: rotate(90deg);
 }
 
-/* grid-template-rowsで実際の高さに追従したスムーズな開閉 */
-.accordion-body-outer {
+.detail-outer {
   display: grid;
   grid-template-rows: 0fr;
   transition: grid-template-rows 0.3s ease;
 }
 
-.accordion-body-outer.open {
+.detail-outer.open {
   grid-template-rows: 1fr;
 }
 
-.accordion-body-inner {
+.detail-inner {
   overflow: hidden;
   min-height: 0;
 }
 
-.accordion-body-outer.open .accordion-body-inner {
+.detail-outer.open .detail-inner {
   border-top: 1px dashed var(--color-text, #000);
 }
 

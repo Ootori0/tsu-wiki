@@ -3,12 +3,12 @@ const drawer = ref(false)
 
 const links = [
   { to: '/', label: '表紙', icon: 'mdi-home' },
-  { to: '/association', label: '協会', icon: 'mdi-bank' },
-  { to: '/pc', label: 'PC', icon: 'mdi-account' },
-  { to: '/magic', label: '魔法', icon: 'mdi-magic-staff' },
-  { to: '/magic/tool', label: '魔道具', icon: 'mdi-flask' },
-  { to: '/magic/other', label: '魔術、その他', icon: 'mdi-star-four-points' },
-  { to: '/magic-guide', label: '魔法作成のすゝめ', icon: 'mdi-book-open-variant' },
+  { to: '/association', label: '協会(未完成)', icon: 'mdi-bank' },
+  { to: '/pc', label: 'PC(未完成)', icon: 'mdi-account' },
+  { to: '/magic', label: '魔法(未完成)', icon: 'mdi-magic-staff' },
+  { to: '/magic/tool', label: '魔道具(未完成)', icon: 'mdi-flask' },
+  { to: '/magic/other', label: '魔術、その他(未完成)', icon: 'mdi-star-four-points' },
+  { to: '/magic-guide', label: '魔法作成のすゝめ(未完成)', icon: 'mdi-book-open-variant' },
   { to: '/setting', label: '背景設定集', icon: 'mdi-book-open-page-variant' },
   { to: '/faq', label: 'よくある質問,裁定', icon: 'mdi-help-circle-outline' },
 ]
