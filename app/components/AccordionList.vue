@@ -26,7 +26,11 @@ const toggle = (id) => {
     <div v-for="item in items" :key="item.id" class="accordion-item">
       <button class="accordion-header" @click="toggle(item.id)">
         <span class="accordion-title">{{ item[titleKey] }}</span>
-        <span class="accordion-icon" :class="{ open: openId === item.id }">▶</span>
+        <span class="accordion-icon" :class="{ open: openId === item.id }">
+          <svg viewBox="0 0 24 24" width="14" height="14">
+            <path d="M8 5l8 7-8 7z" fill="currentColor" />
+          </svg>
+        </span>
       </button>
 
       <div class="detail-outer" :class="{ open: openId === item.id }">
@@ -109,4 +113,18 @@ const toggle = (id) => {
   color: var(--color-text, #000);
   white-space: pre-line;
 }
+
+.accordion-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text, #000);
+  transition: transform 0.25s ease;
+  flex-shrink: 0;
+}
+
+.accordion-icon.open {
+  transform: rotate(90deg);
+}
+
 </style>
