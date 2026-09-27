@@ -194,7 +194,7 @@ const saveCreate = async () => {
         </div>
 
         <div v-else class="view-mode">
-          <p class="accordion-body">{{ item.answer }}</p>
+          <MarkdownText :text="item.answer" />
           <button class="edit-btn" @click="startEdit(item)">編集</button>
         </div>
       </template>
