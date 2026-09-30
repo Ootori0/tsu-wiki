@@ -2,7 +2,7 @@
 const pages = [
   { to: '/association', label: '協会', desc: '各協会の概略・所属NPC/PCなど' },
   { to: '/pc', label: 'PC', desc: 'キャラクターシートまとめ' },
-  { to: '/magic', label: '魔法', desc: '魔法の総覧' },
+  { to: '/magic', label: '魔法', desc: '魔法,魔道具,AF,魔術などの総覧' },
   { to: '/magic-guide', label: '魔法作成のすゝめ', desc: 'オリジナル魔法の作り方' },
   { to: '/setting', label: '背景設定集', desc: '背景設定たち' },
   { to: '/faq', label: 'よくある質問,裁定', desc: 'Q&A形式のルール裁定集' },
