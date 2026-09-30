@@ -61,7 +61,7 @@ const savePassword = async () => {
 
 // --- 自分の魔法一覧 ---
 const { data: fetchedMagics, refresh: refreshMagics } = await useFetch('/api/magics/mine')
-const { data: allPermsList } = await useFetch('/api/admin/permissions').catch(() => ({ data: ref([]) }))
+const { data: allPermsList } = await useFetch('/api/permissions')
 const { data: allTags } = await useFetch('/api/tags')
 
 const magicTypes = ['魔法', '魔道具', 'AF', '魔術・その他']
