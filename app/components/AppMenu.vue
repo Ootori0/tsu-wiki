@@ -11,7 +11,7 @@ const links = computed(() => [
   { to: '/', label: '表紙', icon: 'mdi-home' },
   { to: '/association', label: '協会(未完成)', icon: 'mdi-bank' },
   { to: '/pc', label: 'PC(未完成)', icon: 'mdi-account' },
-  { to: '/magic', label: '魔法(未完成)', icon: 'mdi-magic-staff' },
+  { to: '/magic', label: '魔法', icon: 'mdi-magic-staff' },
   { to: '/magic-guide', label: '魔法作成のすゝめ(未完成)', icon: 'mdi-book-open-variant' },
   { to: '/setting', label: '背景設定集', icon: 'mdi-book-open-page-variant' },
   { to: '/faq', label: 'よくある質問,裁定', icon: 'mdi-help-circle-outline' },
