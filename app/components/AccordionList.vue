@@ -73,10 +73,13 @@ const toggle = (id) => {
   font-weight: bold;
   font-size: 1rem;
   color: var(--color-text, #000);
+  word-break: break-word;
 }
 
 .accordion-icon {
-  font-size: 0.8rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   color: var(--color-text, #000);
   transition: transform 0.25s ease;
   flex-shrink: 0;
@@ -113,18 +116,4 @@ const toggle = (id) => {
   color: var(--color-text, #000);
   white-space: pre-line;
 }
-
-.accordion-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--color-text, #000);
-  transition: transform 0.25s ease;
-  flex-shrink: 0;
-}
-
-.accordion-icon.open {
-  transform: rotate(90deg);
-}
-
 </style>

@@ -21,6 +21,7 @@ const saveName = async () => {
   }
 }
 
+const { resize } = useAutoResize()
 // --- パスワード変更 ---
 const passwordAccordionOpen = ref(false)
 const currentPassword = ref('')
@@ -81,7 +82,7 @@ const newForm = ref({
   type: '魔法', name: '', owner: '', tags: [], cost: '', condition: '', effect: '', visiblePermissions: [],
 })
 
-const startEdit = (item) => {
+const startEdit = async (item) => {
   editingId.value = item.id
   editForm.value = {
     type: item.type,
@@ -93,8 +94,13 @@ const startEdit = (item) => {
     effect: item.effect,
     visiblePermissions: [...item.visible_permissions],
   }
-}
 
+  await nextTick()
+  document.querySelectorAll('.auto-wrap').forEach((el) => {
+    el.style.height = 'auto'
+    el.style.height = el.scrollHeight + 'px'
+  })
+}
 const cancelEdit = () => {
   editingId.value = null
 }
@@ -232,19 +238,19 @@ const toggleFormPerm = (form, permName) => {
             </select>
 
             <label class="edit-label">名称</label>
-            <input v-model="editForm.name" class="edit-input" />
+            <textarea v-model="editForm.name" class="edit-input auto-wrap" rows="1" @input="resize" />
 
             <label class="edit-label">所持者</label>
-            <input v-model="editForm.owner" class="edit-input" />
+            <textarea v-model="editForm.owner" class="edit-input auto-wrap" rows="1" @input="resize" />
 
             <label class="edit-label">コスト</label>
-            <input v-model="editForm.cost" class="edit-input" />
+            <textarea v-model="editForm.cost" class="edit-input auto-wrap" rows="1" @input="resize" />
 
             <label class="edit-label">発動条件</label>
-            <input v-model="editForm.condition" class="edit-input" />
+            <textarea v-model="editForm.condition" class="edit-input auto-wrap" rows="1" @input="resize" />
 
             <label class="edit-label">効果</label>
-            <textarea v-model="editForm.effect" class="edit-textarea" rows="3" />
+            <textarea v-model="editForm.effect" class="edit-textarea auto-wrap" rows="3" @input="resize" />
 
             <label class="edit-label">タグ</label>
             <div class="chip-list">
@@ -297,30 +303,28 @@ const toggleFormPerm = (form, permName) => {
           <select v-model="newForm.type" class="edit-input">
             <option v-for="t in magicTypes" :key="t" :value="t">{{ t }}</option>
           </select>
+            <label class="edit-label">名称</label>
+            <textarea v-model="newForm.name" class="edit-input auto-wrap" rows="1" @input="resize" />
 
-          <label class="edit-label">名称</label>
-          <input v-model="newForm.name" class="edit-input" />
+            <label class="edit-label">所持者</label>
+            <textarea v-model="newForm.owner" class="edit-input auto-wrap" rows="1" @input="resize" />
 
-          <label class="edit-label">所持者</label>
-          <input v-model="newForm.owner" class="edit-input" />
+            <label class="edit-label">コスト</label>
+            <textarea v-model="newForm.cost" class="edit-input auto-wrap" rows="1" @input="resize" />
 
-          <label class="edit-label">コスト</label>
-          <input v-model="newForm.cost" class="edit-input" />
+            <label class="edit-label">発動条件</label>
+            <textarea v-model="newForm.condition" class="edit-input auto-wrap" rows="1" @input="resize" />
 
-          <label class="edit-label">発動条件</label>
-          <input v-model="newForm.condition" class="edit-input" />
-
-          <label class="edit-label">効果</label>
-          <textarea v-model="newForm.effect" class="edit-textarea" rows="3" />
-
-          <label class="edit-label">タグ</label>
-          <div class="chip-list">
+            <label class="edit-label">効果</label>
+            <textarea v-model="newForm.effect" class="edit-textarea auto-wrap" rows="3" @input="resize" />
+            <label class="edit-label">タグ</label>
+            <div class="chip-list">
             <button
-              v-for="tag in allTags ?? []"
-              :key="tag.id"
-              class="chip"
-              :class="{ active: newForm.tags.includes(tag.name) }"
-              @click="toggleFormTag(newForm, tag.name)"
+                v-for="tag in allTags ?? []"
+                :key="tag.id"
+                class="chip"
+                :class="{ active: newForm.tags.includes(tag.name) }"
+                @click="toggleFormTag(newForm, tag.name)"
             >
               {{ tag.name }}
             </button>
@@ -553,6 +557,13 @@ const toggleFormPerm = (form, permName) => {
   padding: 8px;
   font-size: 0.9rem;
   font-family: inherit;
+}
+
+.auto-wrap {
+  resize: none;
+  overflow: hidden;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .edit-actions {
