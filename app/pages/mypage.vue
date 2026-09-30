@@ -256,7 +256,9 @@ const toggleFormPerm = (form, permName) => {
 
             <label class="edit-label">効果</label>
             <textarea v-model="editForm.effect" class="edit-textarea auto-wrap" rows="3" @input="resize" />
-
+            <p class="markdown-hint">
+            # 見出し **太字** *斜体* ~~取消線~~ `コード` &gt; 引用 ||スポイラー||
+            </p>
             <label class="edit-label">タグ</label>
             <div class="chip-list">
               <button
@@ -290,12 +292,12 @@ const toggleFormPerm = (form, permName) => {
             </div>
           </div>
 
-          <div v-else class="view-mode">
+            <div v-else class="view-mode">
             <p class="meta-line">区分: {{ item.type }} / 所持者: {{ item.owner || '-' }}</p>
             <p class="meta-line">コスト: {{ item.cost || '-' }} / 発動条件: {{ item.condition || '-' }}</p>
-            <p class="accordion-body">{{ item.effect }}</p>
+            <MarkdownText :text="item.effect" />
             <button class="edit-btn" @click="startEdit(item)">編集</button>
-          </div>
+            </div>
         </template>
       </AccordionList>
 
@@ -322,6 +324,9 @@ const toggleFormPerm = (form, permName) => {
 
             <label class="edit-label">効果</label>
             <textarea v-model="newForm.effect" class="edit-textarea auto-wrap" rows="3" @input="resize" />
+            <p class="markdown-hint">
+            # 見出し **太字** *斜体* ~~取消線~~ `コード` &gt; 引用 ||スポイラー||
+            </p>
             <label class="edit-label">タグ</label>
             <div class="chip-list">
             <button
@@ -609,5 +614,11 @@ const toggleFormPerm = (form, permName) => {
   font-size: 0.9rem;
   font-weight: bold;
   cursor: pointer;
+}
+
+.markdown-hint {
+  font-size: 0.7rem;
+  opacity: 0.6;
+  margin: 2px 0 0;
 }
 </style>

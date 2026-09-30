@@ -81,7 +81,7 @@ const toggleTag = (tagName) => {
         <div class="magic-detail">
           <p class="meta-line">区分: {{ item.type }} / 使用者: {{ item.owner || '-' }}</p>
           <p class="meta-line">コスト: {{ item.cost || '-' }} / 発動条件: {{ item.condition || '-' }}</p>
-          <p class="magic-effect">{{ item.effect }}</p>
+          <MarkdownText :text="item.effect" />
         </div>
       </template>
     </AccordionList>
