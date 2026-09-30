@@ -30,3 +30,47 @@ CREATE TABLE faq_items (
   created_at TEXT DEFAULT (datetime('now')),
   updated_at TEXT DEFAULT (datetime('now'))
 );
+
+CREATE TABLE users (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL UNIQUE,
+  password_hash TEXT NOT NULL,
+  password_salt TEXT NOT NULL,
+  permissions TEXT NOT NULL DEFAULT '[]', -- JSON配列文字列
+  created_at TEXT DEFAULT (datetime('now')),
+  updated_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TABLE sessions (
+  id TEXT PRIMARY KEY, -- ランダムトークン
+  user_id INTEGER NOT NULL,
+  created_at TEXT DEFAULT (datetime('now')),
+  expires_at TEXT NOT NULL,
+  FOREIGN KEY (user_id) REFERENCES users(id)
+);
+
+
+CREATE TABLE magics (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  type TEXT NOT NULL CHECK (type IN ('魔法', '魔道具', 'AF', '魔術・その他')),
+  visible_permissions TEXT NOT NULL DEFAULT '[]', -- JSON配列(閲覧可能権限)
+  created_by INTEGER NOT NULL,
+  name TEXT NOT NULL,
+  owner TEXT,
+  tags TEXT NOT NULL DEFAULT '[]', -- JSON配列
+  cost TEXT,
+  condition TEXT,
+  effect TEXT,
+  sort_order INTEGER DEFAULT 0,
+  created_at TEXT DEFAULT (datetime('now')),
+  updated_at TEXT DEFAULT (datetime('now')),
+  FOREIGN KEY (created_by) REFERENCES users(id)
+);
+
+CREATE INDEX idx_magics_type ON magics(type);
+
+CREATE TABLE tags (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL UNIQUE,
+  created_at TEXT DEFAULT (datetime('now'))
+);
