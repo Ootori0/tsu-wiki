@@ -1,6 +1,7 @@
 <script setup>
-const { data: fetchedItems, refresh } = await useFetch('/api/faqs')
-
+const { data: fetchedItems, refresh } = await useCachedFetch('/api/faqs', {
+  key: 'faqs-list',
+})
 const localItems = ref([])
 
 watch(

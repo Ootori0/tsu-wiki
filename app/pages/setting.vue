@@ -1,6 +1,7 @@
 <script setup>
-const { data: fetchedItems, refresh } = await useFetch('/api/settings')
-
+const { data: fetchedItems, refresh } = await useCachedFetch('/api/settings', {
+  key: 'settings-list',
+})
 // ローカルの並び替え用配列(APIから取得したデータのコピー)
 const localItems = ref([])
 

@@ -7,7 +7,8 @@ const activeTab = ref('すべて')
 const searchName = ref('')
 const selectedTags = ref([])
 
-const { data: fetchedItems, refresh } = await useFetch('/api/magics', {
+const { data: fetchedItems, refresh } = await useCachedFetch('/api/magics', {
+  key: computed(() => `magics-list-${activeTab.value}`),
   query: computed(() => ({ type: activeTab.value })),
 })
 

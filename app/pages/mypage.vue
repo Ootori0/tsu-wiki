@@ -61,10 +61,15 @@ const savePassword = async () => {
 }
 
 // --- 自分の魔法一覧 ---
-const { data: fetchedMagics, refresh: refreshMagics } = await useFetch('/api/magics/mine')
-const { data: allPermsList } = await useFetch('/api/permissions')
-const { data: allTags } = await useFetch('/api/tags')
-
+const { data: fetchedMagics, refresh: refreshMagics } = await useCachedFetch('/api/magics/mine', {
+  key: 'my-magics-list',
+})
+const { data: allPermsList } = await useCachedFetch('/api/permissions', {
+  key: 'permissions-list',
+})
+const { data: allTags } = await useCachedFetch('/api/tags', {
+  key: 'tags-list',
+})
 const magicTypes = ['魔法', '魔道具', 'AF', '魔術・その他']
 
 const editingId = ref(null)
