@@ -21,6 +21,44 @@ const saveName = async () => {
   }
 }
 
+// --- パスワード変更 ---
+const passwordAccordionOpen = ref(false)
+const currentPassword = ref('')
+const newPassword = ref('')
+const newPasswordConfirm = ref('')
+const passwordError = ref('')
+const passwordSuccess = ref(false)
+const savingPassword = ref(false)
+
+const savePassword = async () => {
+  passwordError.value = ''
+  passwordSuccess.value = false
+
+  if (newPassword.value !== newPasswordConfirm.value) {
+    passwordError.value = '新しいパスワードが一致しません'
+    return
+  }
+
+  savingPassword.value = true
+  try {
+    await $fetch('/api/auth/password', {
+      method: 'PUT',
+      body: {
+        currentPassword: currentPassword.value,
+        newPassword: newPassword.value,
+      },
+    })
+    currentPassword.value = ''
+    newPassword.value = ''
+    newPasswordConfirm.value = ''
+    passwordSuccess.value = true
+  } catch (e) {
+    passwordError.value = e?.data?.statusMessage ?? '変更に失敗しました'
+  } finally {
+    savingPassword.value = false
+  }
+}
+
 // --- 自分の魔法一覧 ---
 const { data: fetchedMagics, refresh: refreshMagics } = await useFetch('/api/magics/mine')
 const { data: allPermsList } = await useFetch('/api/admin/permissions').catch(() => ({ data: ref([]) }))
@@ -130,7 +168,7 @@ const toggleFormPerm = (form, permName) => {
   <div class="page">
     <h1 class="page-title">ユーザーページ</h1>
 
-    <!-- ID変更・権限表示 -->
+    <!-- アカウント情報 -->
     <div class="box">
       <h2 class="box-title">アカウント情報</h2>
 
@@ -146,6 +184,38 @@ const toggleFormPerm = (form, permName) => {
         <span v-for="perm in user?.permissions ?? []" :key="perm" class="chip active">
           {{ perm }}
         </span>
+      </div>
+
+      <!-- パスワード変更(アコーディオン) -->
+      <div class="password-accordion">
+        <button class="password-accordion-header" @click="passwordAccordionOpen = !passwordAccordionOpen">
+          <span>パスワード変更</span>
+          <span class="password-accordion-icon" :class="{ open: passwordAccordionOpen }">
+            <svg viewBox="0 0 24 24" width="14" height="14">
+              <path d="M8 5l8 7-8 7z" fill="currentColor" />
+            </svg>
+          </span>
+        </button>
+
+        <div class="password-outer" :class="{ open: passwordAccordionOpen }">
+          <div class="password-inner">
+            <label class="field-label">現在のパスワード</label>
+            <input v-model="currentPassword" type="password" class="field-input" />
+
+            <label class="field-label">新しいパスワード</label>
+            <input v-model="newPassword" type="password" class="field-input" />
+
+            <label class="field-label">新しいパスワード(確認)</label>
+            <input v-model="newPasswordConfirm" type="password" class="field-input" />
+
+            <p v-if="passwordError" class="error-text">{{ passwordError }}</p>
+            <p v-if="passwordSuccess" class="success-text">パスワードを変更しました</p>
+
+            <button class="save-btn" :disabled="savingPassword" style="margin-top: 8px;" @click="savePassword">
+              パスワードを変更
+            </button>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -346,6 +416,12 @@ const toggleFormPerm = (form, permName) => {
   margin: 4px 0 0;
 }
 
+.success-text {
+  color: #0a0;
+  font-size: 0.8rem;
+  margin: 4px 0 0;
+}
+
 .chip-list {
   display: flex;
   flex-wrap: wrap;
@@ -379,6 +455,54 @@ const toggleFormPerm = (form, permName) => {
 .save-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+/* パスワード変更アコーディオン */
+.password-accordion {
+  margin-top: 14px;
+  border-top: 1px dashed var(--color-text, #000);
+  padding-top: 10px;
+}
+
+.password-accordion-header {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: none;
+  border: none;
+  padding: 4px 0;
+  font-size: 0.85rem;
+  font-weight: bold;
+  color: var(--color-text, #000);
+  cursor: pointer;
+}
+
+.password-accordion-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text, #000);
+  transition: transform 0.25s ease;
+}
+
+.password-accordion-icon.open {
+  transform: rotate(90deg);
+}
+
+.password-outer {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.3s ease;
+}
+
+.password-outer.open {
+  grid-template-rows: 1fr;
+}
+
+.password-inner {
+  overflow: hidden;
+  min-height: 0;
 }
 
 .view-mode {
