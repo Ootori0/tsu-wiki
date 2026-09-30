@@ -75,7 +75,15 @@ const toggleTag = (tagName) => {
       </div>
     </div>
 
-    <AccordionList :items="filteredItems" title-key="name" body-key="effect" />
+    <AccordionList :items="filteredItems" title-key="name">
+      <template #detail="{ item }">
+        <div class="magic-detail">
+          <p class="meta-line">区分: {{ item.type }} / 使用者: {{ item.owner || '-' }}</p>
+          <p class="meta-line">コスト: {{ item.cost || '-' }} / 発動条件: {{ item.condition || '-' }}</p>
+          <p class="magic-effect">{{ item.effect }}</p>
+        </div>
+      </template>
+    </AccordionList>
   </div>
 </template>
 
@@ -161,5 +169,23 @@ const toggleTag = (tagName) => {
 .tag-chip.active {
   background: var(--color-accent, #ffd400);
   font-weight: bold;
+}
+
+.magic-detail {
+  padding: 14px;
+}
+
+.meta-line {
+  margin: 0 0 4px;
+  font-size: 0.8rem;
+  opacity: 0.75;
+}
+
+.magic-effect {
+  margin: 6px 0 0;
+  font-size: 0.9rem;
+  line-height: 1.7;
+  white-space: pre-line;
+  color: var(--color-text, #000);
 }
 </style>
