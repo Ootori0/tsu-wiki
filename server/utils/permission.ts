@@ -1,4 +1,5 @@
 const OVERRIDE_PERMISSIONS = ['admin', 'KP', 'SKP']
+const FULL_ACCESS_PERMISSIONS = ['admin', 'KP']
 
 export function canBypass(userPermissions) {
   if (!userPermissions) return false
@@ -11,8 +12,13 @@ export function canView(userPermissions, visiblePermissions) {
 
   if (!userPermissions) return false // 未ログインは空配列でない限り不可
 
-  // admin/KP/SKPは常にスルー
-  if (canBypass(userPermissions)) return true
+  // admin/KPは常にスルー
+  if (userPermissions.some((p) => FULL_ACCESS_PERMISSIONS.includes(p))) return true
+
+  // SKPはKP/adminのみに公開された魔法以外はスルー
+  if (userPermissions.includes('SKP')) {
+    return !visiblePermissions.every((p) => FULL_ACCESS_PERMISSIONS.includes(p))
+  }
 
   // 共通の権限が1つでもあれば閲覧可
   return userPermissions.some((p) => visiblePermissions.includes(p))
