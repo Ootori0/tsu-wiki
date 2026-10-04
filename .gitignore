@@ -24,3 +24,5 @@ logs
 !.env.example
 
 .yarn/install-state.gz
+# Wrangler local state
+.wrangler
