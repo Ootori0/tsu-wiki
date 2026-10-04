@@ -39,7 +39,7 @@ const selectedPc = ref(null)
             <span v-if="pc.show_title" class="grade-tag">{{ pc.grade }}級</span>
           </div>
           <div class="card-body">
-            <span v-if="pcRank(pc)" class="card-rank">{{ pcRank(pc) }}</span>
+            <span v-for="part in pcRankParts(pc)" :key="part" class="card-rank">{{ part }}</span>
             <span class="card-name">{{ pc.name }}</span>
           </div>
         </button>

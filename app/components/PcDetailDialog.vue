@@ -18,7 +18,7 @@ const pc = defineModel({ type: Object, default: null })
             <PcImage :src="pc.image_url" :alt="pc.name" :icon-size="64" />
           </div>
           <div class="detail-names">
-            <span v-if="pcRank(pc)" class="detail-rank">{{ pcRank(pc) }}</span>
+            <span v-for="part in pcRankParts(pc)" :key="part" class="detail-rank">{{ part }}</span>
             <h2 class="detail-name">{{ pc.name }}</h2>
           </div>
         </div>
@@ -34,7 +34,10 @@ const pc = defineModel({ type: Object, default: null })
           </div>
           <div class="meta-item">
             <dt>役職</dt>
-            <dd>{{ pc.is_representative ? '代表' : '-' }}</dd>
+            <dd>
+              <span v-for="role in pcRoleList(pc)" :key="role" class="role">{{ role }}</span>
+              <template v-if="pcRoleList(pc).length === 0">-</template>
+            </dd>
           </div>
         </dl>
 
@@ -180,6 +183,10 @@ const pc = defineModel({ type: Object, default: null })
   font-weight: bold;
   white-space: pre-line;
   word-break: break-word;
+}
+
+.role {
+  display: block;
 }
 
 .detail-memo {

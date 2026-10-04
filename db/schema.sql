@@ -90,8 +90,10 @@ CREATE TABLE pcs (
   office TEXT NOT NULL DEFAULT '', -- 事務所(自由記述)
   grade INTEGER NOT NULL DEFAULT 10 CHECK (grade BETWEEN 1 AND 10),
   memo TEXT,
-  is_representative INTEGER NOT NULL DEFAULT 0, -- 0/1
+  is_representative INTEGER NOT NULL DEFAULT 0, -- 0/1 協会の代表
+  is_office_representative INTEGER NOT NULL DEFAULT 0, -- 0/1 事務所の代表
   show_title INTEGER NOT NULL DEFAULT 1, -- 0/1 名前と一緒に肩書きを表示するか
+  show_office INTEGER NOT NULL DEFAULT 1, -- 0/1 肩書きに事務所を表示するか
   created_at TEXT DEFAULT (datetime('now')),
   updated_at TEXT DEFAULT (datetime('now')),
   FOREIGN KEY (created_by) REFERENCES users(id)
