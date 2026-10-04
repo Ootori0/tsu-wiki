@@ -181,13 +181,33 @@ const { data: fetchedPcs, refresh: refreshPcsRaw } = await useCachedFetch('/api/
 const { data: allAffiliations } = await useCachedFetch('/api/affiliations', {
   key: 'affiliations-list',
 })
+// フォームの値をAPIの形に変換して表示例に使う
+const formPreview = (form) => ({
+  name: form.name || '名前',
+  affiliation: form.affiliation,
+  office: form.office,
+  grade: form.grade,
+  is_representative: form.isRepresentative,
+  is_office_representative: form.isOfficeRepresentative,
+  show_title: form.showTitle,
+  show_office: form.showOffice,
+})
+
 const myPcItems = computed(() =>
   (fetchedPcs.value ?? []).map((pc) => ({ ...pc, title: pcTitle(pc) }))
 )
 const grades = Array.from({ length: 10 }, (_, i) => i + 1)
 
 const emptyPcForm = () => ({
-  name: '', affiliation: '', office: '', grade: 10, memo: '', isRepresentative: false, showTitle: true,
+  name: '',
+  affiliation: '',
+  office: '',
+  grade: 10,
+  memo: '',
+  isRepresentative: false,
+  isOfficeRepresentative: false,
+  showTitle: true,
+  showOffice: true,
 })
 
 const refreshPcs = async () => {
@@ -217,7 +237,9 @@ const startPcEdit = async (item) => {
     grade: item.grade,
     memo: item.memo ?? '',
     isRepresentative: item.is_representative,
+    isOfficeRepresentative: item.is_office_representative,
     showTitle: item.show_title,
+    showOffice: item.show_office,
   }
 
   await nextTick()
@@ -504,13 +526,25 @@ const savePcCreate = async () => {
 
             <label class="check-label">
               <input v-model="pcEditForm.isRepresentative" type="checkbox" />
-              代表
+              協会の代表
+            </label>
+
+            <label class="check-label">
+              <input v-model="pcEditForm.isOfficeRepresentative" type="checkbox" />
+              事務所の代表
             </label>
 
             <label class="check-label">
               <input v-model="pcEditForm.showTitle" type="checkbox" />
               名前と一緒に肩書きを表示
             </label>
+
+            <label class="check-label">
+              <input v-model="pcEditForm.showOffice" type="checkbox" :disabled="!pcEditForm.showTitle" />
+              肩書きに事務所を表示
+            </label>
+
+            <p class="markdown-hint">表示例: {{ pcTitle(formPreview(pcEditForm)) }}</p>
 
             <label class="edit-label">メモ</label>
             <textarea v-model="pcEditForm.memo" class="edit-textarea auto-wrap" rows="3" @input="resize" />
@@ -528,7 +562,7 @@ const savePcCreate = async () => {
 
           <div v-else class="view-mode">
             <p class="meta-line">
-              所属: {{ item.affiliation || '-' }} / 事務所: {{ item.office || '-' }} / {{ item.grade }}級<template v-if="item.is_representative"> / 代表</template>
+              所属: {{ item.affiliation || '-' }} / 事務所: {{ item.office || '-' }} / {{ item.grade }}級<template v-if="pcRoles(item)"> / {{ pcRoles(item) }}</template>
             </p>
             <MarkdownText :text="item.memo" />
             <button class="edit-btn" @click="startPcEdit(item)">編集</button>
@@ -563,13 +597,25 @@ const savePcCreate = async () => {
 
             <label class="check-label">
               <input v-model="pcNewForm.isRepresentative" type="checkbox" />
-              代表
+              協会の代表
+            </label>
+
+            <label class="check-label">
+              <input v-model="pcNewForm.isOfficeRepresentative" type="checkbox" />
+              事務所の代表
             </label>
 
             <label class="check-label">
               <input v-model="pcNewForm.showTitle" type="checkbox" />
               名前と一緒に肩書きを表示
             </label>
+
+            <label class="check-label">
+              <input v-model="pcNewForm.showOffice" type="checkbox" :disabled="!pcNewForm.showTitle" />
+              肩書きに事務所を表示
+            </label>
+
+            <p class="markdown-hint">表示例: {{ pcTitle(formPreview(pcNewForm)) }}</p>
 
             <label class="edit-label">メモ</label>
             <textarea v-model="pcNewForm.memo" class="edit-textarea auto-wrap" rows="3" @input="resize" />
