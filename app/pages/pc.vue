@@ -27,22 +27,7 @@ const selectedPc = ref(null)
 
     <p v-if="(fetchedPcs ?? []).length === 0" class="empty-text">PCが登録されていません</p>
 
-    <!-- 詳細表示 -->
-    <div v-if="selectedPc" class="overlay" @click.self="selectedPc = null">
-      <div class="detail">
-        <button class="close-btn" @click="selectedPc = null">×</button>
-        <div class="pc-image detail-image">
-          <img v-if="selectedPc.image_url" :src="selectedPc.image_url" :alt="selectedPc.name" />
-          <span v-else class="pc-image-empty">NO IMAGE</span>
-        </div>
-        <h2 class="detail-title">{{ pcTitle(selectedPc) }}</h2>
-        <p class="meta-line">
-          所属: {{ selectedPc.affiliation || '-' }} / {{ selectedPc.grade }}級
-          <template v-if="selectedPc.is_representative"> / 代表</template>
-        </p>
-        <MarkdownText :text="selectedPc.memo" />
-      </div>
-    </div>
+    <PcDetailDialog v-model="selectedPc" />
   </div>
 </template>
 
@@ -112,57 +97,5 @@ const selectedPc = ref(null)
 .empty-text {
   font-size: 0.85rem;
   opacity: 0.6;
-}
-
-.overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 100;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 16px;
-}
-
-.detail {
-  position: relative;
-  width: 100%;
-  max-width: 440px;
-  max-height: 90vh;
-  overflow-y: auto;
-  box-sizing: border-box;
-  border: 1px solid var(--color-text, #000);
-  border-left: 6px solid var(--color-accent, #ffd400);
-  background: var(--color-bg, #fff);
-  color: var(--color-text, #000);
-  padding: 16px;
-}
-
-.close-btn {
-  position: absolute;
-  top: 6px;
-  right: 8px;
-  border: none;
-  background: none;
-  color: var(--color-text, #000);
-  font-size: 1.4rem;
-  cursor: pointer;
-}
-
-.detail-image {
-  max-width: 240px;
-  margin: 8px auto 12px;
-}
-
-.detail-title {
-  font-size: 1rem;
-  margin: 0 0 6px;
-}
-
-.meta-line {
-  margin: 0 0 8px;
-  font-size: 0.8rem;
-  opacity: 0.75;
 }
 </style>

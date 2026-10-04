@@ -187,7 +187,7 @@ const myPcItems = computed(() =>
 const grades = Array.from({ length: 10 }, (_, i) => i + 1)
 
 const emptyPcForm = () => ({
-  name: '', affiliation: '', grade: 10, memo: '', isRepresentative: false,
+  name: '', affiliation: '', grade: 10, memo: '', isRepresentative: false, showTitle: true,
 })
 
 const refreshPcs = async () => {
@@ -216,6 +216,7 @@ const startPcEdit = async (item) => {
     grade: item.grade,
     memo: item.memo ?? '',
     isRepresentative: item.is_representative,
+    showTitle: item.show_title,
   }
 
   await nextTick()
@@ -502,6 +503,11 @@ const savePcCreate = async () => {
               代表
             </label>
 
+            <label class="check-label">
+              <input v-model="pcEditForm.showTitle" type="checkbox" />
+              名前と一緒に肩書きを表示
+            </label>
+
             <label class="edit-label">メモ</label>
             <textarea v-model="pcEditForm.memo" class="edit-textarea auto-wrap" rows="3" @input="resize" />
             <p class="markdown-hint">
@@ -551,6 +557,11 @@ const savePcCreate = async () => {
             <label class="check-label">
               <input v-model="pcNewForm.isRepresentative" type="checkbox" />
               代表
+            </label>
+
+            <label class="check-label">
+              <input v-model="pcNewForm.showTitle" type="checkbox" />
+              名前と一緒に肩書きを表示
             </label>
 
             <label class="edit-label">メモ</label>
