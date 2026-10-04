@@ -87,6 +87,7 @@ CREATE TABLE pcs (
   name TEXT NOT NULL,
   image_url TEXT, -- R2設定後に使用
   affiliation TEXT, -- affiliations.name
+  office TEXT NOT NULL DEFAULT '', -- 事務所(自由記述)
   grade INTEGER NOT NULL DEFAULT 10 CHECK (grade BETWEEN 1 AND 10),
   memo TEXT,
   is_representative INTEGER NOT NULL DEFAULT 0, -- 0/1

@@ -38,6 +38,11 @@ const pc = defineModel({ type: Object, default: null })
           </div>
         </dl>
 
+        <div v-if="pc.office" class="detail-office">
+          <span class="office-label">事務所</span>
+          <span class="office-text">{{ pc.office }}</span>
+        </div>
+
         <div v-if="pc.memo" class="detail-memo">
           <MarkdownText :text="pc.memo" />
         </div>
@@ -153,6 +158,28 @@ const pc = defineModel({ type: Object, default: null })
   margin: 2px 0 0;
   font-size: 0.85rem;
   font-weight: bold;
+}
+
+.detail-office {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  margin: -6px 16px 16px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--color-text, #000);
+}
+
+.office-label {
+  flex-shrink: 0;
+  font-size: 0.65rem;
+  opacity: 0.6;
+}
+
+.office-text {
+  font-size: 0.85rem;
+  font-weight: bold;
+  white-space: pre-line;
+  word-break: break-word;
 }
 
 .detail-memo {

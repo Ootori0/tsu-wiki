@@ -28,10 +28,10 @@ export default defineEventHandler(async (event) => {
   await db
     .prepare(
       `UPDATE pcs
-       SET name = ?, affiliation = ?, grade = ?, memo = ?, is_representative = ?, show_title = ?, updated_at = datetime('now')
+       SET name = ?, affiliation = ?, office = ?, grade = ?, memo = ?, is_representative = ?, show_title = ?, updated_at = datetime('now')
        WHERE id = ?`
     )
-    .bind(pc.name, pc.affiliation, pc.grade, pc.memo, pc.isRepresentative, pc.showTitle, id)
+    .bind(pc.name, pc.affiliation, pc.office, pc.grade, pc.memo, pc.isRepresentative, pc.showTitle, id)
     .run()
 
   return { id: Number(id), success: true }
