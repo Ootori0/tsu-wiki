@@ -1,7 +1,7 @@
 <script setup>
 definePageMeta({ middleware: 'admin' })
 
-const tabs = ['アカウント管理', '権限管理', 'タグ管理']
+const tabs = ['アカウント管理', '権限管理', 'タグ管理', '所属管理']
 const activeTab = ref('アカウント管理')
 
 // --- アカウント管理 ---
@@ -86,6 +86,31 @@ const deleteTag = async (id) => {
   if (!confirm('このタグを削除しますか?')) return
   await $fetch(`/api/tags/${id}`, { method: 'DELETE' })
   await refreshTags()
+}
+
+// --- 所属管理 ---
+const { data: affiliations, refresh: refreshAffiliationsRaw } = await useFetch('/api/affiliations')
+const newAffiliation = ref('')
+
+const refreshAffiliations = async () => {
+  clearNuxtData('affiliations-list')
+  await refreshAffiliationsRaw()
+}
+
+const createAffiliation = async () => {
+  if (!newAffiliation.value) return
+  await $fetch('/api/affiliations', {
+    method: 'POST',
+    body: { name: newAffiliation.value },
+  })
+  newAffiliation.value = ''
+  await refreshAffiliations()
+}
+
+const deleteAffiliation = async (id) => {
+  if (!confirm('この所属を削除しますか?')) return
+  await $fetch(`/api/affiliations/${id}`, { method: 'DELETE' })
+  await refreshAffiliations()
 }
 </script>
 
@@ -202,6 +227,25 @@ const deleteTag = async (id) => {
         <div v-for="tag in tags ?? []" :key="tag.id" class="list-row">
           <span>{{ tag.name }}</span>
           <button class="delete-btn" @click="deleteTag(tag.id)">削除</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 所属管理 -->
+    <div v-if="activeTab === '所属管理'" class="tab-content">
+      <div class="box">
+        <h2 class="box-title">所属作成</h2>
+        <div class="inline-form">
+          <input v-model="newAffiliation" class="field-input" placeholder="所属名" />
+          <button class="save-btn" @click="createAffiliation">追加</button>
+        </div>
+      </div>
+
+      <div class="box">
+        <h2 class="box-title">所属一覧</h2>
+        <div v-for="a in affiliations ?? []" :key="a.id" class="list-row">
+          <span>{{ a.name }}</span>
+          <button class="delete-btn" @click="deleteAffiliation(a.id)">削除</button>
         </div>
       </div>
     </div>

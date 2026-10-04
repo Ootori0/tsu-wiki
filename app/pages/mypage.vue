@@ -173,6 +173,118 @@ const toggleFormPerm = (form, permName) => {
   if (idx === -1) form.visiblePermissions.push(permName)
   else form.visiblePermissions.splice(idx, 1)
 }
+
+// --- 自分のPC一覧 ---
+const { data: fetchedPcs, refresh: refreshPcsRaw } = await useCachedFetch('/api/pcs/mine', {
+  key: 'my-pcs-list',
+})
+const { data: allAffiliations } = await useCachedFetch('/api/affiliations', {
+  key: 'affiliations-list',
+})
+const myPcItems = computed(() =>
+  (fetchedPcs.value ?? []).map((pc) => ({ ...pc, title: pcTitle(pc) }))
+)
+const grades = Array.from({ length: 10 }, (_, i) => i + 1)
+
+const emptyPcForm = () => ({
+  name: '', affiliation: '', grade: 10, memo: '', isRepresentative: false,
+})
+
+const refreshPcs = async () => {
+  // PCタブの一覧キャッシュも破棄して次回表示時に再取得させる
+  clearNuxtData('pcs-list')
+  await refreshPcsRaw()
+}
+
+const pcEditingId = ref(null)
+const pcEditForm = ref(emptyPcForm())
+const pcCreating = ref(false)
+const pcNewForm = ref(emptyPcForm())
+const pcSaving = ref(false)
+const pcDeleting = ref(false)
+const pcError = ref('')
+
+const showPcConfirm = ref(false)
+const pendingPcDeleteId = ref(null)
+
+const startPcEdit = async (item) => {
+  pcError.value = ''
+  pcEditingId.value = item.id
+  pcEditForm.value = {
+    name: item.name,
+    affiliation: item.affiliation ?? '',
+    grade: item.grade,
+    memo: item.memo ?? '',
+    isRepresentative: item.is_representative,
+  }
+
+  await nextTick()
+  document.querySelectorAll('.auto-wrap').forEach((el) => {
+    el.style.height = 'auto'
+    el.style.height = el.scrollHeight + 'px'
+  })
+}
+
+const cancelPcEdit = () => {
+  pcEditingId.value = null
+}
+
+const savePcEdit = async (id) => {
+  pcError.value = ''
+  pcSaving.value = true
+  try {
+    await $fetch(`/api/pcs/${id}`, { method: 'PUT', body: pcEditForm.value })
+    pcEditingId.value = null
+    await refreshPcs()
+  } catch (e) {
+    pcError.value = e?.data?.statusMessage ?? '保存に失敗しました'
+  } finally {
+    pcSaving.value = false
+  }
+}
+
+const requestPcDelete = (id) => {
+  pendingPcDeleteId.value = id
+  showPcConfirm.value = true
+}
+
+const confirmPcDelete = async () => {
+  if (!pendingPcDeleteId.value) return
+  pcDeleting.value = true
+  try {
+    await $fetch(`/api/pcs/${pendingPcDeleteId.value}`, { method: 'DELETE' })
+    pcEditingId.value = null
+    await refreshPcs()
+  } finally {
+    pcDeleting.value = false
+    pendingPcDeleteId.value = null
+  }
+}
+
+const startPcCreate = () => {
+  pcError.value = ''
+  pcCreating.value = true
+  pcNewForm.value = emptyPcForm()
+}
+
+const cancelPcCreate = () => {
+  pcCreating.value = false
+}
+
+const savePcCreate = async () => {
+  if (!pcNewForm.value.name) return
+  pcError.value = ''
+  pcSaving.value = true
+  try {
+    await $fetch('/api/pcs', { method: 'POST', body: pcNewForm.value })
+    pcCreating.value = false
+    await refreshPcs()
+  } catch (e) {
+    pcError.value = e?.data?.statusMessage ?? '保存に失敗しました'
+  } finally {
+    pcSaving.value = false
+  }
+}
 </script>
 
 <template>
@@ -361,11 +473,113 @@ const toggleFormPerm = (form, permName) => {
       </div>
     </div>
 
+    <!-- 自分のPC一覧 -->
+    <div class="box">
+      <h2 class="box-title">あなたのPC一覧</h2>
+
+      <AccordionList :items="myPcItems" title-key="title" body-key="memo">
+        <template #detail="{ item }">
+          <div v-if="pcEditingId === item.id" class="edit-form">
+            <label class="edit-label">名前</label>
+            <textarea v-model="pcEditForm.name" class="edit-input auto-wrap" rows="1" @input="resize" />
+
+            <label class="edit-label">画像</label>
+            <p class="markdown-hint">画像アップロードは準備中です</p>
+
+            <label class="edit-label">所属</label>
+            <select v-model="pcEditForm.affiliation" class="edit-input">
+              <option value="">(未設定)</option>
+              <option v-for="a in allAffiliations ?? []" :key="a.id" :value="a.name">{{ a.name }}</option>
+            </select>
+
+            <label class="edit-label">級</label>
+            <select v-model.number="pcEditForm.grade" class="edit-input">
+              <option v-for="g in grades" :key="g" :value="g">{{ g }}級</option>
+            </select>
+
+            <label class="check-label">
+              <input v-model="pcEditForm.isRepresentative" type="checkbox" />
+              代表
+            </label>
+
+            <label class="edit-label">メモ</label>
+            <textarea v-model="pcEditForm.memo" class="edit-textarea auto-wrap" rows="3" @input="resize" />
+            <p class="markdown-hint">
+            # 見出し **太字** *斜体* ~~取消線~~ `コード` &gt; 引用 ||スポイラー||
+            </p>
+            <p v-if="pcError" class="error-text">{{ pcError }}</p>
+
+            <div class="edit-actions">
+              <button class="save-btn" :disabled="pcSaving" @click="savePcEdit(item.id)">保存</button>
+              <button class="cancel-btn" @click="cancelPcEdit">キャンセル</button>
+              <button class="delete-btn" :disabled="pcDeleting" @click="requestPcDelete(item.id)">削除</button>
+            </div>
+          </div>
+
+          <div v-else class="view-mode">
+            <p class="meta-line">
+              所属: {{ item.affiliation || '-' }} / {{ item.grade }}級<template v-if="item.is_representative"> / 代表</template>
+            </p>
+            <MarkdownText :text="item.memo" />
+            <button class="edit-btn" @click="startPcEdit(item)">編集</button>
+          </div>
+        </template>
+      </AccordionList>
+
+      <!-- 新規作成 -->
+      <div class="add-box">
+        <button v-if="!pcCreating" class="add-btn" @click="startPcCreate">＋ PCを作成</button>
+
+        <div v-else class="edit-form">
+            <label class="edit-label">名前</label>
+            <textarea v-model="pcNewForm.name" class="edit-input auto-wrap" rows="1" @input="resize" />
+
+            <label class="edit-label">画像</label>
+            <p class="markdown-hint">画像アップロードは準備中です</p>
+
+            <label class="edit-label">所属</label>
+            <select v-model="pcNewForm.affiliation" class="edit-input">
+              <option value="">(未設定)</option>
+              <option v-for="a in allAffiliations ?? []" :key="a.id" :value="a.name">{{ a.name }}</option>
+            </select>
+
+            <label class="edit-label">級</label>
+            <select v-model.number="pcNewForm.grade" class="edit-input">
+              <option v-for="g in grades" :key="g" :value="g">{{ g }}級</option>
+            </select>
+
+            <label class="check-label">
+              <input v-model="pcNewForm.isRepresentative" type="checkbox" />
+              代表
+            </label>
+
+            <label class="edit-label">メモ</label>
+            <textarea v-model="pcNewForm.memo" class="edit-textarea auto-wrap" rows="3" @input="resize" />
+            <p class="markdown-hint">
+            # 見出し **太字** *斜体* ~~取消線~~ `コード` &gt; 引用 ||スポイラー||
+            </p>
+            <p v-if="pcError" class="error-text">{{ pcError }}</p>
+
+          <div class="edit-actions">
+            <button class="save-btn" :disabled="pcSaving || !pcNewForm.name" @click="savePcCreate">保存</button>
+            <button class="cancel-btn" @click="cancelPcCreate">キャンセル</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <ConfirmDialog
       v-model="showConfirm"
       title="魔法の削除"
       message="この魔法を削除します。この操作は取り消せません。よろしいですか?"
       @confirm="confirmDelete"
+    />
+
+    <ConfirmDialog
+      v-model="showPcConfirm"
+      title="PCの削除"
+      message="このPCを削除します。この操作は取り消せません。よろしいですか?"
+      @confirm="confirmPcDelete"
     />
   </div>
 </template>
@@ -614,6 +828,14 @@ const toggleFormPerm = (form, permName) => {
   font-size: 0.9rem;
   font-weight: bold;
   cursor: pointer;
+}
+
+.check-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+  font-weight: bold;
 }
 
 .markdown-hint {

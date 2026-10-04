@@ -35,7 +35,10 @@ const handleClick = (event) => {
 </script>
 
 <template>
-  <div class="markdown-body" v-html="renderedHtml" @click="handleClick"></div>
+  <!-- DOMPurifyはDOMが必要なためクライアントでのみ描画する -->
+  <ClientOnly>
+    <div class="markdown-body" v-html="renderedHtml" @click="handleClick"></div>
+  </ClientOnly>
 </template>
 
 <style scoped>
