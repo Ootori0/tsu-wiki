@@ -6,6 +6,17 @@ const activeTab = ref('すべて')
 
 const searchName = ref('')
 const selectedTags = ref([])
+const selectedPerms = ref([])
+
+// admin/KP/SKP のみ公開権限で絞り込み可能
+const { user } = useAuth()
+const canFilterByPerm = computed(() =>
+  (user.value?.permissions ?? []).some((p) => ['admin', 'KP', 'SKP'].includes(p))
+)
+const { data: allPermsList } = await useCachedFetch('/api/permissions', {
+  key: 'permissions-list',
+  immediate: canFilterByPerm.value,
+})
 
 const { data: fetchedItems, refresh } = await useCachedFetch('/api/magics', {
   key: computed(() => `magics-list-${activeTab.value}`),
@@ -25,6 +36,12 @@ const filteredItems = computed(() => {
     )
   }
 
+  if (canFilterByPerm.value && selectedPerms.value.length > 0) {
+    list = list.filter((item) =>
+      selectedPerms.value.some((perm) => item.visible_permissions.includes(perm))
+    )
+  }
+
   return list
 })
 
@@ -34,6 +51,15 @@ const toggleTag = (tagName) => {
     selectedTags.value.push(tagName)
   } else {
     selectedTags.value.splice(idx, 1)
+  }
+}
+
+const togglePerm = (permName) => {
+  const idx = selectedPerms.value.indexOf(permName)
+  if (idx === -1) {
+    selectedPerms.value.push(permName)
+  } else {
+    selectedPerms.value.splice(idx, 1)
   }
 }
 </script>
@@ -72,6 +98,22 @@ const toggleTag = (tagName) => {
           @click="toggleTag(tag.name)"
         >
           {{ tag.name }}
+        </button>
+      </div>
+    </div>
+
+    <!-- 公開権限で絞り込み(admin/KP/SKPのみ) -->
+    <div v-if="canFilterByPerm" class="tag-filter">
+      <span class="tag-filter-label">公開権限で絞り込み</span>
+      <div class="tag-chip-list">
+        <button
+          v-for="perm in allPermsList ?? []"
+          :key="perm.id"
+          class="tag-chip"
+          :class="{ active: selectedPerms.includes(perm.name) }"
+          @click="togglePerm(perm.name)"
+        >
+          {{ perm.name }}
         </button>
       </div>
     </div>

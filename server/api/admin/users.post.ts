@@ -18,13 +18,16 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, statusMessage: 'name and password are required' })
   }
 
+  // admin権限は管理者画面から付与不可
+  const initialPermissions = (permissions ?? []).filter((p) => p !== 'admin')
+
   const { hash, salt } = await hashPassword(password)
 
   const result = await db
     .prepare(
       'INSERT INTO users (name, password_hash, password_salt, permissions) VALUES (?, ?, ?, ?)'
     )
-    .bind(name, hash, salt, JSON.stringify(permissions ?? []))
+    .bind(name, hash, salt, JSON.stringify(initialPermissions))
     .run()
 
   return { id: result.meta.last_row_id, success: true }

@@ -33,6 +33,8 @@ const deleteUser = async (id) => {
 }
 
 const togglePermission = async (targetUser, permName) => {
+  // admin権限は管理者画面から付け外し不可
+  if (permName === 'admin') return
   const perms = [...targetUser.permissions]
   const idx = perms.indexOf(permName)
   if (idx === -1) {
@@ -118,6 +120,7 @@ const deleteTag = async (id) => {
             :key="perm.id"
             class="chip"
             :class="{ active: newUser.permissions.includes(perm.name) }"
+            :disabled="perm.name === 'admin'"
             @click="
               newUser.permissions.includes(perm.name)
                 ? newUser.permissions.splice(newUser.permissions.indexOf(perm.name), 1)
@@ -135,7 +138,13 @@ const deleteTag = async (id) => {
         <div v-for="u in users ?? []" :key="u.id" class="user-row">
           <div class="user-row-header">
             <span class="user-row-name">{{ u.name }}</span>
-            <button class="delete-btn" @click="deleteUser(u.id)">削除</button>
+            <button
+              class="delete-btn"
+              :disabled="u.permissions.includes('admin')"
+              @click="deleteUser(u.id)"
+            >
+              削除
+            </button>
           </div>
           <div class="chip-list">
             <button
@@ -143,6 +152,7 @@ const deleteTag = async (id) => {
               :key="perm.id"
               class="chip"
               :class="{ active: u.permissions.includes(perm.name) }"
+              :disabled="perm.name === 'admin'"
               @click="togglePermission(u, perm.name)"
             >
               {{ perm.name }}
@@ -166,7 +176,13 @@ const deleteTag = async (id) => {
         <h2 class="box-title">権限一覧</h2>
         <div v-for="perm in allPermissions ?? []" :key="perm.id" class="list-row">
           <span>{{ perm.name }}</span>
-          <button class="delete-btn" @click="deletePermission(perm.id)">削除</button>
+          <button
+            class="delete-btn"
+            :disabled="perm.name === 'admin'"
+            @click="deletePermission(perm.id)"
+          >
+            削除
+          </button>
         </div>
       </div>
     </div>
@@ -297,6 +313,12 @@ const deleteTag = async (id) => {
   padding: 8px 16px;
   font-size: 0.85rem;
   cursor: pointer;
+}
+
+.delete-btn:disabled,
+.chip:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
 }
 
 .save-btn:disabled {

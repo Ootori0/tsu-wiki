@@ -11,6 +11,12 @@ export default defineEventHandler(async (event) => {
   }
 
   const id = getRouterParam(event, 'id')
+
+  const target = await db.prepare('SELECT name FROM permissions WHERE id = ?').bind(id).first()
+  if (target?.name === 'admin') {
+    throw createError({ statusCode: 400, statusMessage: 'admin権限は削除できません' })
+  }
+
   await db.prepare('DELETE FROM permissions WHERE id = ?').bind(id).run()
 
   return { success: true }
