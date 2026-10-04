@@ -3,21 +3,52 @@ const pc = defineModel({ type: Object, default: null })
 </script>
 
 <template>
-  <div v-if="pc" class="overlay" @click.self="pc = null">
-    <div class="detail">
-      <button class="close-btn" @click="pc = null">×</button>
-      <div class="pc-image">
-        <img v-if="pc.image_url" :src="pc.image_url" :alt="pc.name" />
-        <span v-else class="pc-image-empty">NO IMAGE</span>
+  <Transition name="fade">
+    <div v-if="pc" class="overlay" @click.self="pc = null">
+      <div class="detail">
+        <div class="detail-band">
+          <span class="band-label">{{ pc.affiliation || '無所属' }}</span>
+          <button class="close-btn" aria-label="閉じる" @click="pc = null">
+            <v-icon icon="mdi-close" size="20" />
+          </button>
+        </div>
+
+        <div class="detail-head">
+          <div class="detail-image">
+            <PcImage :src="pc.image_url" :alt="pc.name" :icon-size="64" />
+          </div>
+          <div class="detail-names">
+            <span v-if="pcRank(pc)" class="detail-rank">{{ pcRank(pc) }}</span>
+            <h2 class="detail-name">{{ pc.name }}</h2>
+          </div>
+        </div>
+
+        <dl class="detail-meta">
+          <div class="meta-item">
+            <dt>所属</dt>
+            <dd>{{ pc.affiliation || '-' }}</dd>
+          </div>
+          <div class="meta-item">
+            <dt>級</dt>
+            <dd>{{ pc.grade }}級</dd>
+          </div>
+          <div class="meta-item">
+            <dt>役職</dt>
+            <dd>{{ pc.is_representative ? '代表' : '-' }}</dd>
+          </div>
+        </dl>
+
+        <div v-if="pc.office" class="detail-office">
+          <span class="office-label">事務所</span>
+          <span class="office-text">{{ pc.office }}</span>
+        </div>
+
+        <div v-if="pc.memo" class="detail-memo">
+          <MarkdownText :text="pc.memo" />
+        </div>
       </div>
-      <h2 class="detail-title">{{ pcTitle(pc) }}</h2>
-      <p class="meta-line">
-        所属: {{ pc.affiliation || '-' }} / {{ pc.grade }}級
-        <template v-if="pc.is_representative"> / 代表</template>
-      </p>
-      <MarkdownText :text="pc.memo" />
     </div>
-  </div>
+  </Transition>
 </template>
 
 <style scoped>
@@ -25,7 +56,7 @@ const pc = defineModel({ type: Object, default: null })
   position: fixed;
   inset: 0;
   z-index: 100;
-  background: rgba(0, 0, 0, 0.5);
+  background: rgba(0, 0, 0, 0.55);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -33,62 +64,135 @@ const pc = defineModel({ type: Object, default: null })
 }
 
 .detail {
-  position: relative;
   width: 100%;
   max-width: 440px;
   max-height: 90vh;
   overflow-y: auto;
   box-sizing: border-box;
-  border: 1px solid var(--color-text, #000);
-  border-left: 6px solid var(--color-accent, #ffd400);
+  border: 2px solid #000;
   background: var(--color-bg, #fff);
   color: var(--color-text, #000);
-  padding: 16px;
+  box-shadow: 6px 6px 0 #000;
+}
+
+.detail-band {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 8px 6px 14px;
+  background: var(--color-accent, #ffd400);
+  color: #000;
+  border-bottom: 2px solid #000;
+}
+
+.band-label {
+  font-size: 0.8rem;
+  font-weight: bold;
+  letter-spacing: 0.1em;
 }
 
 .close-btn {
-  position: absolute;
-  top: 6px;
-  right: 8px;
+  display: flex;
   border: none;
   background: none;
-  color: var(--color-text, #000);
-  font-size: 1.4rem;
+  color: #000;
+  padding: 2px;
   cursor: pointer;
 }
 
-.pc-image {
-  aspect-ratio: 1 / 1;
-  width: 100%;
-  max-width: 240px;
-  margin: 8px auto 12px;
+.detail-head {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--color-accent, #ffd400);
-  overflow: hidden;
+  gap: 14px;
+  align-items: flex-end;
+  padding: 16px 16px 12px;
 }
 
-.pc-image img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
+.detail-image {
+  flex: 0 0 120px;
+  border: 2px solid #000;
 }
 
-.pc-image-empty {
+.detail-names {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.detail-rank {
   font-size: 0.75rem;
+  opacity: 0.7;
+  word-break: break-word;
+}
+
+.detail-name {
+  margin: 0;
+  font-size: 1.3rem;
+  line-height: 1.3;
+  word-break: break-word;
+}
+
+.detail-meta {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  margin: 0 16px 16px;
+  border-top: 1px solid var(--color-text, #000);
+  border-bottom: 1px solid var(--color-text, #000);
+}
+
+.meta-item {
+  padding: 8px 0;
+  text-align: center;
+}
+
+.meta-item + .meta-item {
+  border-left: 1px solid var(--color-text, #000);
+}
+
+.meta-item dt {
+  font-size: 0.65rem;
+  opacity: 0.6;
+}
+
+.meta-item dd {
+  margin: 2px 0 0;
+  font-size: 0.85rem;
   font-weight: bold;
-  opacity: 0.5;
 }
 
-.detail-title {
-  font-size: 1rem;
-  margin: 0 0 6px;
+.detail-office {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  margin: -6px 16px 16px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--color-text, #000);
 }
 
-.meta-line {
-  margin: 0 0 8px;
-  font-size: 0.8rem;
-  opacity: 0.75;
+.office-label {
+  flex-shrink: 0;
+  font-size: 0.65rem;
+  opacity: 0.6;
+}
+
+.office-text {
+  font-size: 0.85rem;
+  font-weight: bold;
+  white-space: pre-line;
+  word-break: break-word;
+}
+
+.detail-memo {
+  padding: 0 16px 18px;
+}
+
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.15s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
 }
 </style>

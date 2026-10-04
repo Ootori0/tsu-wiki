@@ -20,8 +20,16 @@ const selectedPc = ref(null)
     <h1 class="page-title">PC級一覧</h1>
 
     <div class="tier-table">
-      <div v-for="tier in tiers" :key="tier.grade" class="tier-row">
-        <div class="tier-label">{{ tier.grade }}級</div>
+      <div
+        v-for="tier in tiers"
+        :key="tier.grade"
+        class="tier-row"
+        :class="{ empty: tier.pcs.length === 0 }"
+      >
+        <div class="tier-label">
+          <span class="tier-num">{{ tier.grade }}</span>
+          <span class="tier-unit">級</span>
+        </div>
         <div class="tier-items">
           <button
             v-for="pc in tier.pcs"
@@ -30,11 +38,12 @@ const selectedPc = ref(null)
             @click="selectedPc = pc"
           >
             <div class="pc-thumb">
-              <img v-if="pc.image_url" :src="pc.image_url" :alt="pc.name" />
-              <span v-else class="pc-thumb-empty">NO IMAGE</span>
+              <PcImage :src="pc.image_url" :alt="pc.name" :icon-size="32" />
+              <span v-if="pc.is_representative" class="rep-tag">代表</span>
             </div>
             <span class="tier-name">{{ pc.name }}</span>
           </button>
+          <span v-if="tier.pcs.length === 0" class="tier-empty">—</span>
         </div>
       </div>
     </div>
@@ -55,45 +64,83 @@ const selectedPc = ref(null)
   font-size: 1.3rem;
   border-left: 5px solid var(--color-accent);
   padding-left: 10px;
-  margin-bottom: 16px;
+  margin-bottom: 20px;
 }
 
 .tier-table {
-  border: 1px solid var(--color-text, #000);
+  border: 2px solid #000;
+  box-shadow: 4px 4px 0 #000;
+  background: var(--color-bg, #fff);
 }
 
 .tier-row {
   display: flex;
-  min-height: 84px;
+  min-height: 96px;
+}
+
+.tier-row.empty {
+  min-height: 44px;
 }
 
 .tier-row + .tier-row {
-  border-top: 1px solid var(--color-text, #000);
+  border-top: 1px solid #000;
+}
+
+.tier-row + .tier-row .tier-label {
+  box-shadow: inset 0 1px 0 rgba(255, 212, 0, 0.35);
 }
 
 .tier-label {
-  flex: 0 0 52px;
+  flex: 0 0 56px;
   display: flex;
-  align-items: center;
+  align-items: baseline;
   justify-content: center;
-  background: var(--color-accent, #ffd400);
-  color: #000;
+  align-self: stretch;
+  padding-top: 10px;
+  box-sizing: border-box;
+  background: #000;
+  color: var(--color-accent, #ffd400);
   font-weight: bold;
-  font-size: 0.9rem;
-  border-right: 1px solid var(--color-text, #000);
+}
+
+.tier-row.empty .tier-label {
+  align-items: center;
+  padding-top: 0;
+  color: rgba(255, 212, 0, 0.55);
+}
+
+.tier-num {
+  font-size: 1.5rem;
+  line-height: 1;
+}
+
+.tier-unit {
+  font-size: 0.7rem;
+  margin-left: 1px;
 }
 
 .tier-items {
   flex: 1;
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
-  padding: 6px;
+  align-content: flex-start;
+  gap: 10px 8px;
+  padding: 10px;
   min-width: 0;
 }
 
+.tier-row.empty .tier-items {
+  align-content: center;
+  padding: 0 12px;
+}
+
+.tier-empty {
+  font-size: 0.8rem;
+  opacity: 0.3;
+}
+
 .tier-item {
-  width: 64px;
+  width: 60px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -106,33 +153,35 @@ const selectedPc = ref(null)
 }
 
 .pc-thumb {
-  width: 64px;
-  height: 64px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid var(--color-text, #000);
-  background: var(--color-accent, #ffd400);
-  overflow: hidden;
+  position: relative;
+  width: 60px;
+  border: 2px solid #000;
   box-sizing: border-box;
+  transition: transform 0.1s ease;
 }
 
-.pc-thumb img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.pc-thumb-empty {
-  font-size: 0.55rem;
+.rep-tag {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: #000;
+  color: var(--color-accent, #ffd400);
+  font-size: 0.6rem;
   font-weight: bold;
-  opacity: 0.5;
+  line-height: 1.5;
+  text-align: center;
+}
+
+.tier-item:active .pc-thumb {
+  transform: scale(0.94);
 }
 
 .tier-name {
-  margin-top: 2px;
+  margin-top: 4px;
   width: 100%;
   font-size: 0.7rem;
+  font-weight: bold;
   line-height: 1.3;
   text-align: center;
   word-break: break-word;

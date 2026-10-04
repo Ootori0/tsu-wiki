@@ -187,7 +187,7 @@ const myPcItems = computed(() =>
 const grades = Array.from({ length: 10 }, (_, i) => i + 1)
 
 const emptyPcForm = () => ({
-  name: '', affiliation: '', grade: 10, memo: '', isRepresentative: false, showTitle: true,
+  name: '', affiliation: '', office: '', grade: 10, memo: '', isRepresentative: false, showTitle: true,
 })
 
 const refreshPcs = async () => {
@@ -213,6 +213,7 @@ const startPcEdit = async (item) => {
   pcEditForm.value = {
     name: item.name,
     affiliation: item.affiliation ?? '',
+    office: item.office ?? '',
     grade: item.grade,
     memo: item.memo ?? '',
     isRepresentative: item.is_representative,
@@ -493,6 +494,9 @@ const savePcCreate = async () => {
               <option v-for="a in allAffiliations ?? []" :key="a.id" :value="a.name">{{ a.name }}</option>
             </select>
 
+            <label class="edit-label">事務所</label>
+            <textarea v-model="pcEditForm.office" class="edit-input auto-wrap" rows="1" @input="resize" />
+
             <label class="edit-label">級</label>
             <select v-model.number="pcEditForm.grade" class="edit-input">
               <option v-for="g in grades" :key="g" :value="g">{{ g }}級</option>
@@ -524,7 +528,7 @@ const savePcCreate = async () => {
 
           <div v-else class="view-mode">
             <p class="meta-line">
-              所属: {{ item.affiliation || '-' }} / {{ item.grade }}級<template v-if="item.is_representative"> / 代表</template>
+              所属: {{ item.affiliation || '-' }} / 事務所: {{ item.office || '-' }} / {{ item.grade }}級<template v-if="item.is_representative"> / 代表</template>
             </p>
             <MarkdownText :text="item.memo" />
             <button class="edit-btn" @click="startPcEdit(item)">編集</button>
@@ -548,6 +552,9 @@ const savePcCreate = async () => {
               <option value="">(未設定)</option>
               <option v-for="a in allAffiliations ?? []" :key="a.id" :value="a.name">{{ a.name }}</option>
             </select>
+
+            <label class="edit-label">事務所</label>
+            <textarea v-model="pcNewForm.office" class="edit-input auto-wrap" rows="1" @input="resize" />
 
             <label class="edit-label">級</label>
             <select v-model.number="pcNewForm.grade" class="edit-input">
