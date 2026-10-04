@@ -33,6 +33,8 @@ const deleteUser = async (id) => {
 }
 
 const togglePermission = async (targetUser, permName) => {
+  // admin権限は管理者画面から付け外し不可
+  if (permName === 'admin') return
   const perms = [...targetUser.permissions]
   const idx = perms.indexOf(permName)
   if (idx === -1) {
@@ -118,6 +120,7 @@ const deleteTag = async (id) => {
             :key="perm.id"
             class="chip"
             :class="{ active: newUser.permissions.includes(perm.name) }"
+            :disabled="perm.name === 'admin'"
             @click="
               newUser.permissions.includes(perm.name)
                 ? newUser.permissions.splice(newUser.permissions.indexOf(perm.name), 1)
@@ -143,6 +146,7 @@ const deleteTag = async (id) => {
               :key="perm.id"
               class="chip"
               :class="{ active: u.permissions.includes(perm.name) }"
+              :disabled="perm.name === 'admin'"
               @click="togglePermission(u, perm.name)"
             >
               {{ perm.name }}
@@ -297,6 +301,11 @@ const deleteTag = async (id) => {
   padding: 8px 16px;
   font-size: 0.85rem;
   cursor: pointer;
+}
+
+.chip:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
 }
 
 .save-btn:disabled {
