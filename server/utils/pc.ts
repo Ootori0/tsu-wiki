@@ -1,5 +1,5 @@
 export function parsePcBody(body) {
-  const { name, affiliation, grade, memo, isRepresentative } = body ?? {}
+  const { name, affiliation, grade, memo, isRepresentative, showTitle } = body ?? {}
 
   if (!name) {
     throw createError({ statusCode: 400, statusMessage: 'name is required' })
@@ -16,9 +16,10 @@ export function parsePcBody(body) {
     grade: gradeNum,
     memo: memo ?? '',
     isRepresentative: isRepresentative ? 1 : 0,
+    showTitle: showTitle === false ? 0 : 1,
   }
 }
 
 export function formatPc(r) {
-  return { ...r, is_representative: !!r.is_representative }
+  return { ...r, is_representative: !!r.is_representative, show_title: !!r.show_title }
 }

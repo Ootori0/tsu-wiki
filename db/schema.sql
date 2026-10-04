@@ -90,6 +90,7 @@ CREATE TABLE pcs (
   grade INTEGER NOT NULL DEFAULT 10 CHECK (grade BETWEEN 1 AND 10),
   memo TEXT,
   is_representative INTEGER NOT NULL DEFAULT 0, -- 0/1
+  show_title INTEGER NOT NULL DEFAULT 1, -- 0/1 名前と一緒に肩書きを表示するか
   created_at TEXT DEFAULT (datetime('now')),
   updated_at TEXT DEFAULT (datetime('now')),
   FOREIGN KEY (created_by) REFERENCES users(id)

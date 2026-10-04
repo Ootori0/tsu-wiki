@@ -14,10 +14,10 @@ export default defineEventHandler(async (event) => {
 
   const result = await db
     .prepare(
-      `INSERT INTO pcs (created_by, name, affiliation, grade, memo, is_representative)
-       VALUES (?, ?, ?, ?, ?, ?)`
+      `INSERT INTO pcs (created_by, name, affiliation, grade, memo, is_representative, show_title)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`
     )
-    .bind(currentUser.id, pc.name, pc.affiliation, pc.grade, pc.memo, pc.isRepresentative)
+    .bind(currentUser.id, pc.name, pc.affiliation, pc.grade, pc.memo, pc.isRepresentative, pc.showTitle)
     .run()
 
   return { id: result.meta.last_row_id, success: true }
