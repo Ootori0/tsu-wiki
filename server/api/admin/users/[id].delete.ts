@@ -16,6 +16,11 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, statusMessage: '自分自身は削除できません' })
   }
 
+  const target = await db.prepare('SELECT permissions FROM users WHERE id = ?').bind(id).first()
+  if (target && JSON.parse(target.permissions).includes('admin')) {
+    throw createError({ statusCode: 400, statusMessage: 'admin権限を持つアカウントは削除できません' })
+  }
+
   await db.prepare('DELETE FROM sessions WHERE user_id = ?').bind(id).run()
   await db.prepare('DELETE FROM users WHERE id = ?').bind(id).run()
 
