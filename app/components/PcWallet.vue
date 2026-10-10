@@ -42,10 +42,11 @@ const selectedId = defineModel({ type: Number, default: null })
 .wallet-select {
   min-width: 0;
   border: 1px solid var(--color-accent, #ffd400);
-  background: #000;
+  background-color: #000;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%23ffd400' stroke-width='1.8'/%3E%3C/svg%3E");
   color: var(--color-accent, #ffd400);
   padding: 6px 8px;
-  font-size: 0.9rem;
+  font-size: 16px;
   font-family: inherit;
 }
 

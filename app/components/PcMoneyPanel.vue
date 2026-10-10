@@ -1,8 +1,11 @@
 <script setup>
 const props = defineProps({
   pc: { type: Object, required: true },
+  // 親の見出しに所持金を出している場合は非表示にする
+  hideHead: { type: Boolean, default: false },
 })
 const emit = defineEmits(['updated'])
+const { show } = useToast()
 
 const amount = ref(null)
 const reason = ref('')
@@ -33,6 +36,7 @@ const submit = async (sign) => {
       method: 'POST',
       body: { amount: sign * amount.value, reason: reason.value },
     })
+    show(`所持金を${sign > 0 ? '+' : '-'}${formatMoney(amount.value)}しました`)
     amount.value = null
     reason.value = ''
     emit('updated')
@@ -44,29 +48,11 @@ const submit = async (sign) => {
   }
 }
 
-const KIND_LABELS = {
-  manual: '手動',
-  purchase: '購入',
-  sale: '売上',
-  casino: 'カジノ',
-  dealer: 'ディーラー',
-}
-
-const describe = (log) => {
-  switch (log.kind) {
-    case 'manual': return log.detail
-    case 'purchase':
-    case 'sale': return `[${log.sub.split(' ')[0]}] ${log.detail} ${log.sub.split(' ')[1] ?? ''}`
-    case 'casino': return `チンチロ ${handLabel(log.detail)}(掛金${formatMoney(log.sub)})`
-    case 'dealer': return `チンチロ ${log.sub ?? '(削除済みPC)'}の${handLabel(log.detail)}`
-    default: return log.detail
-  }
-}
 </script>
 
 <template>
-  <div class="money-panel">
-    <div class="money-head">
+  <div class="money-panel" :class="{ flat: hideHead }">
+    <div v-if="!hideHead" class="money-head">
       <span class="money-label">所持金</span>
       <span class="money-value" :class="{ negative: pc.money < 0 }">{{ formatMoney(pc.money) }}</span>
     </div>
@@ -98,14 +84,14 @@ const describe = (log) => {
       <div v-for="log in logs ?? []" :key="`${log.kind}-${log.id}`" class="log-row">
         <span class="log-date">{{ formatDateTime(log.created_at) }}</span>
         <span class="log-detail">
-          <span class="log-kind" :class="log.kind">{{ KIND_LABELS[log.kind] }}</span>
-          {{ describe(log) }}
+          <span class="log-kind" :class="log.kind">{{ MONEY_LOG_KIND_LABELS[log.kind] }}</span>
+          {{ describeMoneyLog(log) }}
         </span>
         <span class="log-amount" :class="{ plus: log.amount > 0, minus: log.amount < 0 }">
           {{ log.amount > 0 ? '+' : '' }}{{ formatMoney(log.amount) }}
         </span>
       </div>
-      <p v-if="(logs ?? []).length === 0" class="log-empty">履歴はありません</p>
+      <p v-if="(logs ?? []).length === 0" class="empty">履歴はありません</p>
     </div>
   </div>
 </template>
@@ -116,6 +102,16 @@ const describe = (log) => {
   padding: 10px 12px;
   border: 1px solid var(--color-text, #000);
   background: var(--color-bg, #fff);
+}
+
+.money-panel.flat {
+  margin: 0;
+  border: none;
+  padding: 12px;
+}
+
+.money-panel.flat .money-form {
+  margin-top: 0;
 }
 
 .money-head {
@@ -157,7 +153,7 @@ const describe = (log) => {
   box-sizing: border-box;
   border: 1px solid var(--color-text, #000);
   padding: 6px 8px;
-  font-size: 0.85rem;
+  font-size: 16px;
   font-family: inherit;
 }
 
@@ -275,8 +271,4 @@ const describe = (log) => {
   color: #c00;
 }
 
-.log-empty {
-  font-size: 0.75rem;
-  opacity: 0.6;
-}
 </style>

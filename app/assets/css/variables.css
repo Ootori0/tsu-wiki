@@ -1,17 +1,175 @@
 :root {
   /* Colors */
   --color-bg: #ffffff;
+  --color-page: #f6f5ef; /* ページ背景(白い箱との差で奥行きを出す) */
   --color-accent: #ffd400;
+  --color-accent-strong: #f0c400; /* ホバー */
+  --color-accent-soft: #fff7cc; /* 薄い面(ホバー・選択中の行) */
   --color-text: #000000;
+  --color-line: rgba(0, 0, 0, 0.14); /* 箱の中の区切り線 */
+  --color-error: #c62828;
+  --color-error-soft: #fdecec;
+  --color-plus: #1b7f2a;
 
-  /* Font */
-  --font-base: sans-serif;
+  /* 影(ずらしたベタ影) */
+  --shadow: 4px 4px 0 var(--color-text);
+  --shadow-sm: 2px 2px 0 var(--color-text);
 
-
-  /* タイトル用縦書きフォント */
-  --font-title: 'Yuji Syuku', serif;
+  /* Font(Vuetify の既定 Roboto は読み込んでいないため、日本語フォントを明示) */
+  --font-base: 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', 'BIZ UDPGothic', 'Yu Gothic UI', 'Yu Gothic', Meiryo, system-ui, sans-serif;
+  --v-font-body: var(--font-base);
+  --v-font-heading: var(--font-base);
 
   /* Menu */
   --menu-width: 80vw;
   --menu-transition: 0.3s ease;
+
+  --transition: 0.15s ease;
+}
+
+/* ---------- 共通の土台(Sightus のスマホ表示に揃える) ---------- */
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  -webkit-tap-highlight-color: transparent;
+  font-family: var(--font-base);
+  color: var(--color-text);
+  background: var(--color-page);
+  letter-spacing: 0.02em;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Vuetify の v-application が背景を白で塗るのでページ背景に揃える */
+.v-application {
+  background: var(--color-page) !important;
+  font-family: var(--font-base) !important;
+}
+
+::selection {
+  background: var(--color-accent);
+  color: #000;
+}
+
+/* フォーム部品はブラウザ既定のフォントではなくページのフォントを使う */
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
+  letter-spacing: inherit;
+  color: inherit;
+}
+
+button {
+  -webkit-appearance: none;
+  appearance: none;
+  border-radius: 0;
+  touch-action: manipulation;
+}
+
+a {
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-text);
+  outline-offset: 2px;
+}
+
+/* ---------- 入力欄 ---------- */
+/* iOS で入力時に拡大されないよう 16px を確保 */
+input:not([type='checkbox']):not([type='radio']),
+select,
+textarea {
+  font-size: 16px;
+  border-radius: 0;
+}
+
+input:not([type='checkbox']):not([type='radio']):focus,
+select:focus,
+textarea:focus {
+  outline: none;
+  box-shadow: inset 0 0 0 2px var(--color-accent), var(--shadow-sm);
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--color-text);
+  opacity: 0.4;
+}
+
+/* セレクトボックス: 既定の矢印を消して独自の矢印を出す */
+select {
+  -webkit-appearance: none;
+  appearance: none;
+  padding-right: 34px !important;
+  cursor: pointer;
+  background-color: var(--color-bg);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%23000' stroke-width='1.8'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 12px 8px;
+}
+
+/* 数値入力の上下ボタンを消す */
+input[type='number'] {
+  -moz-appearance: textfield;
+}
+
+input[type='number']::-webkit-inner-spin-button,
+input[type='number']::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+/* チェックボックス・ラジオ */
+input[type='checkbox'],
+input[type='radio'] {
+  -webkit-appearance: none;
+  appearance: none;
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  margin: 0;
+  border: 1px solid var(--color-text);
+  background: var(--color-bg);
+  cursor: pointer;
+  display: inline-grid;
+  place-content: center;
+  transition: background-color var(--transition);
+}
+
+input[type='radio'] {
+  border-radius: 50%;
+}
+
+input[type='checkbox']:checked {
+  background: var(--color-accent)
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3 8.5l3 3 7-7' fill='none' stroke='%23000' stroke-width='2.2'/%3E%3C/svg%3E")
+    no-repeat center / 14px 14px;
+}
+
+input[type='radio']:checked {
+  background: var(--color-accent);
+  box-shadow: inset 0 0 0 4px var(--color-bg);
+}
+
+input[type='checkbox']:disabled,
+input[type='radio']:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ---------- 共通パーツ ---------- */
+/* 空の状態は破線の枠で「何もない」ことをはっきり見せる */
+.empty {
+  font-size: 0.85rem;
+  text-align: center;
+  color: var(--color-text);
+  opacity: 0.6;
+  border: 1px dashed currentColor;
+  padding: 14px 12px;
+  margin: 0 0 8px;
 }

@@ -17,16 +17,14 @@ export async function createSession(db: any, userId: number) {
 export async function getSessionUser(db: any, sessionId: string) {
   if (!sessionId) return null
 
-  const session = await db
-    .prepare('SELECT * FROM sessions WHERE id = ? AND expires_at > datetime("now")')
-    .bind(sessionId)
-    .first()
-
-  if (!session) return null
-
+  // セッションとユーザーを1回の読み出しで取得する
   const user = await db
-    .prepare('SELECT id, name, permissions FROM users WHERE id = ?')
-    .bind(session.user_id)
+    .prepare(
+      `SELECT users.id, users.name, users.permissions
+       FROM sessions JOIN users ON users.id = sessions.user_id
+       WHERE sessions.id = ? AND sessions.expires_at > datetime("now")`
+    )
+    .bind(sessionId)
     .first()
 
   if (!user) return null
@@ -36,4 +34,12 @@ export async function getSessionUser(db: any, sessionId: string) {
 
 export async function deleteSession(db: any, sessionId: string) {
   await db.prepare('DELETE FROM sessions WHERE id = ?').bind(sessionId).run()
+}
+// ログインしていなければ 401 を返す
+export async function requireLogin(event: any, db: any) {
+  const user = await getSessionUser(db, getCookie(event, 'session_id') ?? '')
+  if (!user) {
+    throw createError({ statusCode: 401, statusMessage: 'ログインが必要です' })
+  }
+  return user
 }

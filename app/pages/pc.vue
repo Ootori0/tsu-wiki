@@ -46,7 +46,7 @@ const selectedPc = ref(null)
       </div>
     </section>
 
-    <p v-if="groups.length === 0" class="empty-text">PCが登録されていません</p>
+    <p v-if="groups.length === 0" class="empty">PCが登録されていません</p>
 
     <PcDetailDialog v-model="selectedPc" />
   </div>

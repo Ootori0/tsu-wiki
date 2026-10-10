@@ -1,5 +1,6 @@
 import { getSessionUser } from '../../utils/session'
 import { canBypass } from '../../utils/permission'
+import { invalidateCache } from '../../utils/cache'
 
 export default defineEventHandler(async (event) => {
   const db = event.context.cloudflare.env.tsu_wiki_db
@@ -26,6 +27,8 @@ export default defineEventHandler(async (event) => {
   )
 
   await db.batch(statements)
+
+  invalidateCache('magics')
 
   return { success: true }
 })

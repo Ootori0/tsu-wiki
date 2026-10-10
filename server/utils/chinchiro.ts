@@ -1,3 +1,5 @@
+import { cached } from './cache'
+
 // チンチロ(賭博黙示録カイジの地下チンチロのルールを1人用に簡略化)
 // サイコロ3つを最大3回振り、役が出た時点で終了。3回とも役なしなら「目なし」
 // 倍率は掛金に対する所持金の増減(マイナスは負け)
@@ -24,6 +26,22 @@ export const DEFAULT_PAYOUTS = {
 
 export const BET_UNIT = 100 // 掛金は100万円単位(所持金は万円単位)
 export const MAX_ROLLS = 3
+export const DAILY_PLAY_LIMIT = 8 // PCごとの1日のプレイ回数上限(日本時間0時に戻る)
+
+// 日本時間の今日0時を、DBの created_at と同じ形式(UTC 'YYYY-MM-DD HH:MM:SS')で返す
+export function todayStartUtc() {
+  const jstNow = new Date(Date.now() + 9 * 60 * 60 * 1000)
+  const jstMidnight = Date.UTC(jstNow.getUTCFullYear(), jstNow.getUTCMonth(), jstNow.getUTCDate())
+  return new Date(jstMidnight - 9 * 60 * 60 * 1000).toISOString().slice(0, 19).replace('T', ' ')
+}
+
+export async function countPlaysToday(db, pcId) {
+  const row = await db
+    .prepare('SELECT COUNT(*) AS c FROM chinchiro_games WHERE pc_id = ? AND created_at >= ?')
+    .bind(pcId, todayStartUtc())
+    .first()
+  return row?.c ?? 0
+}
 
 // 出目から役を判定(役なしは null)
 export function judgeRoll(dice) {
@@ -57,7 +75,9 @@ export function playChinchiro() {
 }
 
 export async function loadPayouts(db) {
-  const { results } = await db.prepare('SELECT hand, multiplier FROM chinchiro_payouts').all()
+  const { results } = await cached('casino:payouts', () =>
+    db.prepare('SELECT hand, multiplier FROM chinchiro_payouts').all()
+  )
   const payouts = { ...DEFAULT_PAYOUTS }
   for (const r of results) {
     if (r.hand in payouts) payouts[r.hand] = r.multiplier
@@ -66,7 +86,11 @@ export async function loadPayouts(db) {
 }
 
 // ディーラー設定: { pcId, pcName, share(%) }。未設定なら pcId は null
-export async function loadDealer(db) {
+export function loadDealer(db) {
+  return cached('casino:dealer', () => loadDealerFromDb(db))
+}
+
+async function loadDealerFromDb(db) {
   const { results } = await db.prepare('SELECT key, value FROM casino_settings').all()
   const map = Object.fromEntries(results.map((r) => [r.key, r.value]))
   const pcId = map.dealer_pc_id ? Number(map.dealer_pc_id) : null

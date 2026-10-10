@@ -8,7 +8,7 @@ const { data: payoutData } = await useFetch('/api/casino/chinchiro/payouts', {
 })
 const betUnit = computed(() => payoutData.value?.betUnit ?? 100)
 
-const { data: games, refresh: refreshGames } = await useFetch('/api/casino/chinchiro/games', {
+const { data: gamesData, refresh: refreshGames } = await useFetch('/api/casino/chinchiro/games', {
   key: 'chinchiro-games',
   query: computed(() => ({ pcId: selectedPcId.value })),
   immediate: !!selectedPcId.value,
@@ -18,24 +18,31 @@ const { data: games, refresh: refreshGames } = await useFetch('/api/casino/chinc
 // 戦績の行ごとの所持金の増減(ディーラーとして関わった行はディーラー側の増減)
 const delta = (g) => (g.role === 'dealer' ? g.dealer_delta : g.net)
 
+const games = computed(() => gamesData.value?.games ?? [])
+const dailyLimit = computed(() => gamesData.value?.dailyLimit ?? 8)
+const remainingPlays = computed(() => Math.max(0, dailyLimit.value - (gamesData.value?.playsToday ?? 0)))
+
 const bet = ref(100)
 const betPresets = [100, 500, 1000]
 
 const playing = ref(false)
 const errorMessage = ref('')
 const shownRolls = ref([]) // 演出で表示済みの出目
-const rollingDice = ref(null) // 振っている最中の仮の出目
+const rollingDice = ref(null) // 振っている最中の出目 [{ value, rolling }]
 const result = ref(null)
 
 const betValid = computed(() =>
   Number.isInteger(bet.value) && bet.value >= betUnit.value && bet.value % betUnit.value === 0
 )
 const canPlay = computed(() =>
-  !!selectedPc.value && betValid.value && selectedPc.value.money >= bet.value && !playing.value
+  !!selectedPc.value && betValid.value && selectedPc.value.money >= bet.value && remainingPlays.value > 0 && !playing.value
 )
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
-const randomDice = () => Array.from({ length: 3 }, () => Math.floor(Math.random() * 6) + 1)
+const randomDie = () => Math.floor(Math.random() * 6) + 1
+
+// サイコロが1つずつ止まるまでの待ち時間(最後の1つは少し溜める)
+const STOP_DELAYS = [600, 450, 1100]
 
 const play = async () => {
   if (!canPlay.value) return
@@ -50,14 +57,23 @@ const play = async () => {
       body: { pcId: selectedPc.value.id, bet: bet.value },
     })
 
-    // 1投ずつ転がす演出
+    // 1投ずつ、サイコロを1つずつ止める演出
     for (const dice of res.rolls) {
-      const timer = setInterval(() => { rollingDice.value = randomDice() }, 80)
-      await sleep(700)
+      rollingDice.value = dice.map(() => ({ value: randomDie(), rolling: true }))
+      const timer = setInterval(() => {
+        for (const d of rollingDice.value) {
+          if (d.rolling) d.value = randomDie()
+        }
+      }, 80)
+      for (let i = 0; i < dice.length; i++) {
+        await sleep(STOP_DELAYS[i])
+        rollingDice.value[i] = { value: dice[i], rolling: false }
+      }
       clearInterval(timer)
+      await sleep(400)
       rollingDice.value = null
       shownRolls.value.push(dice)
-      await sleep(350)
+      await sleep(250)
     }
     result.value = res
   } catch (e) {
@@ -101,7 +117,7 @@ const play = async () => {
         <div v-if="rollingDice" class="roll-row">
           <span class="roll-no">{{ shownRolls.length + 1 }}投目</span>
           <div class="dice">
-            <ChinchiroDie v-for="(d, j) in rollingDice" :key="j" :value="d" rolling />
+            <ChinchiroDie v-for="(d, j) in rollingDice" :key="j" :value="d.value" :rolling="d.rolling" />
           </div>
         </div>
         <p v-if="!playing && shownRolls.length === 0" class="bowl-empty">掛金を決めて「振る」</p>
@@ -113,9 +129,6 @@ const play = async () => {
         <span class="result-mult">{{ formatMultiplier(result.multiplier) }}</span>
         <span class="result-net">
           {{ result.net > 0 ? '+' : '' }}{{ formatMoney(result.net) }}
-        </span>
-        <span v-if="result.dealer" class="result-dealer">
-          ディーラー {{ result.dealer.pcName }}: {{ result.dealer.delta > 0 ? '+' : '' }}{{ formatMoney(result.dealer.delta) }}
         </span>
       </div>
       <p v-if="errorMessage" class="error-text">{{ errorMessage }}</p>
@@ -147,6 +160,8 @@ const play = async () => {
         </div>
         <p v-if="!betValid" class="error-text">掛金は{{ formatMoney(betUnit) }}単位で指定してください</p>
         <p v-else-if="selectedPc && selectedPc.money < bet" class="error-text">所持金が掛金に足りません</p>
+        <p v-if="selectedPc && remainingPlays === 0" class="error-text">今日はもう遊べません(1日{{ dailyLimit }}回まで)</p>
+        <p v-if="selectedPc" class="plays-left">今日の残り: {{ remainingPlays }} / {{ dailyLimit }}回</p>
         <button class="play-btn" :disabled="!canPlay" @click="play">
           {{ playing ? '振っています…' : '振る' }}
         </button>
@@ -167,7 +182,7 @@ const play = async () => {
             </td>
           </tr>
         </table>
-        <p class="payout-note">倍率は掛金に対する所持金の増減です。負けで所持金がマイナスになることがあります。</p>
+        <p class="payout-note">倍率は掛金に対する払い戻しです(1倍で掛金がそのまま戻り、0倍で掛金を失います)。マイナスの倍率では掛金以上を失い、所持金がマイナスになることがあります。</p>
       </details>
     </section>
 
@@ -187,7 +202,7 @@ const play = async () => {
           {{ delta(g) > 0 ? '+' : '' }}{{ formatMoney(delta(g)) }}
         </span>
       </div>
-      <p v-if="(games ?? []).length === 0" class="notice">まだ遊んでいません</p>
+      <p v-if="(games ?? []).length === 0" class="empty">まだ遊んでいません</p>
     </section>
   </div>
 </template>
@@ -310,12 +325,6 @@ const play = async () => {
   font-size: 0.78rem;
 }
 
-.result-dealer {
-  width: 100%;
-  text-align: center;
-  font-size: 0.75rem;
-  opacity: 0.8;
-}
 
 .history-kind {
   display: inline-block;
@@ -326,6 +335,13 @@ const play = async () => {
   border: 1px solid #000;
   background: #000;
   color: var(--color-accent, #ffd400);
+}
+
+.plays-left {
+  margin: 8px 0 0;
+  font-size: 0.8rem;
+  font-weight: bold;
+  text-align: right;
 }
 
 .error-text {
@@ -358,7 +374,7 @@ const play = async () => {
   box-sizing: border-box;
   border: 1px solid var(--color-text, #000);
   padding: 8px;
-  font-size: 1rem;
+  font-size: 16px;
   text-align: right;
 }
 

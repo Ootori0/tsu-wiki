@@ -1,6 +1,10 @@
+import { invalidateCache } from '../utils/cache'
+import { requireLogin } from '../utils/session'
+
 
 export default defineEventHandler(async (event) => {
   const db = event.context.cloudflare.env.tsu_wiki_db
+  await requireLogin(event, db)
   const body = await readBody(event)
 
   const { title, content, sortOrder } = body
@@ -15,6 +19,8 @@ export default defineEventHandler(async (event) => {
     )
     .bind(title, content ?? '', sortOrder ?? 0)
     .run()
+
+  invalidateCache('settings')
 
   return { id: result.meta.last_row_id, title, body: content, sortOrder }
 })

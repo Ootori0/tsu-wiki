@@ -2,6 +2,7 @@
 definePageMeta({ middleware: 'auth' })
 
 const { user, fetchUser } = useAuth()
+const { show } = useToast()
 
 // --- ID変更 ---
 const newName = ref(user.value?.name ?? '')
@@ -14,6 +15,7 @@ const saveName = async () => {
   try {
     await $fetch('/api/auth/name', { method: 'PUT', body: { name: newName.value } })
     await fetchUser()
+    show('IDを変更しました')
   } catch (e) {
     nameError.value = e?.data?.statusMessage ?? '変更に失敗しました'
   } finally {
@@ -53,6 +55,7 @@ const savePassword = async () => {
     newPassword.value = ''
     newPasswordConfirm.value = ''
     passwordSuccess.value = true
+    show('パスワードを変更しました')
   } catch (e) {
     passwordError.value = e?.data?.statusMessage ?? '変更に失敗しました'
   } finally {
@@ -116,6 +119,9 @@ const saveEdit = async (id) => {
     await $fetch(`/api/magics/${id}`, { method: 'PUT', body: editForm.value })
     editingId.value = null
     await refreshMagics()
+    show('魔法を保存しました')
+  } catch (e) {
+    show(e?.data?.statusMessage ?? '保存に失敗しました', 'error')
   } finally {
     saving.value = false
   }
@@ -133,6 +139,9 @@ const confirmDelete = async () => {
     await $fetch(`/api/magics/${pendingDeleteId.value}`, { method: 'DELETE' })
     editingId.value = null
     await refreshMagics()
+    show('魔法を削除しました')
+  } catch (e) {
+    show(e?.data?.statusMessage ?? '削除に失敗しました', 'error')
   } finally {
     deleting.value = false
     pendingDeleteId.value = null
@@ -157,6 +166,9 @@ const saveCreate = async () => {
     await $fetch('/api/magics', { method: 'POST', body: newForm.value })
     creating.value = false
     await refreshMagics()
+    show('魔法を作成しました')
+  } catch (e) {
+    show(e?.data?.statusMessage ?? '作成に失敗しました', 'error')
   } finally {
     saving.value = false
   }
@@ -192,6 +204,10 @@ const formPreview = (form) => ({
   show_title: form.showTitle,
   show_office: form.showOffice,
 })
+
+// 一覧ごと折りたためる見出し(件数つき)
+const magicSectionTitle = computed(() => `あなたの魔法一覧(${(fetchedMagics.value ?? []).length}件)`)
+const pcSectionTitle = computed(() => `あなたのPC一覧(${(fetchedPcs.value ?? []).length}件)`)
 
 const myPcItems = computed(() =>
   (fetchedPcs.value ?? []).map((pc) => ({ ...pc, title: pcTitle(pc) }))
@@ -261,6 +277,7 @@ const savePcEdit = async (id) => {
     await $fetch(`/api/pcs/${id}`, { method: 'PUT', body: pcEditForm.value })
     pcEditingId.value = null
     await refreshPcs()
+    show('PCを保存しました')
   } catch (e) {
     pcError.value = e?.data?.statusMessage ?? '保存に失敗しました'
   } finally {
@@ -280,6 +297,9 @@ const confirmPcDelete = async () => {
     await $fetch(`/api/pcs/${pendingPcDeleteId.value}`, { method: 'DELETE' })
     pcEditingId.value = null
     await refreshPcs()
+    show('PCを削除しました')
+  } catch (e) {
+    show(e?.data?.statusMessage ?? '削除に失敗しました', 'error')
   } finally {
     pcDeleting.value = false
     pendingPcDeleteId.value = null
@@ -304,6 +324,7 @@ const savePcCreate = async () => {
     await $fetch('/api/pcs', { method: 'POST', body: pcNewForm.value })
     pcCreating.value = false
     await refreshPcs()
+    show('PCを作成しました')
   } catch (e) {
     pcError.value = e?.data?.statusMessage ?? '保存に失敗しました'
   } finally {
@@ -368,9 +389,11 @@ const savePcCreate = async () => {
     </div>
 
     <!-- 自分の魔法一覧 -->
-    <div class="box">
-      <h2 class="box-title">あなたの魔法一覧</h2>
+    <AccordionList :items="[{ id: 'magics', title: magicSectionTitle }]" title-key="title" class="section-accordion">
+      <template #detail>
+        <div class="section-body">
 
+      <p v-if="!(fetchedMagics ?? []).length" class="empty">まだ魔法がありません</p>
       <AccordionList :items="fetchedMagics ?? []" title-key="name" body-key="effect">
         <template #detail="{ item }">
           <div v-if="editingId === item.id" class="edit-form">
@@ -496,12 +519,16 @@ const savePcCreate = async () => {
           </div>
         </div>
       </div>
-    </div>
+        </div>
+      </template>
+    </AccordionList>
 
     <!-- 自分のPC一覧 -->
-    <div class="box">
-      <h2 class="box-title">あなたのPC一覧</h2>
+    <AccordionList :items="[{ id: 'pcs', title: pcSectionTitle }]" title-key="title" class="section-accordion">
+      <template #detail>
+        <div class="section-body">
 
+      <p v-if="!myPcItems.length" class="empty">まだPCがありません</p>
       <AccordionList :items="myPcItems" title-key="title" body-key="memo">
         <template #detail="{ item }">
           <div v-if="pcEditingId === item.id" class="edit-form">
@@ -566,7 +593,15 @@ const savePcCreate = async () => {
               所属: {{ item.affiliation || '-' }} / 事務所: {{ item.office || '-' }} / {{ item.grade }}級<template v-if="pcRoles(item)"> / {{ pcRoles(item) }}</template>
             </p>
             <MarkdownText :text="item.memo" />
-            <PcMoneyPanel :pc="item" @updated="refreshPcs" />
+            <AccordionList
+              :items="[{ id: `money-${item.id}`, title: `所持金: ${formatMoney(item.money)}` }]"
+              title-key="title"
+              class="money-accordion"
+            >
+              <template #detail>
+                <PcMoneyPanel :pc="item" hide-head @updated="refreshPcs" />
+              </template>
+            </AccordionList>
             <button class="edit-btn" @click="startPcEdit(item)">編集</button>
           </div>
         </template>
@@ -635,7 +670,9 @@ const savePcCreate = async () => {
           </div>
         </div>
       </div>
-    </div>
+        </div>
+      </template>
+    </AccordionList>
 
     <ConfirmDialog
       v-model="showConfirm"
@@ -694,7 +731,7 @@ const savePcCreate = async () => {
   box-sizing: border-box;
   border: 1px solid var(--color-text, #000);
   padding: 8px;
-  font-size: 0.9rem;
+  font-size: 16px;
   margin-top: 4px;
 }
 
@@ -747,6 +784,8 @@ const savePcCreate = async () => {
   padding: 8px 16px;
   font-size: 0.85rem;
   cursor: pointer;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .save-btn:disabled {
@@ -848,7 +887,7 @@ const savePcCreate = async () => {
   box-sizing: border-box;
   border: 1px solid var(--color-text, #000);
   padding: 8px;
-  font-size: 0.9rem;
+  font-size: 16px;
   font-family: inherit;
 }
 
@@ -882,6 +921,18 @@ const savePcCreate = async () => {
   font-size: 0.85rem;
   cursor: pointer;
   margin-left: auto;
+}
+
+.section-accordion {
+  margin-bottom: 16px;
+}
+
+.section-body {
+  padding: 12px;
+}
+
+.money-accordion {
+  margin: 10px 0;
 }
 
 .add-box {

@@ -14,7 +14,7 @@ const pages = [
     <!-- タイトル -->
     <header class="title-block">
       <div class="title-frame">
-        <h1 class="title">ツラトゥストラは<br>かく語りき</h1>
+        <h1 class="title">ツァラトゥストラは<br>かく語りき</h1>
       </div>
     </header>
 
@@ -89,7 +89,6 @@ const pages = [
 
 .title {
   margin: 0;
-  font-family: var(--font-title);
   font-size: 2rem;
   color: var(--color-text);
   writing-mode: vertical-rl;

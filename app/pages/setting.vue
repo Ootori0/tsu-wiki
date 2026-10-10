@@ -1,4 +1,7 @@
 <script setup>
+const { show } = useToast()
+// 追加・編集はログインしている人のみ
+const { user } = useAuth()
 const { data: fetchedItems, refresh } = await useCachedFetch('/api/settings', {
   key: 'settings-list',
 })
@@ -48,6 +51,9 @@ const saveEdit = async (id) => {
     })
     editingId.value = null
     await refresh()
+    show('保存しました')
+  } catch (e) {
+    show(e?.data?.statusMessage ?? '保存に失敗しました', 'error')
   } finally {
     saving.value = false
   }
@@ -65,6 +71,9 @@ const confirmDelete = async () => {
     await $fetch(`/api/settings/${pendingDeleteId.value}`, { method: 'DELETE' })
     editingId.value = null
     await refresh()
+    show('削除しました')
+  } catch (e) {
+    show(e?.data?.statusMessage ?? '削除に失敗しました', 'error')
   } finally {
     deleting.value = false
     pendingDeleteId.value = null
@@ -97,9 +106,9 @@ const applyOrder = async () => {
     })
     isOrderChanged.value = false
     await refresh()
+    show('並び順を反映しました')
   } catch (e) {
-    console.error('並び順の反映に失敗しました', e)
-    alert('並び順の反映に失敗しました。もう一度お試しください。')
+    show(e?.data?.statusMessage ?? '並び順の反映に失敗しました', 'error')
   } finally {
     applyingOrder.value = false
   }
@@ -137,6 +146,9 @@ const saveCreate = async () => {
     })
     creating.value = false
     await refresh()
+    show('追加しました')
+  } catch (e) {
+    show(e?.data?.statusMessage ?? '追加に失敗しました', 'error')
   } finally {
     saving.value = false
   }
@@ -147,6 +159,7 @@ const saveCreate = async () => {
   <div class="page">
     <h1 class="page-title">背景設定集</h1>
 
+    <p v-if="localItems.length === 0" class="empty">まだ項目がありません</p>
     <AccordionList
       :items="localItems"
       title-key="title"
@@ -189,13 +202,13 @@ const saveCreate = async () => {
 
         <div v-else class="view-mode">
           <MarkdownText :text="item.body" />
-          <button class="edit-btn" @click="startEdit(item)">編集</button>
+          <button v-if="user" class="edit-btn" @click="startEdit(item)">編集</button>
         </div>
       </template>
     </AccordionList>
 
     <!-- 項目追加(一番下) -->
-    <div class="add-box">
+    <div v-if="user" class="add-box">
       <button v-if="!creating" class="add-btn" @click="startCreate">
         ＋ 項目追加
       </button>
@@ -307,7 +320,7 @@ const saveCreate = async () => {
   box-sizing: border-box;
   border: 1px solid var(--color-text, #000);
   padding: 8px;
-  font-size: 0.9rem;
+  font-size: 16px;
   color: var(--color-text, #000);
   background: var(--color-bg, #fff);
   font-family: inherit;
