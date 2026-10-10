@@ -11,7 +11,19 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 403, statusMessage: 'admin権限が必要です' })
   }
 
-  const { payouts } = (await readBody(event)) ?? {}
+  const { payouts, dealerPcId, dealerShare } = (await readBody(event)) ?? {}
+
+  const share = Number(dealerShare ?? 100)
+  if (!Number.isInteger(share) || share < 0 || share > 100) {
+    throw createError({ statusCode: 400, statusMessage: 'ディーラーの割合は0〜100の整数で指定してください' })
+  }
+  const dealerId = dealerPcId === null || dealerPcId === undefined || dealerPcId === '' ? null : Number(dealerPcId)
+  if (dealerId !== null) {
+    const pc = await db.prepare('SELECT id FROM pcs WHERE id = ?').bind(dealerId).first()
+    if (!pc) {
+      throw createError({ statusCode: 400, statusMessage: 'ディーラーのPCが見つかりません' })
+    }
+  }
 
   const statements = CHINCHIRO_HANDS.map((hand) => {
     const raw = Number(payouts?.[hand])
@@ -28,6 +40,18 @@ export default defineEventHandler(async (event) => {
       .bind(hand, value)
   })
 
-  await db.batch(statements)
+  const setting = (key, value) =>
+    db
+      .prepare(
+        `INSERT INTO casino_settings (key, value) VALUES (?, ?)
+         ON CONFLICT(key) DO UPDATE SET value = excluded.value`
+      )
+      .bind(key, value)
+
+  await db.batch([
+    ...statements,
+    setting('dealer_pc_id', dealerId === null ? null : String(dealerId)),
+    setting('dealer_share', String(share)),
+  ])
   return { success: true }
 })

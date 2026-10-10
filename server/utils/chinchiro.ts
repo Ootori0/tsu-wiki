@@ -64,3 +64,24 @@ export async function loadPayouts(db) {
   }
   return payouts
 }
+
+// ディーラー設定: { pcId, pcName, share(%) }。未設定なら pcId は null
+export async function loadDealer(db) {
+  const { results } = await db.prepare('SELECT key, value FROM casino_settings').all()
+  const map = Object.fromEntries(results.map((r) => [r.key, r.value]))
+  const pcId = map.dealer_pc_id ? Number(map.dealer_pc_id) : null
+  const share = map.dealer_share !== undefined && map.dealer_share !== null ? Number(map.dealer_share) : 100
+
+  let pcName = null
+  if (pcId) {
+    const pc = await db.prepare('SELECT name FROM pcs WHERE id = ?').bind(pcId).first()
+    if (!pc) return { pcId: null, pcName: null, share } // ディーラーのPCが削除済み
+    pcName = pc.name
+  }
+  return { pcId, pcName, share }
+}
+
+// プレイヤーの増減に対するディーラーの増減(負けの share% を受け取り、勝ちの share% を支払う)
+export function dealerDeltaOf(net, share) {
+  return -Math.round((net * share) / 100)
+}

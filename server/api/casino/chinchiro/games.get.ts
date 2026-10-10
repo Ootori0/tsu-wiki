@@ -19,9 +19,16 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 403, statusMessage: '閲覧権限がありません' })
   }
 
+  // 自分が遊んだゲームと、ディーラーとして関わったゲーム
   const { results } = await db
-    .prepare('SELECT * FROM chinchiro_games WHERE pc_id = ? ORDER BY id DESC LIMIT 20')
-    .bind(pcId)
+    .prepare(
+      `SELECT g.*, pcs.name AS player_name,
+              CASE WHEN g.pc_id = ? THEN 'player' ELSE 'dealer' END AS role
+       FROM chinchiro_games g LEFT JOIN pcs ON pcs.id = g.pc_id
+       WHERE g.pc_id = ? OR g.dealer_pc_id = ?
+       ORDER BY g.id DESC LIMIT 20`
+    )
+    .bind(pcId, pcId, pcId)
     .all()
 
   return results.map((r) => ({ ...r, rolls: JSON.parse(r.rolls) }))

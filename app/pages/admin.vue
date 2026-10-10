@@ -191,7 +191,11 @@ const { data: chinchiroData, refresh: refreshChinchiro } = await useFetch('/api/
   key: 'admin-chinchiro-payouts',
 })
 const payoutForm = ref({})
-watch(chinchiroData, (d) => { payoutForm.value = { ...(d?.payouts ?? {}) } }, { immediate: true })
+const dealerForm = ref({ pcId: null, share: 100 })
+watch(chinchiroData, (d) => {
+  payoutForm.value = { ...(d?.payouts ?? {}) }
+  dealerForm.value = { pcId: d?.dealer?.pcId ?? null, share: d?.dealer?.share ?? 100 }
+}, { immediate: true })
 const payoutMessage = ref('')
 const payoutError = ref('')
 
@@ -199,7 +203,14 @@ const savePayouts = async () => {
   payoutMessage.value = ''
   payoutError.value = ''
   try {
-    await $fetch('/api/casino/chinchiro/payouts', { method: 'PUT', body: { payouts: payoutForm.value } })
+    await $fetch('/api/casino/chinchiro/payouts', {
+      method: 'PUT',
+      body: {
+        payouts: payoutForm.value,
+        dealerPcId: dealerForm.value.pcId,
+        dealerShare: dealerForm.value.share,
+      },
+    })
     clearNuxtData('chinchiro-payouts')
     await refreshChinchiro()
     payoutMessage.value = '保存しました'
@@ -447,6 +458,21 @@ const savePayouts = async () => {
 
     <!-- カジノ設定 -->
     <div v-if="activeTab === 'カジノ設定'" class="tab-content">
+      <div class="box">
+        <h2 class="box-title">ディーラー</h2>
+        <p class="item-meta">プレイヤーの負け額の割合分を受け取り、勝ち額の割合分を支払います(所持金はマイナスになり得ます)。</p>
+        <label class="field-label">ディーラーPC</label>
+        <select v-model="dealerForm.pcId" class="field-input">
+          <option :value="null">なし</option>
+          <option v-for="pc in allPcs ?? []" :key="pc.id" :value="pc.id">{{ pc.name }}</option>
+        </select>
+        <label class="field-label">還元割合(%)</label>
+        <input v-model.number="dealerForm.share" type="number" min="0" max="100" step="1" class="field-input" />
+        <p v-if="payoutError" class="error-text">{{ payoutError }}</p>
+        <p v-if="payoutMessage" class="item-meta">{{ payoutMessage }}</p>
+        <button class="save-btn" @click="savePayouts">保存</button>
+      </div>
+
       <div class="box">
         <h2 class="box-title">チンチロの倍率</h2>
         <p class="item-meta">掛金に対する所持金の増減(マイナスは負け)。小数第2位まで指定できます。</p>

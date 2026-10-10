@@ -15,6 +15,9 @@ const { data: games, refresh: refreshGames } = await useFetch('/api/casino/chinc
   watch: [selectedPcId],
 })
 
+// 戦績の行ごとの所持金の増減(ディーラーとして関わった行はディーラー側の増減)
+const delta = (g) => (g.role === 'dealer' ? g.dealer_delta : g.net)
+
 const bet = ref(100)
 const betPresets = [100, 500, 1000]
 
@@ -62,6 +65,7 @@ const play = async () => {
   } finally {
     rollingDice.value = null
     playing.value = false
+    // ディーラーが自分の別PCの場合もあるので自分のPC一覧ごと再取得
     await Promise.all([refreshMyPcs(), refreshGames()])
   }
 }
@@ -80,6 +84,10 @@ const play = async () => {
       <h2 class="game-title">チンチロ</h2>
       <p class="game-rule">
         サイコロ3つを最大3回振り、役が出た時点で決着。3回とも役なしなら「目なし」。
+      </p>
+      <p v-if="payoutData?.dealer?.pcId" class="dealer-info">
+        ディーラー: <strong>{{ payoutData.dealer.pcName }}</strong>
+        (勝ち負けの{{ payoutData.dealer.share }}%を負担)
       </p>
 
       <!-- 盤面 -->
@@ -105,6 +113,9 @@ const play = async () => {
         <span class="result-mult">{{ formatMultiplier(result.multiplier) }}</span>
         <span class="result-net">
           {{ result.net > 0 ? '+' : '' }}{{ formatMoney(result.net) }}
+        </span>
+        <span v-if="result.dealer" class="result-dealer">
+          ディーラー {{ result.dealer.pcName }}: {{ result.dealer.delta > 0 ? '+' : '' }}{{ formatMoney(result.dealer.delta) }}
         </span>
       </div>
       <p v-if="errorMessage" class="error-text">{{ errorMessage }}</p>
@@ -164,9 +175,16 @@ const play = async () => {
       <h2 class="history-title">{{ selectedPc.name }}の戦績(最新20件)</h2>
       <div v-for="g in games ?? []" :key="g.id" class="history-row">
         <span class="history-date">{{ formatDateTime(g.created_at) }}</span>
-        <span class="history-name">{{ handLabel(g.hand) }}(掛金{{ formatMoney(g.bet) }})</span>
-        <span class="history-net" :class="{ plus: g.net > 0, minus: g.net < 0 }">
-          {{ g.net > 0 ? '+' : '' }}{{ formatMoney(g.net) }}
+        <span v-if="g.role === 'dealer'" class="history-name">
+          <span class="history-kind">ディーラー</span>
+          {{ g.player_name ?? '(削除済みPC)' }}の{{ handLabel(g.hand) }}
+        </span>
+        <span v-else class="history-name">{{ handLabel(g.hand) }}(掛金{{ formatMoney(g.bet) }})</span>
+        <span
+          class="history-net"
+          :class="{ plus: delta(g) > 0, minus: delta(g) < 0 }"
+        >
+          {{ delta(g) > 0 ? '+' : '' }}{{ formatMoney(delta(g)) }}
         </span>
       </div>
       <p v-if="(games ?? []).length === 0" class="notice">まだ遊んでいません</p>
@@ -285,6 +303,29 @@ const play = async () => {
 .result-net {
   font-size: 1.1rem;
   font-weight: bold;
+}
+
+.dealer-info {
+  margin: -6px 0 12px;
+  font-size: 0.78rem;
+}
+
+.result-dealer {
+  width: 100%;
+  text-align: center;
+  font-size: 0.75rem;
+  opacity: 0.8;
+}
+
+.history-kind {
+  display: inline-block;
+  margin-right: 4px;
+  padding: 0 5px;
+  font-size: 0.65rem;
+  font-weight: bold;
+  border: 1px solid #000;
+  background: #000;
+  color: var(--color-accent, #ffd400);
 }
 
 .error-text {

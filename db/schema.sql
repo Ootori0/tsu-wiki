@@ -168,8 +168,16 @@ CREATE TABLE chinchiro_games (
   hand TEXT NOT NULL,
   multiplier REAL NOT NULL,
   net INTEGER NOT NULL, -- 所持金の増減
+  dealer_pc_id INTEGER, -- このゲームのディーラー(いなければNULL)
+  dealer_delta INTEGER NOT NULL DEFAULT 0, -- ディーラーの所持金の増減
   played_by INTEGER NOT NULL,
   created_at TEXT DEFAULT (datetime('now'))
 );
 
 CREATE INDEX idx_chinchiro_games_pc ON chinchiro_games(pc_id);
+
+-- カジノの設定(dealer_pc_id: ディーラーPC / dealer_share: ディーラーの負担・受取割合(%))
+CREATE TABLE casino_settings (
+  key TEXT PRIMARY KEY,
+  value TEXT
+);
