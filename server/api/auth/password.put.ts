@@ -38,5 +38,11 @@ export default defineEventHandler(async (event) => {
     .bind(hash, salt, currentUser.id)
     .run()
 
+  // 他の端末のログインを切る(今使っているセッションは残す)
+  await db
+    .prepare('DELETE FROM sessions WHERE user_id = ? AND id != ?')
+    .bind(currentUser.id, sessionId)
+    .run()
+
   return { success: true }
 })

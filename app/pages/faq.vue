@@ -1,5 +1,7 @@
 <script setup>
 const { show } = useToast()
+// 追加・編集はログインしている人のみ
+const { user } = useAuth()
 const { data: fetchedItems, refresh } = await useCachedFetch('/api/faqs', {
   key: 'faqs-list',
 })
@@ -207,13 +209,13 @@ const saveCreate = async () => {
 
         <div v-else class="view-mode">
           <MarkdownText :text="item.answer" />
-          <button class="edit-btn" @click="startEdit(item)">編集</button>
+          <button v-if="user" class="edit-btn" @click="startEdit(item)">編集</button>
         </div>
       </template>
     </AccordionList>
 
     <!-- 項目追加(一番下) -->
-    <div class="add-box">
+    <div v-if="user" class="add-box">
       <button v-if="!creating" class="add-btn" @click="startCreate">
         ＋ 項目追加
       </button>

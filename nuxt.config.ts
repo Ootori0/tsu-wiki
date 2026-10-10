@@ -39,6 +39,7 @@ export default defineNuxtConfig({
         { property: 'og:image', content: 'https://tsu.inami0.com/icon.jpg' },
         { property: 'og:site_name', content: 'tsu-wiki' },
         { name: 'theme-color', content: '#ffd400' },
+        { name: 'apple-mobile-web-app-title', content: 'tsu-wiki' },
 
         // Twitter Card
         { name: 'twitter:card', content: 'summary_large_image' },
@@ -49,6 +50,9 @@ export default defineNuxtConfig({
 
       link: [
         { rel: 'icon', type: 'image/jpeg', href: '/icon.jpg' },
+        // ホーム画面に追加したときのアイコン
+        { rel: 'apple-touch-icon', sizes: '180x180', href: '/apple-touch-icon.png' },
+        { rel: 'manifest', href: '/manifest.webmanifest' },
       ],
     },
   },
