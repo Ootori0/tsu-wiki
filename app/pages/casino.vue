@@ -187,7 +187,7 @@ const play = async () => {
           {{ delta(g) > 0 ? '+' : '' }}{{ formatMoney(delta(g)) }}
         </span>
       </div>
-      <p v-if="(games ?? []).length === 0" class="notice">まだ遊んでいません</p>
+      <p v-if="(games ?? []).length === 0" class="empty">まだ遊んでいません</p>
     </section>
   </div>
 </template>
@@ -358,7 +358,7 @@ const play = async () => {
   box-sizing: border-box;
   border: 1px solid var(--color-text, #000);
   padding: 8px;
-  font-size: 1rem;
+  font-size: 16px;
   text-align: right;
 }
 

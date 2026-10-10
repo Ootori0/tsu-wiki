@@ -91,7 +91,7 @@ const login = async () => {
   box-sizing: border-box;
   border: 1px solid var(--color-text, #000);
   padding: 10px;
-  font-size: 0.95rem;
+  font-size: 16px;
   color: var(--color-text, #000);
   background: var(--color-bg, #fff);
 }

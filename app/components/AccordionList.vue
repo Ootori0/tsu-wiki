@@ -1,5 +1,5 @@
 <script setup>
-defineProps({
+const props = defineProps({
   items: {
     type: Array,
     required: true,
@@ -12,12 +12,26 @@ defineProps({
     type: String,
     default: 'body',
   },
+  // true なら複数を同時に開ける(false だと1つ開くと他は閉じる)
+  multiple: {
+    type: Boolean,
+    default: false,
+  },
+  // 最初から開いておく id
+  defaultOpen: {
+    type: Array,
+    default: () => [],
+  },
 })
 
-const openId = ref(null)
+const openIds = ref(new Set(props.defaultOpen))
+const isOpen = (id) => openIds.value.has(id)
 
 const toggle = (id) => {
-  openId.value = openId.value === id ? null : id
+  const next = new Set(props.multiple ? openIds.value : [])
+  if (isOpen(id)) next.delete(id)
+  else next.add(id)
+  openIds.value = next
 }
 </script>
 
@@ -25,17 +39,19 @@ const toggle = (id) => {
   <div class="accordion-list">
     <div v-for="item in items" :key="item.id" class="accordion-item">
       <button class="accordion-header" @click="toggle(item.id)">
-        <span class="accordion-title">{{ item[titleKey] }}</span>
-        <span class="accordion-icon" :class="{ open: openId === item.id }">
+        <span class="accordion-title">
+          <slot name="title" :item="item">{{ item[titleKey] }}</slot>
+        </span>
+        <span class="accordion-icon" :class="{ open: isOpen(item.id) }">
           <svg viewBox="0 0 24 24" width="14" height="14">
             <path d="M8 5l8 7-8 7z" fill="currentColor" />
           </svg>
         </span>
       </button>
 
-      <div class="detail-outer" :class="{ open: openId === item.id }">
+      <div class="detail-outer" :class="{ open: isOpen(item.id) }">
         <div class="detail-inner">
-          <slot name="detail" :item="item" :is-open="openId === item.id">
+          <slot name="detail" :item="item" :is-open="isOpen(item.id)">
             <p class="accordion-body">{{ item[bodyKey] }}</p>
           </slot>
         </div>
@@ -52,9 +68,15 @@ const toggle = (id) => {
 }
 
 .accordion-item {
-  border: 1px solid var(--color-text, #000);
-  border-left: 6px solid var(--color-accent, #ffd400);
-  background: var(--color-bg, #fff);
+  border: 1px solid var(--color-text);
+  border-left: 6px solid var(--color-accent);
+  background: var(--color-bg);
+  transition: box-shadow var(--transition);
+}
+
+/* 開いている項目は影を付けて浮かせる */
+.accordion-item:has(> .detail-outer.open) {
+  box-shadow: var(--shadow-sm);
 }
 
 .accordion-header {
@@ -62,17 +84,27 @@ const toggle = (id) => {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 8px;
   background: none;
   border: none;
+  min-height: 48px;
   padding: 12px 14px;
   cursor: pointer;
   text-align: left;
+  color: var(--color-text);
+  transition: background-color var(--transition);
+}
+
+@media (hover: hover) {
+  .accordion-header:hover {
+    background: var(--color-accent-soft);
+  }
 }
 
 .accordion-title {
+  flex: 1;
   font-weight: bold;
-  font-size: 1rem;
-  color: var(--color-text, #000);
+  font-size: 0.95rem;
   word-break: break-word;
 }
 
@@ -80,7 +112,6 @@ const toggle = (id) => {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--color-text, #000);
   transition: transform 0.25s ease;
   flex-shrink: 0;
 }
@@ -104,8 +135,8 @@ const toggle = (id) => {
   min-height: 0;
 }
 
-.detail-outer.open .detail-inner {
-  border-top: 1px dashed var(--color-text, #000);
+.detail-outer.open > .detail-inner {
+  border-top: 1px dashed var(--color-line);
 }
 
 .accordion-body {
@@ -113,7 +144,6 @@ const toggle = (id) => {
   padding: 14px;
   font-size: 0.9rem;
   line-height: 1.7;
-  color: var(--color-text, #000);
   white-space: pre-line;
 }
 </style>

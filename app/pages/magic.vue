@@ -13,10 +13,14 @@ const { user } = useAuth()
 const canFilterByPerm = computed(() =>
   (user.value?.permissions ?? []).some((p) => ['admin', 'KP', 'SKP'].includes(p))
 )
-const { data: allPermsList } = await useCachedFetch('/api/permissions', {
+const { data: allPermsList, execute: loadPerms } = await useCachedFetch('/api/permissions', {
   key: 'permissions-list',
-  immediate: canFilterByPerm.value,
+  immediate: false,
 })
+// ログイン情報はクライアントで後から読み込まれるので、権限が分かった時点で取得する
+watch(canFilterByPerm, (can) => {
+  if (can && !allPermsList.value) loadPerms()
+}, { immediate: true })
 
 const { data: fetchedItems, refresh } = await useCachedFetch('/api/magics', {
   key: computed(() => `magics-list-${activeTab.value}`),
@@ -118,6 +122,7 @@ const togglePerm = (permName) => {
       </div>
     </div>
 
+    <p v-if="filteredItems.length === 0" class="empty">該当する魔法がありません</p>
     <AccordionList :items="filteredItems" title-key="name">
       <template #detail="{ item }">
         <div class="magic-detail">
@@ -178,7 +183,7 @@ const togglePerm = (permName) => {
   background: var(--color-bg, #fff);
   color: var(--color-text, #000);
   padding: 8px 10px;
-  font-size: 0.85rem;
+  font-size: 16px;
 }
 
 .tag-filter {

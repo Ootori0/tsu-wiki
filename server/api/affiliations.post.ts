@@ -17,6 +17,11 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, statusMessage: 'name is required' })
   }
 
+  const exists = await db.prepare('SELECT id FROM affiliations WHERE name = ?').bind(name).first()
+  if (exists) {
+    throw createError({ statusCode: 409, statusMessage: '同じ名前の所属が既にあります' })
+  }
+
   const result = await db
     .prepare('INSERT INTO affiliations (name) VALUES (?)')
     .bind(name)
