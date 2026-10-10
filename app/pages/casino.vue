@@ -8,7 +8,7 @@ const { data: payoutData } = await useFetch('/api/casino/chinchiro/payouts', {
 })
 const betUnit = computed(() => payoutData.value?.betUnit ?? 100)
 
-const { data: games, refresh: refreshGames } = await useFetch('/api/casino/chinchiro/games', {
+const { data: gamesData, refresh: refreshGames } = await useFetch('/api/casino/chinchiro/games', {
   key: 'chinchiro-games',
   query: computed(() => ({ pcId: selectedPcId.value })),
   immediate: !!selectedPcId.value,
@@ -17,6 +17,10 @@ const { data: games, refresh: refreshGames } = await useFetch('/api/casino/chinc
 
 // 戦績の行ごとの所持金の増減(ディーラーとして関わった行はディーラー側の増減)
 const delta = (g) => (g.role === 'dealer' ? g.dealer_delta : g.net)
+
+const games = computed(() => gamesData.value?.games ?? [])
+const dailyLimit = computed(() => gamesData.value?.dailyLimit ?? 8)
+const remainingPlays = computed(() => Math.max(0, dailyLimit.value - (gamesData.value?.playsToday ?? 0)))
 
 const bet = ref(100)
 const betPresets = [100, 500, 1000]
@@ -31,7 +35,7 @@ const betValid = computed(() =>
   Number.isInteger(bet.value) && bet.value >= betUnit.value && bet.value % betUnit.value === 0
 )
 const canPlay = computed(() =>
-  !!selectedPc.value && betValid.value && selectedPc.value.money >= bet.value && !playing.value
+  !!selectedPc.value && betValid.value && selectedPc.value.money >= bet.value && remainingPlays.value > 0 && !playing.value
 )
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
@@ -126,9 +130,6 @@ const play = async () => {
         <span class="result-net">
           {{ result.net > 0 ? '+' : '' }}{{ formatMoney(result.net) }}
         </span>
-        <span v-if="result.dealer" class="result-dealer">
-          ディーラー {{ result.dealer.pcName }}: {{ result.dealer.delta > 0 ? '+' : '' }}{{ formatMoney(result.dealer.delta) }}
-        </span>
       </div>
       <p v-if="errorMessage" class="error-text">{{ errorMessage }}</p>
 
@@ -159,6 +160,8 @@ const play = async () => {
         </div>
         <p v-if="!betValid" class="error-text">掛金は{{ formatMoney(betUnit) }}単位で指定してください</p>
         <p v-else-if="selectedPc && selectedPc.money < bet" class="error-text">所持金が掛金に足りません</p>
+        <p v-if="selectedPc && remainingPlays === 0" class="error-text">今日はもう遊べません(1日{{ dailyLimit }}回まで)</p>
+        <p v-if="selectedPc" class="plays-left">今日の残り: {{ remainingPlays }} / {{ dailyLimit }}回</p>
         <button class="play-btn" :disabled="!canPlay" @click="play">
           {{ playing ? '振っています…' : '振る' }}
         </button>
@@ -322,12 +325,6 @@ const play = async () => {
   font-size: 0.78rem;
 }
 
-.result-dealer {
-  width: 100%;
-  text-align: center;
-  font-size: 0.75rem;
-  opacity: 0.8;
-}
 
 .history-kind {
   display: inline-block;
@@ -338,6 +335,13 @@ const play = async () => {
   border: 1px solid #000;
   background: #000;
   color: var(--color-accent, #ffd400);
+}
+
+.plays-left {
+  margin: 8px 0 0;
+  font-size: 0.8rem;
+  font-weight: bold;
+  text-align: right;
 }
 
 .error-text {

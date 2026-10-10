@@ -1,5 +1,6 @@
 import { getSessionUser } from '../../../utils/session'
 import { isAdmin } from '../../../utils/permission'
+import { DAILY_PLAY_LIMIT, countPlaysToday } from '../../../utils/chinchiro'
 
 export default defineEventHandler(async (event) => {
   const db = event.context.cloudflare.env.tsu_wiki_db
@@ -31,5 +32,9 @@ export default defineEventHandler(async (event) => {
     .bind(pcId, pcId, pcId)
     .all()
 
-  return results.map((r) => ({ ...r, rolls: JSON.parse(r.rolls) }))
+  return {
+    games: results.map((r) => ({ ...r, rolls: JSON.parse(r.rolls) })),
+    playsToday: await countPlaysToday(db, pcId),
+    dailyLimit: DAILY_PLAY_LIMIT,
+  }
 })

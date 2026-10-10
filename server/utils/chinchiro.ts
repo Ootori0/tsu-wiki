@@ -26,6 +26,22 @@ export const DEFAULT_PAYOUTS = {
 
 export const BET_UNIT = 100 // 掛金は100万円単位(所持金は万円単位)
 export const MAX_ROLLS = 3
+export const DAILY_PLAY_LIMIT = 8 // PCごとの1日のプレイ回数上限(日本時間0時に戻る)
+
+// 日本時間の今日0時を、DBの created_at と同じ形式(UTC 'YYYY-MM-DD HH:MM:SS')で返す
+export function todayStartUtc() {
+  const jstNow = new Date(Date.now() + 9 * 60 * 60 * 1000)
+  const jstMidnight = Date.UTC(jstNow.getUTCFullYear(), jstNow.getUTCMonth(), jstNow.getUTCDate())
+  return new Date(jstMidnight - 9 * 60 * 60 * 1000).toISOString().slice(0, 19).replace('T', ' ')
+}
+
+export async function countPlaysToday(db, pcId) {
+  const row = await db
+    .prepare('SELECT COUNT(*) AS c FROM chinchiro_games WHERE pc_id = ? AND created_at >= ?')
+    .bind(pcId, todayStartUtc())
+    .first()
+  return row?.c ?? 0
+}
 
 // 出目から役を判定(役なしは null)
 export function judgeRoll(dice) {
