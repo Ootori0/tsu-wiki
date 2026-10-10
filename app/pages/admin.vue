@@ -498,7 +498,7 @@ const savePayouts = async () => {
 
       <div class="box">
         <h2 class="box-title">チンチロの倍率</h2>
-        <p class="item-meta">掛金に対する所持金の増減(マイナスは負け)。小数第2位まで指定できます。</p>
+        <p class="item-meta">入力するのは掛金に対する所持金の増減(マイナスは負け)。カジノ画面では1を足した払い戻し倍率で表示されます。小数第2位まで指定できます。</p>
         <table class="payout-table">
           <tr>
             <th>役</th>
@@ -510,6 +510,7 @@ const savePayouts = async () => {
             <td class="item-meta">{{ (handProbability(h.key) * 100).toFixed(2) }}%</td>
             <td>
               <input v-model.number="payoutForm[h.key]" type="number" step="0.01" class="field-input payout-input" />
+              <span class="item-meta payout-display">表示: {{ formatMultiplier(payoutForm[h.key]) }}</span>
             </td>
           </tr>
         </table>
@@ -742,6 +743,12 @@ const savePayouts = async () => {
   border-bottom: 1px dashed var(--color-text, #000);
   text-align: left;
   vertical-align: middle;
+}
+
+.payout-display {
+  display: block;
+  margin-top: 2px;
+  white-space: nowrap;
 }
 
 .payout-input {

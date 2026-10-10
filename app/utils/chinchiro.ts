@@ -36,7 +36,8 @@ export function expectedReturn(payouts) {
   )
 }
 
+// 表示用の払い戻し倍率。内部の倍率(所持金の増減)に1を足し、-1倍(全額負け)を0倍として表示する
 export function formatMultiplier(value) {
-  const n = Number(value ?? 0)
-  return `${n > 0 ? '+' : ''}${n}倍`
+  const n = Math.round((Number(value ?? 0) + 1) * 100) / 100
+  return `${n}倍`
 }
