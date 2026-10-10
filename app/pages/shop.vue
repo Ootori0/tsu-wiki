@@ -35,12 +35,9 @@ const canBuy = (item) => {
 const pending = ref(null)
 const showConfirm = ref(false)
 const buying = ref(false)
-const message = ref('')
-const errorMessage = ref('')
+const { show } = useToast()
 
 const requestBuy = (item) => {
-  message.value = ''
-  errorMessage.value = ''
   pending.value = { item, quantity: qtyOf(item) }
   showConfirm.value = true
 }
@@ -60,10 +57,10 @@ const buy = async () => {
       method: 'POST',
       body: { pcId: selectedPc.value.id, itemId: item.id, quantity },
     })
-    message.value = `「${item.name}」を${quantity}個購入しました`
+    show(`「${item.name}」を${quantity}個購入しました`)
     quantities.value[item.id] = 1
   } catch (e) {
-    errorMessage.value = e?.data?.statusMessage ?? '購入に失敗しました'
+    show(e?.data?.statusMessage ?? '購入に失敗しました', 'error')
   } finally {
     buying.value = false
     pending.value = null
@@ -93,8 +90,6 @@ const buy = async () => {
       </button>
     </div>
 
-    <p v-if="message" class="success-text">{{ message }}</p>
-    <p v-if="errorMessage" class="error-text">{{ errorMessage }}</p>
 
     <div class="item-list">
       <div
@@ -133,7 +128,7 @@ const buy = async () => {
         </div>
       </div>
 
-      <p v-if="shopItems.length === 0" class="notice">商品がありません</p>
+      <p v-if="shopItems.length === 0" class="empty">商品がありません</p>
     </div>
 
     <section v-if="selectedPc" class="history">
@@ -148,7 +143,7 @@ const buy = async () => {
           {{ p.amount >= 0 ? '+' : '-' }}{{ formatMoney(Math.abs(p.amount)) }}
         </span>
       </div>
-      <p v-if="(purchases ?? []).length === 0" class="notice">取引履歴はありません</p>
+      <p v-if="(purchases ?? []).length === 0" class="empty">取引履歴はありません</p>
     </section>
 
     <ConfirmDialog
@@ -203,17 +198,6 @@ const buy = async () => {
 .tab-btn.active {
   background: var(--color-accent, #ffd400);
   color: #000;
-}
-
-.success-text,
-.error-text {
-  font-size: 0.85rem;
-  margin: 0 0 10px;
-  font-weight: bold;
-}
-
-.error-text {
-  color: #c00;
 }
 
 .item-list {
@@ -274,7 +258,7 @@ const buy = async () => {
   box-sizing: border-box;
   border: 1px solid var(--color-text, #000);
   padding: 6px;
-  font-size: 0.9rem;
+  font-size: 16px;
   text-align: right;
 }
 

@@ -17,6 +17,11 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, statusMessage: 'name is required' })
   }
 
+  const exists = await db.prepare('SELECT id FROM tags WHERE name = ?').bind(name).first()
+  if (exists) {
+    throw createError({ statusCode: 409, statusMessage: '同じ名前のタグが既にあります' })
+  }
+
   const result = await db
     .prepare('INSERT INTO tags (name) VALUES (?)')
     .bind(name)

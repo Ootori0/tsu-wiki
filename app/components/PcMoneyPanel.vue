@@ -3,6 +3,7 @@ const props = defineProps({
   pc: { type: Object, required: true },
 })
 const emit = defineEmits(['updated'])
+const { show } = useToast()
 
 const amount = ref(null)
 const reason = ref('')
@@ -33,6 +34,7 @@ const submit = async (sign) => {
       method: 'POST',
       body: { amount: sign * amount.value, reason: reason.value },
     })
+    show(`所持金を${sign > 0 ? '+' : '-'}${formatMoney(amount.value)}しました`)
     amount.value = null
     reason.value = ''
     emit('updated')
@@ -105,7 +107,7 @@ const describe = (log) => {
           {{ log.amount > 0 ? '+' : '' }}{{ formatMoney(log.amount) }}
         </span>
       </div>
-      <p v-if="(logs ?? []).length === 0" class="log-empty">履歴はありません</p>
+      <p v-if="(logs ?? []).length === 0" class="empty">履歴はありません</p>
     </div>
   </div>
 </template>
@@ -157,7 +159,7 @@ const describe = (log) => {
   box-sizing: border-box;
   border: 1px solid var(--color-text, #000);
   padding: 6px 8px;
-  font-size: 0.85rem;
+  font-size: 16px;
   font-family: inherit;
 }
 
@@ -275,8 +277,4 @@ const describe = (log) => {
   color: #c00;
 }
 
-.log-empty {
-  font-size: 0.75rem;
-  opacity: 0.6;
-}
 </style>

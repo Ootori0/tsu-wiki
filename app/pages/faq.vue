@@ -1,4 +1,5 @@
 <script setup>
+const { show } = useToast()
 const { data: fetchedItems, refresh } = await useCachedFetch('/api/faqs', {
   key: 'faqs-list',
 })
@@ -48,6 +49,9 @@ const saveEdit = async (id) => {
     })
     editingId.value = null
     await refresh()
+    show('保存しました')
+  } catch (e) {
+    show(e?.data?.statusMessage ?? '保存に失敗しました', 'error')
   } finally {
     saving.value = false
   }
@@ -65,6 +69,9 @@ const confirmDelete = async () => {
     await $fetch(`/api/faqs/${pendingDeleteId.value}`, { method: 'DELETE' })
     editingId.value = null
     await refresh()
+    show('削除しました')
+  } catch (e) {
+    show(e?.data?.statusMessage ?? '削除に失敗しました', 'error')
   } finally {
     deleting.value = false
     pendingDeleteId.value = null
@@ -95,9 +102,9 @@ const applyOrder = async () => {
     })
     isOrderChanged.value = false
     await refresh()
+    show('並び順を反映しました')
   } catch (e) {
-    console.error('並び順の反映に失敗しました', e)
-    alert('並び順の反映に失敗しました。もう一度お試しください。')
+    show(e?.data?.statusMessage ?? '並び順の反映に失敗しました', 'error')
   } finally {
     applyingOrder.value = false
   }
@@ -134,6 +141,9 @@ const saveCreate = async () => {
     })
     creating.value = false
     await refresh()
+    show('追加しました')
+  } catch (e) {
+    show(e?.data?.statusMessage ?? '追加に失敗しました', 'error')
   } finally {
     saving.value = false
   }
@@ -154,6 +164,7 @@ const saveCreate = async () => {
       />
     </div>
 
+    <p v-if="localItems.length === 0" class="empty">まだ項目がありません</p>
     <AccordionList
       :items="localItems"
       title-key="question"
@@ -259,7 +270,7 @@ const saveCreate = async () => {
   background: var(--color-bg, #fff);
   color: var(--color-text, #000);
   padding: 10px 12px;
-  font-size: 0.9rem;
+  font-size: 16px;
 }
 
 .search-input:focus {
@@ -334,7 +345,7 @@ const saveCreate = async () => {
   box-sizing: border-box;
   border: 1px solid var(--color-text, #000);
   padding: 8px;
-  font-size: 0.9rem;
+  font-size: 16px;
   color: var(--color-text, #000);
   background: var(--color-bg, #fff);
   font-family: inherit;
