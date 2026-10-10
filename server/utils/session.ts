@@ -35,3 +35,11 @@ export async function getSessionUser(db: any, sessionId: string) {
 export async function deleteSession(db: any, sessionId: string) {
   await db.prepare('DELETE FROM sessions WHERE id = ?').bind(sessionId).run()
 }
+// ログインしていなければ 401 を返す
+export async function requireLogin(event: any, db: any) {
+  const user = await getSessionUser(db, getCookie(event, 'session_id') ?? '')
+  if (!user) {
+    throw createError({ statusCode: 401, statusMessage: 'ログインが必要です' })
+  }
+  return user
+}

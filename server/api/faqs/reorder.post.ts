@@ -1,7 +1,9 @@
 import { invalidateCache } from '../../utils/cache'
+import { requireLogin } from '../../utils/session'
 
 export default defineEventHandler(async (event) => {
   const db = event.context.cloudflare.env.tsu_wiki_db
+  await requireLogin(event, db)
   const body = await readBody(event)
   const order = body?.order
 
