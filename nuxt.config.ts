@@ -29,11 +29,11 @@ export default defineNuxtConfig({
     head: {
       title: 'tsu-wiki',
       meta: [
-        { name: 'description', content: 'ツラトゥストラはかく語りきwiki' },
+        { name: 'description', content: 'ツァラトゥストラはかく語りきwiki' },
 
         // OGP
         { property: 'og:title', content: 'tsu-wiki' },
-        { property: 'og:description', content: 'ツラトゥストラはかく語りきwiki' },
+        { property: 'og:description', content: 'ツァラトゥストラはかく語りきwiki' },
         { property: 'og:type', content: 'website' },
         { property: 'og:url', content: 'https://tsu.inami0.com' },
         { property: 'og:image', content: 'https://tsu.inami0.com/icon.jpg' },
@@ -43,15 +43,11 @@ export default defineNuxtConfig({
         // Twitter Card
         { name: 'twitter:card', content: 'summary_large_image' },
         { name: 'twitter:title', content: 'tsu-wiki' },
-        { name: 'twitter:description', content: 'ツラトゥストラはかく語りきwiki' },
+        { name: 'twitter:description', content: 'ツァラトゥストラはかく語りきwiki' },
         { name: 'twitter:image', content: 'https://tsu.inami0.com/icon.jpg' },
       ],
 
       link: [
-        {
-          rel: 'stylesheet',
-          href: 'https://fonts.googleapis.com/css2?family=Yuji+Syuku&display=swap',
-        },
         { rel: 'icon', type: 'image/jpeg', href: '/icon.jpg' },
       ],
     },
