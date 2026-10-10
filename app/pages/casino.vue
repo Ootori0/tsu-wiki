@@ -24,7 +24,7 @@ const betPresets = [100, 500, 1000]
 const playing = ref(false)
 const errorMessage = ref('')
 const shownRolls = ref([]) // 演出で表示済みの出目
-const rollingDice = ref(null) // 振っている最中の仮の出目
+const rollingDice = ref(null) // 振っている最中の出目 [{ value, rolling }]
 const result = ref(null)
 
 const betValid = computed(() =>
@@ -35,7 +35,10 @@ const canPlay = computed(() =>
 )
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
-const randomDice = () => Array.from({ length: 3 }, () => Math.floor(Math.random() * 6) + 1)
+const randomDie = () => Math.floor(Math.random() * 6) + 1
+
+// サイコロが1つずつ止まるまでの待ち時間(最後の1つは少し溜める)
+const STOP_DELAYS = [600, 450, 1100]
 
 const play = async () => {
   if (!canPlay.value) return
@@ -50,14 +53,23 @@ const play = async () => {
       body: { pcId: selectedPc.value.id, bet: bet.value },
     })
 
-    // 1投ずつ転がす演出
+    // 1投ずつ、サイコロを1つずつ止める演出
     for (const dice of res.rolls) {
-      const timer = setInterval(() => { rollingDice.value = randomDice() }, 80)
-      await sleep(700)
+      rollingDice.value = dice.map(() => ({ value: randomDie(), rolling: true }))
+      const timer = setInterval(() => {
+        for (const d of rollingDice.value) {
+          if (d.rolling) d.value = randomDie()
+        }
+      }, 80)
+      for (let i = 0; i < dice.length; i++) {
+        await sleep(STOP_DELAYS[i])
+        rollingDice.value[i] = { value: dice[i], rolling: false }
+      }
       clearInterval(timer)
+      await sleep(400)
       rollingDice.value = null
       shownRolls.value.push(dice)
-      await sleep(350)
+      await sleep(250)
     }
     result.value = res
   } catch (e) {
@@ -101,7 +113,7 @@ const play = async () => {
         <div v-if="rollingDice" class="roll-row">
           <span class="roll-no">{{ shownRolls.length + 1 }}投目</span>
           <div class="dice">
-            <ChinchiroDie v-for="(d, j) in rollingDice" :key="j" :value="d" rolling />
+            <ChinchiroDie v-for="(d, j) in rollingDice" :key="j" :value="d.value" :rolling="d.rolling" />
           </div>
         </div>
         <p v-if="!playing && shownRolls.length === 0" class="bowl-empty">掛金を決めて「振る」</p>
