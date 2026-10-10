@@ -1,6 +1,8 @@
 <script setup>
 const props = defineProps({
   pc: { type: Object, required: true },
+  // 親の見出しに所持金を出している場合は非表示にする
+  hideHead: { type: Boolean, default: false },
 })
 const emit = defineEmits(['updated'])
 const { show } = useToast()
@@ -67,8 +69,8 @@ const describe = (log) => {
 </script>
 
 <template>
-  <div class="money-panel">
-    <div class="money-head">
+  <div class="money-panel" :class="{ flat: hideHead }">
+    <div v-if="!hideHead" class="money-head">
       <span class="money-label">所持金</span>
       <span class="money-value" :class="{ negative: pc.money < 0 }">{{ formatMoney(pc.money) }}</span>
     </div>
@@ -118,6 +120,16 @@ const describe = (log) => {
   padding: 10px 12px;
   border: 1px solid var(--color-text, #000);
   background: var(--color-bg, #fff);
+}
+
+.money-panel.flat {
+  margin: 0;
+  border: none;
+  padding: 12px;
+}
+
+.money-panel.flat .money-form {
+  margin-top: 0;
 }
 
 .money-head {
