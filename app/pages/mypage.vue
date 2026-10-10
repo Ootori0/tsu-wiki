@@ -527,7 +527,7 @@ const savePcCreate = async () => {
             </select>
 
             <label class="edit-label">所持金({{ MONEY_UNIT }})</label>
-            <input v-model.number="pcEditForm.money" type="number" min="0" step="1" class="edit-input" />
+            <input v-model.number="pcEditForm.money" type="number" step="1" class="edit-input" />
 
             <label class="check-label">
               <input v-model="pcEditForm.isRepresentative" type="checkbox" />
@@ -601,7 +601,7 @@ const savePcCreate = async () => {
             </select>
 
             <label class="edit-label">所持金({{ MONEY_UNIT }})</label>
-            <input v-model.number="pcNewForm.money" type="number" min="0" step="1" class="edit-input" />
+            <input v-model.number="pcNewForm.money" type="number" step="1" class="edit-input" />
 
             <label class="check-label">
               <input v-model="pcNewForm.isRepresentative" type="checkbox" />

@@ -14,7 +14,7 @@ const selectedId = defineModel({ type: Number, default: null })
     </select>
     <div class="wallet-money">
       <span class="money-label">所持金</span>
-      <span class="money-value">{{ formatMoney(pc?.money) }}</span>
+      <span class="money-value" :class="{ negative: (pc?.money ?? 0) < 0 }">{{ formatMoney(pc?.money) }}</span>
     </div>
   </div>
 </template>
@@ -64,5 +64,9 @@ const selectedId = defineModel({ type: Number, default: null })
   font-size: 1.2rem;
   font-weight: bold;
   line-height: 1.2;
+}
+
+.money-value.negative {
+  color: #ff6b6b;
 }
 </style>

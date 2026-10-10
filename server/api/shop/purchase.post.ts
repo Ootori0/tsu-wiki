@@ -43,12 +43,15 @@ export default defineEventHandler(async (event) => {
     .bind(item.id, pc.id)
     .all()
 
-  // CHECK制約(所持金・在庫は0以上)に反するとバッチ全体がロールバックされる
+  // 所持金・在庫が0未満になるとCHECK制約違反でバッチ全体がロールバックされる
+  // (所持金は pcs 側に制約がないので balance_checks に一度入れて確かめる)
   try {
     await db.batch([
       db
         .prepare('UPDATE pcs SET money = money - ?, updated_at = datetime(\'now\') WHERE id = ?')
         .bind(total, pc.id),
+      db.prepare('INSERT INTO balance_checks (money) SELECT money FROM pcs WHERE id = ?').bind(pc.id),
+      db.prepare('DELETE FROM balance_checks'),
       db
         .prepare('UPDATE shop_items SET stock = CASE WHEN stock IS NULL THEN NULL ELSE stock - ? END WHERE id = ?')
         .bind(qty, item.id),

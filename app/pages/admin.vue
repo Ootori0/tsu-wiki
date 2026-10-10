@@ -1,7 +1,7 @@
 <script setup>
 definePageMeta({ middleware: 'admin' })
 
-const tabs = ['アカウント管理', '権限管理', 'タグ管理', '所属管理', '商品管理']
+const tabs = ['アカウント管理', '権限管理', 'タグ管理', '所属管理', '商品管理', 'カジノ設定']
 const activeTab = ref('アカウント管理')
 
 // --- アカウント管理 ---
@@ -184,6 +184,28 @@ const deleteItem = async (id) => {
   if (!confirm('この商品を削除しますか?(購入履歴は残ります)')) return
   await $fetch(`/api/shop/items/${id}`, { method: 'DELETE' })
   await afterItemChange()
+}
+
+// --- カジノ設定 ---
+const { data: chinchiroData, refresh: refreshChinchiro } = await useFetch('/api/casino/chinchiro/payouts', {
+  key: 'admin-chinchiro-payouts',
+})
+const payoutForm = ref({})
+watch(chinchiroData, (d) => { payoutForm.value = { ...(d?.payouts ?? {}) } }, { immediate: true })
+const payoutMessage = ref('')
+const payoutError = ref('')
+
+const savePayouts = async () => {
+  payoutMessage.value = ''
+  payoutError.value = ''
+  try {
+    await $fetch('/api/casino/chinchiro/payouts', { method: 'PUT', body: { payouts: payoutForm.value } })
+    clearNuxtData('chinchiro-payouts')
+    await refreshChinchiro()
+    payoutMessage.value = '保存しました'
+  } catch (e) {
+    payoutError.value = e?.data?.statusMessage ?? '保存に失敗しました'
+  }
 }
 </script>
 
@@ -422,6 +444,35 @@ const deleteItem = async (id) => {
         </div>
       </div>
     </div>
+
+    <!-- カジノ設定 -->
+    <div v-if="activeTab === 'カジノ設定'" class="tab-content">
+      <div class="box">
+        <h2 class="box-title">チンチロの倍率</h2>
+        <p class="item-meta">掛金に対する所持金の増減(マイナスは負け)。小数第2位まで指定できます。</p>
+        <table class="payout-table">
+          <tr>
+            <th>役</th>
+            <th>確率</th>
+            <th>倍率</th>
+          </tr>
+          <tr v-for="h in CHINCHIRO_HANDS" :key="h.key">
+            <td>{{ h.label }}<br /><span class="item-meta">{{ h.desc }}</span></td>
+            <td class="item-meta">{{ (handProbability(h.key) * 100).toFixed(2) }}%</td>
+            <td>
+              <input v-model.number="payoutForm[h.key]" type="number" step="0.01" class="field-input payout-input" />
+            </td>
+          </tr>
+        </table>
+        <p class="item-meta expected">
+          期待値: 掛金1に対して {{ expectedReturn(payoutForm) >= 0 ? '+' : '' }}{{ expectedReturn(payoutForm).toFixed(3) }}
+          (還元率 {{ ((1 + expectedReturn(payoutForm)) * 100).toFixed(1) }}%)
+        </p>
+        <p v-if="payoutError" class="error-text">{{ payoutError }}</p>
+        <p v-if="payoutMessage" class="item-meta">{{ payoutMessage }}</p>
+        <button class="save-btn" @click="savePayouts">保存</button>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -613,6 +664,31 @@ const deleteItem = async (id) => {
 .add-seller {
   display: block;
   margin-top: 8px;
+}
+
+.payout-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 8px;
+  font-size: 0.85rem;
+}
+
+.payout-table th,
+.payout-table td {
+  padding: 4px;
+  border-bottom: 1px dashed var(--color-text, #000);
+  text-align: left;
+  vertical-align: middle;
+}
+
+.payout-input {
+  width: 90px;
+  margin-top: 0;
+}
+
+.expected {
+  margin-top: 10px;
+  font-weight: bold;
 }
 
 .item-meta {

@@ -94,7 +94,7 @@ CREATE TABLE pcs (
   is_office_representative INTEGER NOT NULL DEFAULT 0, -- 0/1 事務所の代表
   show_title INTEGER NOT NULL DEFAULT 1, -- 0/1 名前と一緒に肩書きを表示するか
   show_office INTEGER NOT NULL DEFAULT 1, -- 0/1 肩書きに事務所を表示するか
-  money INTEGER NOT NULL DEFAULT 0 CHECK (money >= 0), -- 所持金
+  money INTEGER NOT NULL DEFAULT 0, -- 所持金(万円単位。カジノの負けでマイナスになり得る)
   created_at TEXT DEFAULT (datetime('now')),
   updated_at TEXT DEFAULT (datetime('now')),
   FOREIGN KEY (created_by) REFERENCES users(id)
@@ -147,3 +147,29 @@ CREATE TABLE purchase_payouts (
 );
 
 CREATE INDEX idx_purchase_payouts_pc ON purchase_payouts(pc_id);
+
+-- 店の購入時に所持金がマイナスにならないことを確かめるための一時テーブル(常に空)
+CREATE TABLE balance_checks (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  money INTEGER NOT NULL CHECK (money >= 0)
+);
+
+-- チンチロの払い戻し倍率(掛金に対する増減の倍率。マイナスは負け)
+CREATE TABLE chinchiro_payouts (
+  hand TEXT PRIMARY KEY,
+  multiplier REAL NOT NULL
+);
+
+CREATE TABLE chinchiro_games (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  pc_id INTEGER NOT NULL,
+  bet INTEGER NOT NULL,
+  rolls TEXT NOT NULL, -- JSON配列 [[1,2,3], ...]
+  hand TEXT NOT NULL,
+  multiplier REAL NOT NULL,
+  net INTEGER NOT NULL, -- 所持金の増減
+  played_by INTEGER NOT NULL,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE INDEX idx_chinchiro_games_pc ON chinchiro_games(pc_id);

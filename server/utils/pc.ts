@@ -13,9 +13,10 @@ export function parsePcBody(body) {
     throw createError({ statusCode: 400, statusMessage: '級は1~10で指定してください' })
   }
 
+  // カジノの負けでマイナスになり得るので負の値も許可
   const moneyNum = Number(money ?? 0)
-  if (!Number.isInteger(moneyNum) || moneyNum < 0) {
-    throw createError({ statusCode: 400, statusMessage: '所持金は0以上の整数で指定してください' })
+  if (!Number.isInteger(moneyNum)) {
+    throw createError({ statusCode: 400, statusMessage: '所持金は整数で指定してください' })
   }
 
   return {
