@@ -23,16 +23,17 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 403, statusMessage: '編集権限がありません' })
   }
 
+  // 所持金は /api/pcs/[id]/money で履歴つきで更新するのでここでは変更しない
   const pc = parsePcBody(await readBody(event))
 
   await db
     .prepare(
       `UPDATE pcs
        SET name = ?, affiliation = ?, office = ?, grade = ?, memo = ?, is_representative = ?, is_office_representative = ?,
-           show_title = ?, show_office = ?, money = ?, updated_at = datetime('now')
+           show_title = ?, show_office = ?, updated_at = datetime('now')
        WHERE id = ?`
     )
-    .bind(pc.name, pc.affiliation, pc.office, pc.grade, pc.memo, pc.isRepresentative, pc.isOfficeRepresentative, pc.showTitle, pc.showOffice, pc.money, id)
+    .bind(pc.name, pc.affiliation, pc.office, pc.grade, pc.memo, pc.isRepresentative, pc.isOfficeRepresentative, pc.showTitle, pc.showOffice, id)
     .run()
 
   return { id: Number(id), success: true }

@@ -236,7 +236,6 @@ const startPcEdit = async (item) => {
     affiliation: item.affiliation ?? '',
     office: item.office ?? '',
     grade: item.grade,
-    money: item.money,
     memo: item.memo ?? '',
     isRepresentative: item.is_representative,
     isOfficeRepresentative: item.is_office_representative,
@@ -526,9 +525,6 @@ const savePcCreate = async () => {
               <option v-for="g in grades" :key="g" :value="g">{{ g }}級</option>
             </select>
 
-            <label class="edit-label">所持金({{ MONEY_UNIT }})</label>
-            <input v-model.number="pcEditForm.money" type="number" step="1" class="edit-input" />
-
             <label class="check-label">
               <input v-model="pcEditForm.isRepresentative" type="checkbox" />
               協会の代表
@@ -567,9 +563,10 @@ const savePcCreate = async () => {
 
           <div v-else class="view-mode">
             <p class="meta-line">
-              所属: {{ item.affiliation || '-' }} / 事務所: {{ item.office || '-' }} / {{ item.grade }}級<template v-if="pcRoles(item)"> / {{ pcRoles(item) }}</template> / 所持金: {{ formatMoney(item.money) }}
+              所属: {{ item.affiliation || '-' }} / 事務所: {{ item.office || '-' }} / {{ item.grade }}級<template v-if="pcRoles(item)"> / {{ pcRoles(item) }}</template>
             </p>
             <MarkdownText :text="item.memo" />
+            <PcMoneyPanel :pc="item" @updated="refreshPcs" />
             <button class="edit-btn" @click="startPcEdit(item)">編集</button>
           </div>
         </template>
@@ -600,7 +597,7 @@ const savePcCreate = async () => {
               <option v-for="g in grades" :key="g" :value="g">{{ g }}級</option>
             </select>
 
-            <label class="edit-label">所持金({{ MONEY_UNIT }})</label>
+            <label class="edit-label">初期所持金({{ MONEY_UNIT }})</label>
             <input v-model.number="pcNewForm.money" type="number" step="1" class="edit-input" />
 
             <label class="check-label">
