@@ -1,6 +1,6 @@
 export function parsePcBody(body) {
   const {
-    name, affiliation, office, grade, memo,
+    name, affiliation, office, grade, memo, money,
     isRepresentative, isOfficeRepresentative, showTitle, showOffice,
   } = body ?? {}
 
@@ -13,6 +13,12 @@ export function parsePcBody(body) {
     throw createError({ statusCode: 400, statusMessage: '級は1~10で指定してください' })
   }
 
+  // カジノの負けでマイナスになり得るので負の値も許可
+  const moneyNum = Number(money ?? 0)
+  if (!Number.isInteger(moneyNum)) {
+    throw createError({ statusCode: 400, statusMessage: '所持金は整数で指定してください' })
+  }
+
   return {
     name,
     affiliation: affiliation ?? '',
@@ -23,6 +29,7 @@ export function parsePcBody(body) {
     isOfficeRepresentative: isOfficeRepresentative ? 1 : 0,
     showTitle: showTitle === false ? 0 : 1,
     showOffice: showOffice === false ? 0 : 1,
+    money: moneyNum,
   }
 }
 

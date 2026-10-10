@@ -15,10 +15,10 @@ export default defineEventHandler(async (event) => {
   const result = await db
     .prepare(
       `INSERT INTO pcs (created_by, name, affiliation, office, grade, memo,
-        is_representative, is_office_representative, show_title, show_office)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        is_representative, is_office_representative, show_title, show_office, money)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
-    .bind(currentUser.id, pc.name, pc.affiliation, pc.office, pc.grade, pc.memo, pc.isRepresentative, pc.isOfficeRepresentative, pc.showTitle, pc.showOffice)
+    .bind(currentUser.id, pc.name, pc.affiliation, pc.office, pc.grade, pc.memo, pc.isRepresentative, pc.isOfficeRepresentative, pc.showTitle, pc.showOffice, pc.money)
     .run()
 
   return { id: result.meta.last_row_id, success: true }

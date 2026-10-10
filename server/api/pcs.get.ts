@@ -7,5 +7,9 @@ export default defineEventHandler(async (event) => {
     .prepare('SELECT * FROM pcs ORDER BY affiliation ASC, grade ASC, name ASC')
     .all()
 
-  return results.map(formatPc)
+  // 所持金は本人(マイページ・店)でのみ扱うため公開一覧には含めない
+  return results.map((r) => {
+    const { money, ...pc } = formatPc(r)
+    return pc
+  })
 })
