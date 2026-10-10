@@ -72,6 +72,5 @@ export default defineEventHandler(async (event) => {
     multiplier,
     net,
     money: updated.money,
-    dealer: dealerPcId ? { pcName: dealer.pcName, delta: dealerDelta } : null,
   }
 })

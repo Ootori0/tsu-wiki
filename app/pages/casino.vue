@@ -126,9 +126,6 @@ const play = async () => {
         <span class="result-net">
           {{ result.net > 0 ? '+' : '' }}{{ formatMoney(result.net) }}
         </span>
-        <span v-if="result.dealer" class="result-dealer">
-          ディーラー {{ result.dealer.pcName }}: {{ result.dealer.delta > 0 ? '+' : '' }}{{ formatMoney(result.dealer.delta) }}
-        </span>
       </div>
       <p v-if="errorMessage" class="error-text">{{ errorMessage }}</p>
 
@@ -322,12 +319,6 @@ const play = async () => {
   font-size: 0.78rem;
 }
 
-.result-dealer {
-  width: 100%;
-  text-align: center;
-  font-size: 0.75rem;
-  opacity: 0.8;
-}
 
 .history-kind {
   display: inline-block;
