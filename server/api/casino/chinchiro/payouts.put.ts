@@ -1,6 +1,7 @@
 import { getSessionUser } from '../../../utils/session'
 import { isAdmin } from '../../../utils/permission'
 import { CHINCHIRO_HANDS } from '../../../utils/chinchiro'
+import { invalidateCache } from '../../../utils/cache'
 
 export default defineEventHandler(async (event) => {
   const db = event.context.cloudflare.env.tsu_wiki_db
@@ -53,5 +54,7 @@ export default defineEventHandler(async (event) => {
     setting('dealer_pc_id', dealerId === null ? null : String(dealerId)),
     setting('dealer_share', String(share)),
   ])
+  invalidateCache('casino:payouts', 'casino:dealer')
+
   return { success: true }
 })

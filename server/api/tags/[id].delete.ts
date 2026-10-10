@@ -1,5 +1,6 @@
 import { getSessionUser } from '../../utils/session'
 import { isAdmin } from '../../utils/permission'
+import { invalidateCache } from '../../utils/cache'
 
 export default defineEventHandler(async (event) => {
   const db = event.context.cloudflare.env.tsu_wiki_db
@@ -12,6 +13,8 @@ export default defineEventHandler(async (event) => {
 
   const id = getRouterParam(event, 'id')
   await db.prepare('DELETE FROM tags WHERE id = ?').bind(id).run()
+
+  invalidateCache('tags')
 
   return { success: true }
 })

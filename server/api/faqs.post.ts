@@ -1,3 +1,5 @@
+import { invalidateCache } from '../utils/cache'
+
 export default defineEventHandler(async (event) => {
   const db = event.context.cloudflare.env.tsu_wiki_db
   const body = await readBody(event)
@@ -17,6 +19,8 @@ export default defineEventHandler(async (event) => {
     )
     .bind(question, answer, sortOrder ?? 0)
     .run()
+
+  invalidateCache('faqs')
 
   return { id: result.meta.last_row_id, question, answer, sortOrder }
 })

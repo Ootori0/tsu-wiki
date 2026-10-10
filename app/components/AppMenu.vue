@@ -1,8 +1,8 @@
 <script setup>
-const { user, fetchUser, logout } = useAuth()
+const { user, ensureUser, logout } = useAuth()
 
 onMounted(() => {
-  fetchUser()
+  ensureUser()
 })
 
 const drawer = ref(false)

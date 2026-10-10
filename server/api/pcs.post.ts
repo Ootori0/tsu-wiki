@@ -1,5 +1,6 @@
 import { getSessionUser } from '../utils/session'
 import { parsePcBody } from '../utils/pc'
+import { invalidateCache } from '../utils/cache'
 
 export default defineEventHandler(async (event) => {
   const db = event.context.cloudflare.env.tsu_wiki_db
@@ -32,6 +33,8 @@ export default defineEventHandler(async (event) => {
         ]
       : []),
   ])
+
+  invalidateCache('pcs', 'casino:dealer')
 
   return { id: result.meta.last_row_id, success: true }
 })

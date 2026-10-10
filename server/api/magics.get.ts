@@ -1,5 +1,6 @@
 import { getSessionUser } from '../utils/session'
 import { canView } from '../utils/permission'
+import { cached } from '../utils/cache'
 
 export default defineEventHandler(async (event) => {
   const db = event.context.cloudflare.env.tsu_wiki_db
@@ -9,26 +10,20 @@ export default defineEventHandler(async (event) => {
   const query = getQuery(event)
   const type = query.type
 
-  let sql = 'SELECT * FROM magics'
-  const params = []
-
-  if (type && type !== 'すべて') {
-    sql += ' WHERE type = ?'
-    params.push(type)
-  }
-
-  sql += ' ORDER BY sort_order ASC'
-
-  const { results } = await db.prepare(sql).bind(...params).all()
-
-  const userPermissions = currentUser?.permissions ?? null
-
-  const visibleResults = results
-    .map((r) => ({
+  // 全件をキャッシュし、区分・閲覧権限での絞り込みはリクエストごとに行う
+  const all = await cached('magics', async () => {
+    const { results } = await db.prepare('SELECT * FROM magics ORDER BY sort_order ASC').all()
+    return results.map((r) => ({
       ...r,
       tags: JSON.parse(r.tags),
       visible_permissions: JSON.parse(r.visible_permissions),
     }))
+  })
+
+  const userPermissions = currentUser?.permissions ?? null
+
+  const visibleResults = all
+    .filter((r) => !type || type === 'すべて' || r.type === type)
     .filter((r) => canView(userPermissions, r.visible_permissions))
 
   return visibleResults
