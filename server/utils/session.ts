@@ -17,16 +17,14 @@ export async function createSession(db: any, userId: number) {
 export async function getSessionUser(db: any, sessionId: string) {
   if (!sessionId) return null
 
-  const session = await db
-    .prepare('SELECT * FROM sessions WHERE id = ? AND expires_at > datetime("now")')
-    .bind(sessionId)
-    .first()
-
-  if (!session) return null
-
+  // セッションとユーザーを1回の読み出しで取得する
   const user = await db
-    .prepare('SELECT id, name, permissions FROM users WHERE id = ?')
-    .bind(session.user_id)
+    .prepare(
+      `SELECT users.id, users.name, users.permissions
+       FROM sessions JOIN users ON users.id = sessions.user_id
+       WHERE sessions.id = ? AND sessions.expires_at > datetime("now")`
+    )
+    .bind(sessionId)
     .first()
 
   if (!user) return null

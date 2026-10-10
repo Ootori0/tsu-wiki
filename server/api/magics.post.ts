@@ -1,4 +1,5 @@
 import { getSessionUser } from '../utils/session'
+import { invalidateCache } from '../utils/cache'
 
 export default defineEventHandler(async (event) => {
   const db = event.context.cloudflare.env.tsu_wiki_db
@@ -38,6 +39,8 @@ export default defineEventHandler(async (event) => {
       sortOrder ?? 0
     )
     .run()
+
+  invalidateCache('magics')
 
   return { id: result.meta.last_row_id, success: true }
 })

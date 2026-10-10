@@ -1,5 +1,6 @@
 import { getSessionUser } from '../../utils/session'
 import { isAdmin } from '../../utils/permission'
+import { invalidateCache } from '../../utils/cache'
 
 export default defineEventHandler(async (event) => {
   const db = event.context.cloudflare.env.tsu_wiki_db
@@ -23,6 +24,8 @@ export default defineEventHandler(async (event) => {
   }
 
   const result = await db.prepare('INSERT INTO permissions (name) VALUES (?)').bind(name).run()
+
+  invalidateCache('permissions')
 
   return { id: result.meta.last_row_id, name }
 })

@@ -1,3 +1,5 @@
+import { cached } from './cache'
+
 // チンチロ(賭博黙示録カイジの地下チンチロのルールを1人用に簡略化)
 // サイコロ3つを最大3回振り、役が出た時点で終了。3回とも役なしなら「目なし」
 // 倍率は掛金に対する所持金の増減(マイナスは負け)
@@ -57,7 +59,9 @@ export function playChinchiro() {
 }
 
 export async function loadPayouts(db) {
-  const { results } = await db.prepare('SELECT hand, multiplier FROM chinchiro_payouts').all()
+  const { results } = await cached('casino:payouts', () =>
+    db.prepare('SELECT hand, multiplier FROM chinchiro_payouts').all()
+  )
   const payouts = { ...DEFAULT_PAYOUTS }
   for (const r of results) {
     if (r.hand in payouts) payouts[r.hand] = r.multiplier
@@ -66,7 +70,11 @@ export async function loadPayouts(db) {
 }
 
 // ディーラー設定: { pcId, pcName, share(%) }。未設定なら pcId は null
-export async function loadDealer(db) {
+export function loadDealer(db) {
+  return cached('casino:dealer', () => loadDealerFromDb(db))
+}
+
+async function loadDealerFromDb(db) {
   const { results } = await db.prepare('SELECT key, value FROM casino_settings').all()
   const map = Object.fromEntries(results.map((r) => [r.key, r.value]))
   const pcId = map.dealer_pc_id ? Number(map.dealer_pc_id) : null

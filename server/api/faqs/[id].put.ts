@@ -1,3 +1,5 @@
+import { invalidateCache } from '../../utils/cache'
+
 export default defineEventHandler(async (event) => {
   const db = event.context.cloudflare.env.tsu_wiki_db
   const id = getRouterParam(event, 'id')
@@ -20,6 +22,8 @@ export default defineEventHandler(async (event) => {
     )
     .bind(question, answer, id)
     .run()
+
+  invalidateCache('faqs')
 
   return { id: Number(id), question, answer }
 })

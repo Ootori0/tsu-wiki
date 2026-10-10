@@ -15,7 +15,7 @@ const run = async (action, successMessage, errorMessage = '操作に失敗しま
   }
 }
 
-const tabs = ['アカウント管理', '権限管理', 'タグ管理', '所属管理', '商品管理', 'カジノ設定']
+const tabs = ['アカウント管理', '権限管理', 'タグ管理', '所属管理', '商品管理', 'カジノ設定', '所持金履歴']
 const activeTab = ref('アカウント管理')
 
 // --- アカウント管理 ---
@@ -218,6 +218,19 @@ const deleteItem = async (id) => {
     await afterItemChange()
   }, '商品を削除しました')
 }
+
+// --- 所持金履歴 ---
+const logPcId = ref(null)
+const { data: moneyLogs, execute: loadMoneyLogs, pending: loadingLogs } = await useFetch('/api/admin/money-logs', {
+  key: 'admin-money-logs',
+  query: computed(() => (logPcId.value ? { pcId: logPcId.value } : {})),
+  immediate: false,
+  watch: false,
+})
+// タブを開いたとき・PCを切り替えたときに読み込む
+watch([activeTab, logPcId], () => {
+  if (activeTab.value === '所持金履歴') loadMoneyLogs()
+})
 
 // --- カジノ設定 ---
 const { data: chinchiroData, refresh: refreshChinchiro } = await useFetch('/api/casino/chinchiro/payouts', {
@@ -481,6 +494,35 @@ const savePayouts = async () => {
       </div>
     </div>
 
+    <!-- 所持金履歴 -->
+    <div v-if="activeTab === '所持金履歴'" class="tab-content">
+      <div class="box">
+        <h2 class="box-title">所持金履歴(最新200件)</h2>
+        <div class="inline-form">
+          <select v-model="logPcId" class="field-input">
+            <option :value="null">すべてのPC</option>
+            <option v-for="pc in allPcs ?? []" :key="pc.id" :value="pc.id">{{ pc.name }}</option>
+          </select>
+          <button class="edit-btn" :disabled="loadingLogs" @click="loadMoneyLogs()">再読み込み</button>
+        </div>
+        <div v-for="log in moneyLogs ?? []" :key="`${log.kind}-${log.id}`" class="log-row">
+          <div class="log-top">
+            <span class="item-meta">{{ formatDateTime(log.created_at) }}</span>
+            <span class="log-pc">{{ log.pc_name ?? '(削除済みPC)' }}</span>
+            <span class="log-amount" :class="{ plus: log.amount > 0, minus: log.amount < 0 }">
+              {{ log.amount > 0 ? '+' : '' }}{{ formatMoney(log.amount) }}
+            </span>
+          </div>
+          <div class="item-meta">
+            <span class="log-kind">{{ MONEY_LOG_KIND_LABELS[log.kind] }}</span>
+            {{ describeMoneyLog(log) }}
+            <template v-if="log.user_name">(操作: {{ log.user_name }})</template>
+          </div>
+        </div>
+        <p v-if="!loadingLogs && (moneyLogs ?? []).length === 0" class="empty">履歴はありません</p>
+      </div>
+    </div>
+
     <!-- カジノ設定 -->
     <div v-if="activeTab === 'カジノ設定'" class="tab-content">
       <div class="box">
@@ -709,6 +751,8 @@ const savePayouts = async () => {
   padding: 3px 10px;
   font-size: 0.78rem;
   cursor: pointer;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .seller-row {
@@ -743,6 +787,50 @@ const savePayouts = async () => {
   border-bottom: 1px dashed var(--color-text, #000);
   text-align: left;
   vertical-align: middle;
+}
+
+.log-row {
+  border-top: 1px dashed var(--color-text, #000);
+  padding: 8px 0;
+}
+
+.log-row:first-of-type {
+  margin-top: 10px;
+}
+
+.log-top {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.log-pc {
+  flex: 1;
+  font-weight: bold;
+  font-size: 0.9rem;
+}
+
+.log-amount {
+  font-weight: bold;
+  white-space: nowrap;
+}
+
+.log-amount.plus {
+  color: var(--color-plus);
+}
+
+.log-amount.minus {
+  color: var(--color-error);
+}
+
+.log-kind {
+  display: inline-block;
+  margin-right: 4px;
+  padding: 0 5px;
+  font-size: 0.65rem;
+  font-weight: bold;
+  border: 1px solid #000;
+  background: var(--color-accent);
 }
 
 .payout-display {

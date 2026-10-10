@@ -1,6 +1,7 @@
 import { getSessionUser } from '../../utils/session'
 import { isAdmin } from '../../utils/permission'
 import { parsePcBody } from '../../utils/pc'
+import { invalidateCache } from '../../utils/cache'
 
 export default defineEventHandler(async (event) => {
   const db = event.context.cloudflare.env.tsu_wiki_db
@@ -35,6 +36,8 @@ export default defineEventHandler(async (event) => {
     )
     .bind(pc.name, pc.affiliation, pc.office, pc.grade, pc.memo, pc.isRepresentative, pc.isOfficeRepresentative, pc.showTitle, pc.showOffice, id)
     .run()
+
+  invalidateCache('pcs', 'casino:dealer')
 
   return { id: Number(id), success: true }
 })
