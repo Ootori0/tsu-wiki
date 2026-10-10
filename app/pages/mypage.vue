@@ -205,6 +205,10 @@ const formPreview = (form) => ({
   show_office: form.showOffice,
 })
 
+// 一覧ごと折りたためる見出し(件数つき)
+const magicSectionTitle = computed(() => `あなたの魔法一覧(${(fetchedMagics.value ?? []).length}件)`)
+const pcSectionTitle = computed(() => `あなたのPC一覧(${(fetchedPcs.value ?? []).length}件)`)
+
 const myPcItems = computed(() =>
   (fetchedPcs.value ?? []).map((pc) => ({ ...pc, title: pcTitle(pc) }))
 )
@@ -385,8 +389,9 @@ const savePcCreate = async () => {
     </div>
 
     <!-- 自分の魔法一覧 -->
-    <div class="box">
-      <h2 class="box-title">あなたの魔法一覧</h2>
+    <AccordionList :items="[{ id: 'magics', title: magicSectionTitle }]" title-key="title" class="section-accordion">
+      <template #detail>
+        <div class="section-body">
 
       <p v-if="!(fetchedMagics ?? []).length" class="empty">まだ魔法がありません</p>
       <AccordionList :items="fetchedMagics ?? []" title-key="name" body-key="effect">
@@ -514,11 +519,14 @@ const savePcCreate = async () => {
           </div>
         </div>
       </div>
-    </div>
+        </div>
+      </template>
+    </AccordionList>
 
     <!-- 自分のPC一覧 -->
-    <div class="box">
-      <h2 class="box-title">あなたのPC一覧</h2>
+    <AccordionList :items="[{ id: 'pcs', title: pcSectionTitle }]" title-key="title" class="section-accordion">
+      <template #detail>
+        <div class="section-body">
 
       <p v-if="!myPcItems.length" class="empty">まだPCがありません</p>
       <AccordionList :items="myPcItems" title-key="title" body-key="memo">
@@ -585,7 +593,15 @@ const savePcCreate = async () => {
               所属: {{ item.affiliation || '-' }} / 事務所: {{ item.office || '-' }} / {{ item.grade }}級<template v-if="pcRoles(item)"> / {{ pcRoles(item) }}</template>
             </p>
             <MarkdownText :text="item.memo" />
-            <PcMoneyPanel :pc="item" @updated="refreshPcs" />
+            <AccordionList
+              :items="[{ id: `money-${item.id}`, title: `所持金: ${formatMoney(item.money)}` }]"
+              title-key="title"
+              class="money-accordion"
+            >
+              <template #detail>
+                <PcMoneyPanel :pc="item" hide-head @updated="refreshPcs" />
+              </template>
+            </AccordionList>
             <button class="edit-btn" @click="startPcEdit(item)">編集</button>
           </div>
         </template>
@@ -654,7 +670,9 @@ const savePcCreate = async () => {
           </div>
         </div>
       </div>
-    </div>
+        </div>
+      </template>
+    </AccordionList>
 
     <ConfirmDialog
       v-model="showConfirm"
@@ -903,6 +921,18 @@ const savePcCreate = async () => {
   font-size: 0.85rem;
   cursor: pointer;
   margin-left: auto;
+}
+
+.section-accordion {
+  margin-bottom: 16px;
+}
+
+.section-body {
+  padding: 12px;
+}
+
+.money-accordion {
+  margin: 10px 0;
 }
 
 .add-box {
