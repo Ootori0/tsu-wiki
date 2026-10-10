@@ -1,7 +1,7 @@
 <script setup>
 definePageMeta({ middleware: 'admin' })
 
-const tabs = ['アカウント管理', '権限管理', 'タグ管理', '所属管理']
+const tabs = ['アカウント管理', '権限管理', 'タグ管理', '所属管理', '商品管理']
 const activeTab = ref('アカウント管理')
 
 // --- アカウント管理 ---
@@ -111,6 +111,68 @@ const deleteAffiliation = async (id) => {
   if (!confirm('この所属を削除しますか?')) return
   await $fetch(`/api/affiliations/${id}`, { method: 'DELETE' })
   await refreshAffiliations()
+}
+
+// --- 商品管理 ---
+const shops = ['魔法店', '武器屋']
+const { data: shopItems, refresh: refreshShopItems } = await useFetch('/api/shop/items', {
+  key: 'admin-shop-items',
+})
+const { data: allPurchases, refresh: refreshAllPurchases } = await useFetch('/api/shop/purchases', {
+  key: 'admin-purchases',
+})
+
+const emptyItemForm = () => ({ shop: '魔法店', name: '', price: 0, stock: '', description: '' })
+const newItem = ref(emptyItemForm())
+const editingItemId = ref(null)
+const editItem = ref(emptyItemForm())
+const itemError = ref('')
+
+const afterItemChange = async () => {
+  // 店ページの商品キャッシュも破棄する
+  clearNuxtData('shop-items')
+  await refreshShopItems()
+}
+
+const createItem = async () => {
+  if (!newItem.value.name) return
+  itemError.value = ''
+  try {
+    await $fetch('/api/shop/items', { method: 'POST', body: newItem.value })
+    newItem.value = emptyItemForm()
+    await afterItemChange()
+  } catch (e) {
+    itemError.value = e?.data?.statusMessage ?? '追加に失敗しました'
+  }
+}
+
+const startEditItem = (item) => {
+  itemError.value = ''
+  editingItemId.value = item.id
+  editItem.value = {
+    shop: item.shop,
+    name: item.name,
+    price: item.price,
+    stock: item.stock ?? '',
+    description: item.description ?? '',
+  }
+}
+
+const saveItem = async (id) => {
+  itemError.value = ''
+  try {
+    await $fetch(`/api/shop/items/${id}`, { method: 'PUT', body: editItem.value })
+    editingItemId.value = null
+    await afterItemChange()
+  } catch (e) {
+    itemError.value = e?.data?.statusMessage ?? '保存に失敗しました'
+  }
+}
+
+const deleteItem = async (id) => {
+  if (!confirm('この商品を削除しますか?(購入履歴は残ります)')) return
+  await $fetch(`/api/shop/items/${id}`, { method: 'DELETE' })
+  await afterItemChange()
 }
 </script>
 
@@ -246,6 +308,80 @@ const deleteAffiliation = async (id) => {
         <div v-for="a in affiliations ?? []" :key="a.id" class="list-row">
           <span>{{ a.name }}</span>
           <button class="delete-btn" @click="deleteAffiliation(a.id)">削除</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 商品管理 -->
+    <div v-if="activeTab === '商品管理'" class="tab-content">
+      <div class="box">
+        <h2 class="box-title">商品追加</h2>
+        <label class="field-label">店</label>
+        <select v-model="newItem.shop" class="field-input">
+          <option v-for="s in shops" :key="s" :value="s">{{ s }}</option>
+        </select>
+        <label class="field-label">商品名</label>
+        <input v-model="newItem.name" class="field-input" />
+        <label class="field-label">価格({{ MONEY_UNIT }})</label>
+        <input v-model.number="newItem.price" type="number" min="0" class="field-input" />
+        <label class="field-label">在庫(空欄=無制限)</label>
+        <input v-model="newItem.stock" type="number" min="0" class="field-input" />
+        <label class="field-label">説明</label>
+        <textarea v-model="newItem.description" class="field-input" rows="3" />
+        <p v-if="itemError && !editingItemId" class="error-text">{{ itemError }}</p>
+        <button class="save-btn" :disabled="!newItem.name" @click="createItem">追加</button>
+      </div>
+
+      <div v-for="shop in shops" :key="shop" class="box">
+        <h2 class="box-title">{{ shop }}の商品</h2>
+        <div
+          v-for="item in (shopItems ?? []).filter((i) => i.shop === shop)"
+          :key="item.id"
+          class="user-row"
+        >
+          <template v-if="editingItemId === item.id">
+            <label class="field-label">店</label>
+            <select v-model="editItem.shop" class="field-input">
+              <option v-for="s in shops" :key="s" :value="s">{{ s }}</option>
+            </select>
+            <label class="field-label">商品名</label>
+            <input v-model="editItem.name" class="field-input" />
+            <label class="field-label">価格({{ MONEY_UNIT }})</label>
+            <input v-model.number="editItem.price" type="number" min="0" class="field-input" />
+            <label class="field-label">在庫(空欄=無制限)</label>
+            <input v-model="editItem.stock" type="number" min="0" class="field-input" />
+            <label class="field-label">説明</label>
+            <textarea v-model="editItem.description" class="field-input" rows="3" />
+            <p v-if="itemError" class="error-text">{{ itemError }}</p>
+            <div class="inline-form">
+              <button class="save-btn" @click="saveItem(item.id)">保存</button>
+              <button class="save-btn cancel" @click="editingItemId = null">キャンセル</button>
+            </div>
+          </template>
+          <template v-else>
+            <div class="user-row-header">
+              <span class="user-row-name">{{ item.name }}</span>
+              <div class="inline-form">
+                <button class="edit-btn" @click="startEditItem(item)">編集</button>
+                <button class="delete-btn" @click="deleteItem(item.id)">削除</button>
+              </div>
+            </div>
+            <p class="item-meta">
+              {{ formatMoney(item.price) }} / 在庫: {{ item.stock === null ? '無制限' : item.stock }}
+            </p>
+          </template>
+        </div>
+      </div>
+
+      <div class="box">
+        <h2 class="box-title">購入履歴(最新100件)</h2>
+        <button class="edit-btn" @click="refreshAllPurchases()">再読み込み</button>
+        <div v-for="p in allPurchases ?? []" :key="p.id" class="list-row">
+          <span class="item-meta">
+            {{ formatDateTime(p.created_at) }}<br />
+            {{ p.pc_name ?? '(削除済みPC)' }}: [{{ p.shop }}] {{ p.item_name }} ×{{ p.quantity }}
+          </span>
+          <span class="user-row-name">{{ formatMoney(p.total) }}</span>
         </div>
       </div>
     </div>
@@ -403,6 +539,30 @@ const deleteAffiliation = async (id) => {
 
 .list-row:first-child {
   border-top: none;
+}
+
+.error-text {
+  color: #c00;
+  font-size: 0.8rem;
+  margin: 6px 0 0;
+}
+
+.save-btn.cancel {
+  background: var(--color-bg, #fff);
+}
+
+.edit-btn {
+  border: 1px solid var(--color-text, #000);
+  background: var(--color-accent, #ffd400);
+  padding: 3px 10px;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+
+.item-meta {
+  margin: 0;
+  font-size: 0.78rem;
+  opacity: 0.8;
 }
 
 .delete-btn {

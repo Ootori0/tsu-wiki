@@ -29,10 +29,10 @@ export default defineEventHandler(async (event) => {
     .prepare(
       `UPDATE pcs
        SET name = ?, affiliation = ?, office = ?, grade = ?, memo = ?, is_representative = ?, is_office_representative = ?,
-           show_title = ?, show_office = ?, updated_at = datetime('now')
+           show_title = ?, show_office = ?, money = ?, updated_at = datetime('now')
        WHERE id = ?`
     )
-    .bind(pc.name, pc.affiliation, pc.office, pc.grade, pc.memo, pc.isRepresentative, pc.isOfficeRepresentative, pc.showTitle, pc.showOffice, id)
+    .bind(pc.name, pc.affiliation, pc.office, pc.grade, pc.memo, pc.isRepresentative, pc.isOfficeRepresentative, pc.showTitle, pc.showOffice, pc.money, id)
     .run()
 
   return { id: Number(id), success: true }

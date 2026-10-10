@@ -8,6 +8,15 @@ defineProps({
     type: String,
     default: '確認',
   },
+  // false の場合は削除以外の確認用(黄色ボタン)
+  danger: {
+    type: Boolean,
+    default: true,
+  },
+  confirmLabel: {
+    type: String,
+    default: '削除する',
+  },
   message: {
     type: String,
     default: 'この操作を実行しますか?',
@@ -37,7 +46,7 @@ const onConfirm = () => {
 
         <div class="confirm-actions">
           <button class="confirm-cancel" @click="onCancel">キャンセル</button>
-          <button class="confirm-delete" @click="onConfirm">削除する</button>
+          <button class="confirm-delete" :class="{ safe: !danger }" @click="onConfirm">{{ confirmLabel }}</button>
         </div>
       </div>
     </div>
@@ -124,6 +133,13 @@ const onConfirm = () => {
 
 .confirm-delete:active {
   background: #900;
+}
+
+.confirm-delete.safe {
+  background: var(--color-accent, #ffd400);
+  color: #000;
+  border-color: #000;
+  font-weight: bold;
 }
 
 @keyframes fadeIn {
