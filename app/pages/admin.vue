@@ -596,6 +596,16 @@ const savePayouts = async () => {
   display: none;
 }
 
+/* マウス操作の端末では横スクロールできないので折り返して全タブを表示する */
+@media (hover: hover) and (pointer: fine) {
+  .tab-bar {
+    flex-wrap: wrap;
+    overflow-x: visible;
+    margin: 0 0 16px;
+    padding: 0;
+  }
+}
+
 .tab-btn {
   border: 1px solid var(--color-text, #000);
   background: var(--color-bg, #fff);
