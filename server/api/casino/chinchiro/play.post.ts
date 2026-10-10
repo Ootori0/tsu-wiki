@@ -1,6 +1,8 @@
 import { getSessionUser } from '../../../utils/session'
 import { isAdmin } from '../../../utils/permission'
-import { BET_UNIT, loadPayouts, loadDealer, dealerDeltaOf, playChinchiro } from '../../../utils/chinchiro'
+import {
+  BET_UNIT, DAILY_PLAY_LIMIT, loadPayouts, loadDealer, dealerDeltaOf, playChinchiro, countPlaysToday, todayStartUtc,
+} from '../../../utils/chinchiro'
 
 export default defineEventHandler(async (event) => {
   const db = event.context.cloudflare.env.tsu_wiki_db
@@ -27,6 +29,9 @@ export default defineEventHandler(async (event) => {
   if (pc.money < betNum) {
     throw createError({ statusCode: 409, statusMessage: '所持金が掛金に足りません' })
   }
+  if ((await countPlaysToday(db, pc.id)) >= DAILY_PLAY_LIMIT) {
+    throw createError({ statusCode: 429, statusMessage: `今日のプレイ回数の上限(${DAILY_PLAY_LIMIT}回)に達しました` })
+  }
 
   const payouts = await loadPayouts(db)
   const dealer = await loadDealer(db)
@@ -43,6 +48,13 @@ export default defineEventHandler(async (event) => {
   try {
     await db.batch([
       db.prepare('INSERT INTO balance_checks (money) SELECT money - ? FROM pcs WHERE id = ?').bind(betNum, pc.id),
+      // 同時に遊ばれても上限を超えないよう、残り回数が0以上であることも同じ仕組みで確かめる
+      db
+        .prepare(
+          `INSERT INTO balance_checks (money)
+           SELECT ? - 1 - COUNT(*) FROM chinchiro_games WHERE pc_id = ? AND created_at >= ?`
+        )
+        .bind(DAILY_PLAY_LIMIT, pc.id, todayStartUtc()),
       db.prepare('DELETE FROM balance_checks'),
       db
         .prepare('UPDATE pcs SET money = money + ?, updated_at = datetime(\'now\') WHERE id = ?')
@@ -62,7 +74,7 @@ export default defineEventHandler(async (event) => {
         .bind(pc.id, betNum, JSON.stringify(rolls), hand, multiplier, net, dealerPcId, dealerDelta, currentUser.id),
     ])
   } catch {
-    throw createError({ statusCode: 409, statusMessage: '所持金が掛金に足りません' })
+    throw createError({ statusCode: 409, statusMessage: '所持金が掛金に足りないか、今日のプレイ回数の上限に達しました' })
   }
 
   const updated = await db.prepare('SELECT money FROM pcs WHERE id = ?').bind(pc.id).first()
@@ -72,5 +84,7 @@ export default defineEventHandler(async (event) => {
     multiplier,
     net,
     money: updated.money,
+    playsToday: await countPlaysToday(db, pc.id),
+    dailyLimit: DAILY_PLAY_LIMIT,
   }
 })
