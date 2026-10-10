@@ -1,6 +1,6 @@
 import { getSessionUser } from '../../utils/session'
 import { isAdmin } from '../../utils/permission'
-import { parseShopItemBody } from '../../utils/shop'
+import { parseShopItemBody, assertSellersExist, sellerInsertStatements } from '../../utils/shop'
 
 export default defineEventHandler(async (event) => {
   const db = event.context.cloudflare.env.tsu_wiki_db
@@ -12,11 +12,15 @@ export default defineEventHandler(async (event) => {
   }
 
   const item = parseShopItemBody(await readBody(event))
+  await assertSellersExist(db, item.sellers)
 
-  const result = await db
-    .prepare('INSERT INTO shop_items (shop, name, price, stock, description) VALUES (?, ?, ?, ?, ?)')
-    .bind(item.shop, item.name, item.price, item.stock, item.description)
-    .run()
+  // 商品と販売者を同じトランザクションで登録(販売者の item_id は直前に追加した商品)
+  await db.batch([
+    db
+      .prepare('INSERT INTO shop_items (shop, name, price, stock, description) VALUES (?, ?, ?, ?, ?)')
+      .bind(item.shop, item.name, item.price, item.stock, item.description),
+    ...sellerInsertStatements(db, '(SELECT MAX(id) FROM shop_items)', [], item.sellers),
+  ])
 
-  return { id: result.meta.last_row_id, success: true }
+  return { success: true }
 })

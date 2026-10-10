@@ -11,7 +11,10 @@ export default defineEventHandler(async (event) => {
   }
 
   const id = getRouterParam(event, 'id')
-  await db.prepare('DELETE FROM shop_items WHERE id = ?').bind(id).run()
+  await db.batch([
+    db.prepare('DELETE FROM shop_item_sellers WHERE item_id = ?').bind(id),
+    db.prepare('DELETE FROM shop_items WHERE id = ?').bind(id),
+  ])
 
   return { success: true }
 })

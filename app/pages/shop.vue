@@ -112,6 +112,9 @@ const buy = async () => {
           <template v-else-if="item.stock === 0">売り切れ</template>
           <template v-else>在庫: {{ item.stock }}</template>
         </p>
+        <p v-if="item.sellers?.length" class="item-sellers">
+          販売者: {{ item.sellers.map((s) => s.pcName).join('、') }}
+        </p>
         <MarkdownText v-if="item.description" :text="item.description" />
 
         <div v-if="item.stock !== 0 && selectedPc" class="item-buy">
@@ -134,13 +137,18 @@ const buy = async () => {
     </div>
 
     <section v-if="selectedPc" class="history">
-      <h2 class="history-title">{{ selectedPc.name }}の購入履歴</h2>
-      <div v-for="p in purchases ?? []" :key="p.id" class="history-row">
+      <h2 class="history-title">{{ selectedPc.name }}の取引履歴</h2>
+      <div v-for="p in purchases ?? []" :key="`${p.kind}-${p.id}`" class="history-row">
         <span class="history-date">{{ formatDateTime(p.created_at) }}</span>
-        <span class="history-name">[{{ p.shop }}] {{ p.item_name }} ×{{ p.quantity }}</span>
-        <span class="history-total">-{{ formatMoney(p.total) }}</span>
+        <span class="history-name">
+          <span class="history-kind" :class="p.kind">{{ p.kind === 'sale' ? '売上' : '購入' }}</span>
+          [{{ p.shop }}] {{ p.item_name }} ×{{ p.quantity }}
+        </span>
+        <span class="history-total" :class="p.kind">
+          {{ p.amount >= 0 ? '+' : '-' }}{{ formatMoney(Math.abs(p.amount)) }}
+        </span>
       </div>
-      <p v-if="(purchases ?? []).length === 0" class="notice">購入履歴はありません</p>
+      <p v-if="(purchases ?? []).length === 0" class="notice">取引履歴はありません</p>
     </section>
 
     <ConfirmDialog
@@ -322,5 +330,30 @@ const buy = async () => {
 
 .history-total {
   font-weight: bold;
+  white-space: nowrap;
+}
+
+.history-total.sale {
+  color: #080;
+}
+
+.history-kind {
+  display: inline-block;
+  margin-right: 4px;
+  padding: 0 5px;
+  font-size: 0.65rem;
+  font-weight: bold;
+  border: 1px solid #000;
+}
+
+.history-kind.sale {
+  background: var(--color-accent, #ffd400);
+  color: #000;
+}
+
+.item-sellers {
+  margin: 0 0 6px;
+  font-size: 0.75rem;
+  opacity: 0.7;
 }
 </style>

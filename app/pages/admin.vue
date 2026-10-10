@@ -122,7 +122,17 @@ const { data: allPurchases, refresh: refreshAllPurchases } = await useFetch('/ap
   key: 'admin-purchases',
 })
 
-const emptyItemForm = () => ({ shop: '魔法店', name: '', price: 0, stock: '', description: '' })
+const { data: allPcs } = await useFetch('/api/pcs', { key: 'admin-all-pcs' })
+
+const emptyItemForm = () => ({ shop: '魔法店', name: '', price: 0, stock: '', description: '', sellers: [] })
+
+const addSeller = (form) => {
+  form.sellers.push({ pcId: null, amount: 0 })
+}
+
+const removeSeller = (form, index) => {
+  form.sellers.splice(index, 1)
+}
 const newItem = ref(emptyItemForm())
 const editingItemId = ref(null)
 const editItem = ref(emptyItemForm())
@@ -155,6 +165,7 @@ const startEditItem = (item) => {
     price: item.price,
     stock: item.stock ?? '',
     description: item.description ?? '',
+    sellers: (item.sellers ?? []).map((s) => ({ pcId: s.pcId, amount: s.amount })),
   }
 }
 
@@ -328,6 +339,16 @@ const deleteItem = async (id) => {
         <input v-model="newItem.stock" type="number" min="0" class="field-input" />
         <label class="field-label">説明</label>
         <textarea v-model="newItem.description" class="field-input" rows="3" />
+        <label class="field-label">販売者(1個売れるごとに入る金額)</label>
+        <div v-for="(seller, i) in newItem.sellers" :key="i" class="seller-row">
+          <select v-model.number="seller.pcId" class="field-input">
+            <option :value="null" disabled>PCを選択</option>
+            <option v-for="pc in allPcs ?? []" :key="pc.id" :value="pc.id">{{ pc.name }}</option>
+          </select>
+          <input v-model.number="seller.amount" type="number" min="0" class="field-input seller-amount" />
+          <button class="delete-btn" @click="removeSeller(newItem, i)">×</button>
+        </div>
+        <button class="edit-btn add-seller" @click="addSeller(newItem)">＋ 販売者を追加</button>
         <p v-if="itemError && !editingItemId" class="error-text">{{ itemError }}</p>
         <button class="save-btn" :disabled="!newItem.name" @click="createItem">追加</button>
       </div>
@@ -352,6 +373,16 @@ const deleteItem = async (id) => {
             <input v-model="editItem.stock" type="number" min="0" class="field-input" />
             <label class="field-label">説明</label>
             <textarea v-model="editItem.description" class="field-input" rows="3" />
+            <label class="field-label">販売者(1個売れるごとに入る金額)</label>
+            <div v-for="(seller, i) in editItem.sellers" :key="i" class="seller-row">
+              <select v-model.number="seller.pcId" class="field-input">
+                <option :value="null" disabled>PCを選択</option>
+                <option v-for="pc in allPcs ?? []" :key="pc.id" :value="pc.id">{{ pc.name }}</option>
+              </select>
+              <input v-model.number="seller.amount" type="number" min="0" class="field-input seller-amount" />
+              <button class="delete-btn" @click="removeSeller(editItem, i)">×</button>
+            </div>
+            <button class="edit-btn add-seller" @click="addSeller(editItem)">＋ 販売者を追加</button>
             <p v-if="itemError" class="error-text">{{ itemError }}</p>
             <div class="inline-form">
               <button class="save-btn" @click="saveItem(item.id)">保存</button>
@@ -369,6 +400,9 @@ const deleteItem = async (id) => {
             <p class="item-meta">
               {{ formatMoney(item.price) }} / 在庫: {{ item.stock === null ? '無制限' : item.stock }}
             </p>
+            <p v-if="item.sellers?.length" class="item-meta">
+              販売者: {{ item.sellers.map((s) => `${s.pcName}(${formatMoney(s.amount)})`).join('、') }}
+            </p>
           </template>
         </div>
       </div>
@@ -380,6 +414,9 @@ const deleteItem = async (id) => {
           <span class="item-meta">
             {{ formatDateTime(p.created_at) }}<br />
             {{ p.pc_name ?? '(削除済みPC)' }}: [{{ p.shop }}] {{ p.item_name }} ×{{ p.quantity }}
+            <template v-for="po in p.payouts" :key="po.purchase_id + po.pc_name">
+              <br />→ {{ po.pc_name ?? '(削除済みPC)' }} +{{ formatMoney(po.amount) }}
+            </template>
           </span>
           <span class="user-row-name">{{ formatMoney(p.total) }}</span>
         </div>
@@ -557,6 +594,25 @@ const deleteItem = async (id) => {
   padding: 3px 10px;
   font-size: 0.78rem;
   cursor: pointer;
+}
+
+.seller-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.seller-row .field-input {
+  flex: 1;
+}
+
+.seller-row .seller-amount {
+  flex: 0 0 90px;
+}
+
+.add-seller {
+  display: block;
+  margin-top: 8px;
 }
 
 .item-meta {

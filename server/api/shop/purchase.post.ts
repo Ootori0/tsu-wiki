@@ -37,6 +37,11 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 409, statusMessage: '所持金が足りません' })
   }
 
+  const { results: sellers } = await db
+    .prepare('SELECT pc_id, amount FROM shop_item_sellers WHERE item_id = ?')
+    .bind(item.id)
+    .all()
+
   // CHECK制約(所持金・在庫は0以上)に反するとバッチ全体がロールバックされる
   try {
     await db.batch([
@@ -52,6 +57,17 @@ export default defineEventHandler(async (event) => {
            VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
         )
         .bind(pc.id, item.id, item.shop, item.name, item.price, qty, total, currentUser.id),
+      // 販売者へ「1個あたりの金額×個数」を支払う
+      ...sellers.flatMap((s) => [
+        db
+          .prepare('UPDATE pcs SET money = money + ?, updated_at = datetime(\'now\') WHERE id = ?')
+          .bind(s.amount * qty, s.pc_id),
+        db
+          .prepare(
+            'INSERT INTO purchase_payouts (purchase_id, pc_id, amount) VALUES ((SELECT MAX(id) FROM purchases), ?, ?)'
+          )
+          .bind(s.pc_id, s.amount * qty),
+      ]),
     ])
   } catch {
     throw createError({ statusCode: 409, statusMessage: '在庫または所持金が足りません' })
