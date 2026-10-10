@@ -37,9 +37,10 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 409, statusMessage: '所持金が足りません' })
   }
 
+  // 購入したPC自身が販売者の場合は受け取れない
   const { results: sellers } = await db
-    .prepare('SELECT pc_id, amount FROM shop_item_sellers WHERE item_id = ?')
-    .bind(item.id)
+    .prepare('SELECT pc_id, amount FROM shop_item_sellers WHERE item_id = ? AND pc_id != ?')
+    .bind(item.id, pc.id)
     .all()
 
   // CHECK制約(所持金・在庫は0以上)に反するとバッチ全体がロールバックされる
