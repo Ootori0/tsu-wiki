@@ -36,7 +36,7 @@ const handleLogout = async () => {
 
 <template>
   <div>
-    <div class="top-bar">
+    <div class="top-bar" :class="{ 'drawer-open': drawer }">
       <!-- ハンバーガーボタン -->
       <div
         class="hamburger-box"
@@ -128,7 +128,10 @@ const handleLogout = async () => {
   align-items: center;
   gap: 8px;
   padding: 8px;
-  /* 横幅いっぱいの帯だが、下にあるメニュー内のボタンを押せるようにする */
+}
+
+/* 閉じているときは帯の下のページを押せないようにし、メニューを開いているときだけメニュー内のボタンを押せるようにする */
+.top-bar.drawer-open {
   pointer-events: none;
 }
 
