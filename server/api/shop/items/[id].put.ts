@@ -1,5 +1,5 @@
 import { getSessionUser } from '../../../utils/session'
-import { isAdmin } from '../../../utils/permission'
+import { isManager } from '../../../utils/permission'
 import { parseShopItemBody, assertSellersExist, sellerInsertStatements } from '../../../utils/shop'
 
 export default defineEventHandler(async (event) => {
@@ -7,8 +7,8 @@ export default defineEventHandler(async (event) => {
   const sessionId = getCookie(event, 'session_id')
   const currentUser = await getSessionUser(db, sessionId ?? '')
 
-  if (!currentUser || !isAdmin(currentUser.permissions)) {
-    throw createError({ statusCode: 403, statusMessage: 'admin権限が必要です' })
+  if (!currentUser || !isManager(currentUser.permissions)) {
+    throw createError({ statusCode: 403, statusMessage: '管理権限(admin/KP)が必要です' })
   }
 
   const id = Number(getRouterParam(event, 'id'))

@@ -23,6 +23,7 @@ const links = computed(() => [
   { to: '/setting', label: '背景設定集', icon: 'mdi-book-open-page-variant' },
   { to: '/faq', label: 'よくある質問,裁定', icon: 'mdi-help-circle-outline' },
   ...(user.value ? [{ to: '/mypage', label: 'マイページ', icon: 'mdi-account-circle' }] : []),
+  ...(user.value?.permissions?.includes('KP') ? [{ to: '/kp', label: 'KP画面', icon: 'mdi-dice-multiple' }] : []),
   ...(user.value?.permissions?.includes('admin') ? [{ to: '/admin', label: '管理者画面', icon: 'mdi-shield-crown' }] : []),
 ])
 

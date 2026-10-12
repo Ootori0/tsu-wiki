@@ -28,3 +28,8 @@ export function isAdmin(userPermissions) {
   if (!userPermissions) return false
   return userPermissions.includes('admin')
 }
+// 管理系の操作(タグ・所属・商品・カジノ設定・所持金履歴)ができる: admin または KP
+export function isManager(userPermissions) {
+  if (!userPermissions) return false
+  return userPermissions.includes('admin') || userPermissions.includes('KP')
+}
