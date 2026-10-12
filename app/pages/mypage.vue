@@ -424,7 +424,7 @@ const savePcCreate = async () => {
             <label class="edit-label">効果</label>
             <textarea v-model="editForm.effect" class="edit-textarea auto-wrap" rows="3" @input="resize" />
             <p class="markdown-hint">
-            # 見出し **太字** *斜体* ~~取消線~~ `コード` &gt; 引用 ||スポイラー||
+            # 見出し **太字** ~~取消線~~ `コード` &gt; 引用 ||スポイラー||
             </p>
             <label class="edit-label">タグ</label>
             <div class="chip-list">
@@ -492,7 +492,7 @@ const savePcCreate = async () => {
             <label class="edit-label">効果</label>
             <textarea v-model="newForm.effect" class="edit-textarea auto-wrap" rows="3" @input="resize" />
             <p class="markdown-hint">
-            # 見出し **太字** *斜体* ~~取消線~~ `コード` &gt; 引用 ||スポイラー||
+            # 見出し **太字** ~~取消線~~ `コード` &gt; 引用 ||スポイラー||
             </p>
             <label class="edit-label">タグ</label>
             <div class="chip-list">
@@ -584,7 +584,7 @@ const savePcCreate = async () => {
             <label class="edit-label">メモ</label>
             <textarea v-model="pcEditForm.memo" class="edit-textarea auto-wrap" rows="3" @input="resize" />
             <p class="markdown-hint">
-            # 見出し **太字** *斜体* ~~取消線~~ `コード` &gt; 引用 ||スポイラー||
+            # 見出し **太字** ~~取消線~~ `コード` &gt; 引用 ||スポイラー||
             </p>
             <p v-if="pcError" class="error-text">{{ pcError }}</p>
 
@@ -663,7 +663,7 @@ const savePcCreate = async () => {
             <label class="edit-label">メモ</label>
             <textarea v-model="pcNewForm.memo" class="edit-textarea auto-wrap" rows="3" @input="resize" />
             <p class="markdown-hint">
-            # 見出し **太字** *斜体* ~~取消線~~ `コード` &gt; 引用 ||スポイラー||
+            # 見出し **太字** ~~取消線~~ `コード` &gt; 引用 ||スポイラー||
             </p>
             <p v-if="pcError" class="error-text">{{ pcError }}</p>
 
