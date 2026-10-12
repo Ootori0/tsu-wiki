@@ -60,6 +60,13 @@ const handleLogout = async () => {
           </g>
         </svg>
       </div>
+
+      <!-- メニューを開いたとき、メニューの枠外の右上に出す -->
+      <Transition name="money-btn">
+        <button v-if="user && drawer" class="drawer-money-btn" @click="openMoney">
+          <v-icon icon="mdi-cash" size="18" />所持金
+        </button>
+      </Transition>
     </div>
 
     <!-- スライドメニュー -->
@@ -70,11 +77,6 @@ const handleLogout = async () => {
       class="drawer-menu"
     >
       <!-- ログイン状態表示エリア(ドロワー上部) -->
-      <!-- 右上: 所持金の編集 -->
-      <button v-if="user" class="drawer-money-btn" @click="openMoney">
-        <v-icon icon="mdi-cash" size="18" />所持金
-      </button>
-
       <div class="drawer-account-area">
         <template v-if="user">
           <div class="drawer-user-info">
@@ -234,9 +236,8 @@ const handleLogout = async () => {
 }
 
 .drawer-money-btn {
-  position: absolute;
-  top: 12px;
-  right: 12px;
+  pointer-events: auto;
+  margin-left: auto;
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -248,6 +249,16 @@ const handleLogout = async () => {
   font-weight: bold;
   cursor: pointer;
   box-shadow: 2px 2px 0 #000;
+}
+
+.money-btn-enter-active,
+.money-btn-leave-active {
+  transition: opacity 0.2s ease;
+}
+
+.money-btn-enter-from,
+.money-btn-leave-to {
+  opacity: 0;
 }
 
 .drawer-logout-btn {
