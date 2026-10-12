@@ -3,6 +3,7 @@ definePageMeta({ middleware: 'auth' })
 
 const { user, fetchUser } = useAuth()
 const { show } = useToast()
+const { openMoneyDialog } = useMoneyDialog()
 
 // --- ID変更 ---
 const newName = ref(user.value?.name ?? '')
@@ -388,6 +389,12 @@ const savePcCreate = async () => {
       </div>
     </div>
 
+    <!-- 所持金(ダイアログで編集) -->
+    <button class="money-open-btn" @click="openMoneyDialog()">
+      <v-icon icon="mdi-cash" size="20" />
+      <span>所持金の増減・履歴</span>
+    </button>
+
     <!-- 自分の魔法一覧 -->
     <AccordionList :items="[{ id: 'magics', title: magicSectionTitle }]" title-key="title" class="section-accordion">
       <template #detail>
@@ -593,15 +600,11 @@ const savePcCreate = async () => {
               所属: {{ item.affiliation || '-' }} / 事務所: {{ item.office || '-' }} / {{ item.grade }}級<template v-if="pcRoles(item)"> / {{ pcRoles(item) }}</template>
             </p>
             <MarkdownText :text="item.memo" />
-            <AccordionList
-              :items="[{ id: `money-${item.id}`, title: `所持金: ${formatMoney(item.money)}` }]"
-              title-key="title"
-              class="money-accordion"
-            >
-              <template #detail>
-                <PcMoneyPanel :pc="item" hide-head @updated="refreshPcs" />
-              </template>
-            </AccordionList>
+            <div class="money-row">
+              <span class="money-label">所持金</span>
+              <span class="money-value" :class="{ negative: item.money < 0 }">{{ formatMoney(item.money) }}</span>
+              <button class="money-edit-btn" @click="openMoneyDialog(item.id)">増減・履歴</button>
+            </div>
             <button class="edit-btn" @click="startPcEdit(item)">編集</button>
           </div>
         </template>
@@ -931,8 +934,55 @@ const savePcCreate = async () => {
   padding: 12px;
 }
 
-.money-accordion {
+.money-open-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  margin-bottom: 16px;
+  padding: 12px;
+  border: 2px solid #000;
+  background: var(--color-accent, #ffd400);
+  color: #000;
+  font-size: 0.95rem;
+  font-weight: bold;
+  cursor: pointer;
+  box-shadow: 3px 3px 0 #000;
+}
+
+.money-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   margin: 10px 0;
+  padding: 8px 10px;
+  border: 1px solid var(--color-text, #000);
+}
+
+.money-label {
+  font-size: 0.75rem;
+  font-weight: bold;
+}
+
+.money-value {
+  flex: 1;
+  font-weight: bold;
+}
+
+.money-value.negative {
+  color: var(--color-error, #c62828);
+}
+
+.money-edit-btn {
+  flex-shrink: 0;
+  border: 1px solid #000;
+  background: var(--color-accent, #ffd400);
+  color: #000;
+  padding: 4px 10px;
+  font-size: 0.8rem;
+  font-weight: bold;
+  cursor: pointer;
 }
 
 .add-box {

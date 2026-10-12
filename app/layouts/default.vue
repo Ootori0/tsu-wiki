@@ -2,6 +2,7 @@
   <div>
     <AppMenu />
     <AppToast />
+    <MoneyDialog />
     <v-main>
       <slot />
     </v-main>

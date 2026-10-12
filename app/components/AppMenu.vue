@@ -1,5 +1,11 @@
 <script setup>
 const { user, ensureUser, logout } = useAuth()
+const { openMoneyDialog } = useMoneyDialog()
+
+const openMoney = () => {
+  drawer.value = false
+  openMoneyDialog()
+}
 
 onMounted(() => {
   ensureUser()
@@ -64,6 +70,11 @@ const handleLogout = async () => {
       class="drawer-menu"
     >
       <!-- ログイン状態表示エリア(ドロワー上部) -->
+      <!-- 右上: 所持金の編集 -->
+      <button v-if="user" class="drawer-money-btn" @click="openMoney">
+        <v-icon icon="mdi-cash" size="18" />所持金
+      </button>
+
       <div class="drawer-account-area">
         <template v-if="user">
           <div class="drawer-user-info">
@@ -117,9 +128,12 @@ const handleLogout = async () => {
   align-items: center;
   gap: 8px;
   padding: 8px;
+  /* 横幅いっぱいの帯だが、下にあるメニュー内のボタンを押せるようにする */
+  pointer-events: none;
 }
 
 .hamburger-box {
+  pointer-events: auto;
   width: 44px;
   height: 44px;
   cursor: pointer;
@@ -214,6 +228,23 @@ const handleLogout = async () => {
   font-size: 0.9rem;
   font-weight: bold;
   color: var(--color-text, #000);
+}
+
+.drawer-money-btn {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid #000;
+  background: var(--color-accent, #ffd400);
+  color: #000;
+  padding: 6px 12px;
+  font-size: 0.85rem;
+  font-weight: bold;
+  cursor: pointer;
+  box-shadow: 2px 2px 0 #000;
 }
 
 .drawer-logout-btn {
