@@ -1,5 +1,11 @@
 <script setup>
 const { user, ensureUser, logout } = useAuth()
+const { openMoneyDialog } = useMoneyDialog()
+
+const openMoney = () => {
+  drawer.value = false
+  openMoneyDialog()
+}
 
 onMounted(() => {
   ensureUser()
@@ -9,13 +15,11 @@ const drawer = ref(false)
 
 const links = computed(() => [
   { to: '/', label: '表紙', icon: 'mdi-home' },
-  { to: '/association', label: '協会(未完成)', icon: 'mdi-bank' },
   { to: '/pc', label: 'PC', icon: 'mdi-account' },
   { to: '/pc-tier', label: 'PC級一覧', icon: 'mdi-format-list-numbered' },
   { to: '/magic', label: '魔法', icon: 'mdi-magic-staff' },
   { to: '/shop', label: '魔法店/武器屋', icon: 'mdi-store' },
   { to: '/casino', label: 'カジノ[アーリア]', icon: 'mdi-cards-playing' },
-  { to: '/magic-guide', label: '魔法作成のすゝめ(未完成)', icon: 'mdi-book-open-variant' },
   { to: '/setting', label: '背景設定集', icon: 'mdi-book-open-page-variant' },
   { to: '/faq', label: 'よくある質問,裁定', icon: 'mdi-help-circle-outline' },
   ...(user.value ? [{ to: '/mypage', label: 'マイページ', icon: 'mdi-account-circle' }] : []),
@@ -32,7 +36,7 @@ const handleLogout = async () => {
 
 <template>
   <div>
-    <div class="top-bar">
+    <div class="top-bar" :class="{ 'drawer-open': drawer }">
       <!-- ハンバーガーボタン -->
       <div
         class="hamburger-box"
@@ -66,6 +70,11 @@ const handleLogout = async () => {
       class="drawer-menu"
     >
       <!-- ログイン状態表示エリア(ドロワー上部) -->
+      <!-- 右上: 所持金の編集 -->
+      <button v-if="user" class="drawer-money-btn" @click="openMoney">
+        <v-icon icon="mdi-cash" size="18" />所持金
+      </button>
+
       <div class="drawer-account-area">
         <template v-if="user">
           <div class="drawer-user-info">
@@ -121,7 +130,13 @@ const handleLogout = async () => {
   padding: 8px;
 }
 
+/* 閉じているときは帯の下のページを押せないようにし、メニューを開いているときだけメニュー内のボタンを押せるようにする */
+.top-bar.drawer-open {
+  pointer-events: none;
+}
+
 .hamburger-box {
+  pointer-events: auto;
   width: 44px;
   height: 44px;
   cursor: pointer;
@@ -216,6 +231,23 @@ const handleLogout = async () => {
   font-size: 0.9rem;
   font-weight: bold;
   color: var(--color-text, #000);
+}
+
+.drawer-money-btn {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid #000;
+  background: var(--color-accent, #ffd400);
+  color: #000;
+  padding: 6px 12px;
+  font-size: 0.85rem;
+  font-weight: bold;
+  cursor: pointer;
+  box-shadow: 2px 2px 0 #000;
 }
 
 .drawer-logout-btn {
