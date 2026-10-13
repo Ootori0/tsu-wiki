@@ -6,6 +6,7 @@ const props = defineProps({
 })
 
 const { show } = useToast()
+const { resize, fitAll } = useAutoResize()
 
 // 操作を実行して結果をトーストで知らせる(失敗時はAPIのメッセージを出す)
 const run = async (action, successMessage, errorMessage = '操作に失敗しました') => {
@@ -225,6 +226,7 @@ const openItemEdit = (item) => {
     sellers: (item.sellers ?? []).map((s) => ({ pcId: s.pcId, amount: s.amount })),
   }
   itemDialogOpen.value = true
+  fitAll()
 }
 
 const saveItem = async () => {
@@ -540,7 +542,7 @@ const savePayouts = async () => {
       <label class="field-label">在庫(空欄=無制限)</label>
       <input v-model="itemForm.stock" type="number" min="0" class="field-input" />
       <label class="field-label">説明</label>
-      <textarea v-model="itemForm.description" class="field-input" rows="3" />
+      <textarea v-model="itemForm.description" class="field-input auto-wrap" rows="3" @input="resize" />
       <label class="field-label">販売者(1個売れるごとに入る金額)</label>
       <div v-for="(seller, i) in itemForm.sellers" :key="i" class="seller-row">
         <select v-model.number="seller.pcId" class="field-input">
@@ -920,5 +922,12 @@ const savePayouts = async () => {
 .delete-btn.dlg {
   padding: 8px 16px;
   font-size: 0.85rem;
+}
+
+.auto-wrap {
+  resize: none;
+  overflow: hidden;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 </style>

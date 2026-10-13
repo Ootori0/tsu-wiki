@@ -24,7 +24,7 @@ const saveName = async () => {
   }
 }
 
-const { resize } = useAutoResize()
+const { resize, fitAll: fitTextareas } = useAutoResize()
 // --- パスワード変更 ---
 const passwordAccordionOpen = ref(false)
 const currentPassword = ref('')
@@ -87,15 +87,6 @@ const magicForm = ref(emptyMagicForm())
 const saving = ref(false)
 const deleting = ref(false)
 const showConfirm = ref(false)
-
-// ポップアップを開いたあと、入力済みの文章に合わせて入力欄の高さを広げる
-const fitTextareas = async () => {
-  await nextTick()
-  document.querySelectorAll('.auto-wrap').forEach((el) => {
-    el.style.height = 'auto'
-    el.style.height = el.scrollHeight + 'px'
-  })
-}
 
 const openMagicCreate = () => {
   magicEditingId.value = null
