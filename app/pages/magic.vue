@@ -6,6 +6,8 @@ const activeTab = ref('すべて')
 
 const searchName = ref('')
 const selectedTags = ref([])
+// タグの一覧は折りたたんでおき、押すと開く
+const tagFilterOpen = ref(false)
 const selectedPerms = ref([])
 
 // admin/KP/SKP のみ公開権限で絞り込み可能
@@ -92,17 +94,30 @@ const togglePerm = (permName) => {
 
     <!-- タグ選択式検索 -->
     <div class="tag-filter">
-      <span class="tag-filter-label">タグで絞り込み</span>
-      <div class="tag-chip-list">
-        <button
-          v-for="tag in fetchedTags ?? []"
-          :key="tag.id"
-          class="tag-chip"
-          :class="{ active: selectedTags.includes(tag.name) }"
-          @click="toggleTag(tag.name)"
-        >
-          {{ tag.name }}
-        </button>
+      <button class="tag-filter-toggle" :aria-expanded="tagFilterOpen" @click="tagFilterOpen = !tagFilterOpen">
+        <span class="tag-filter-label">タグで絞り込み</span>
+        <span v-if="selectedTags.length" class="tag-filter-count">{{ selectedTags.length }}件選択中</span>
+        <span class="tag-filter-icon" :class="{ open: tagFilterOpen }">
+          <svg viewBox="0 0 24 24" width="12" height="12">
+            <path d="M8 5l8 7-8 7z" fill="currentColor" />
+          </svg>
+        </span>
+      </button>
+      <div class="tag-filter-outer" :class="{ open: tagFilterOpen }">
+        <div class="tag-filter-inner">
+          <div class="tag-chip-list">
+            <button
+              v-for="tag in fetchedTags ?? []"
+              :key="tag.id"
+              class="tag-chip"
+              :class="{ active: selectedTags.includes(tag.name) }"
+              @click="toggleTag(tag.name)"
+            >
+              {{ tag.name }}
+            </button>
+          </div>
+          <button v-if="selectedTags.length" class="tag-clear" @click="selectedTags = []">選択を解除</button>
+        </div>
       </div>
     </div>
 
@@ -196,6 +211,71 @@ const togglePerm = (permName) => {
   font-weight: bold;
   color: var(--color-text, #000);
   margin-bottom: 6px;
+}
+
+.tag-filter-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 4px 0;
+  border: none;
+  background: none;
+  color: var(--color-text, #000);
+  cursor: pointer;
+  text-align: left;
+}
+
+.tag-filter-toggle .tag-filter-label {
+  margin-bottom: 0;
+}
+
+.tag-filter-count {
+  font-size: 0.72rem;
+  padding: 1px 8px;
+  background: var(--color-accent, #ffd400);
+  border: 1px solid var(--color-text, #000);
+  border-radius: 10px;
+}
+
+.tag-filter-icon {
+  display: flex;
+  margin-left: auto;
+  transition: transform 0.25s ease;
+}
+
+.tag-filter-icon.open {
+  transform: rotate(90deg);
+}
+
+.tag-filter-outer {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.3s ease;
+}
+
+.tag-filter-outer.open {
+  grid-template-rows: 1fr;
+}
+
+.tag-filter-inner {
+  overflow: hidden;
+  min-height: 0;
+}
+
+.tag-filter-outer.open > .tag-filter-inner {
+  padding-top: 6px;
+}
+
+.tag-clear {
+  margin-top: 8px;
+  border: none;
+  background: none;
+  padding: 0;
+  font-size: 0.75rem;
+  text-decoration: underline;
+  color: var(--color-text, #000);
+  cursor: pointer;
 }
 
 .tag-chip-list {

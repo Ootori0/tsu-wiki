@@ -32,61 +32,90 @@ const { data: allPermissions, refresh: refreshPermissions } = await useFetch('/a
   immediate: hasTab('アカウント管理') || hasTab('権限管理'),
 })
 
-const newUser = ref({ name: '', password: '', permissions: [] })
-const creatingUser = ref(false)
+// 記入・編集はポップアップで行う(編集中の id が null なら新規作成)
+const userDialogOpen = ref(false)
+const editingUserId = ref(null)
+const userForm = ref({ name: '', password: '', permissions: [] })
+const savingUser = ref(false)
 
-const createUser = async () => {
-  if (!newUser.value.name || !newUser.value.password) return
-  creatingUser.value = true
-  await run(async () => {
-    await $fetch('/api/admin/users', {
-      method: 'POST',
-      body: newUser.value,
-    })
-    newUser.value = { name: '', password: '', permissions: [] }
+const openUserCreate = () => {
+  editingUserId.value = null
+  userForm.value = { name: '', password: '', permissions: [] }
+  userDialogOpen.value = true
+}
+
+const openUserEdit = (u) => {
+  editingUserId.value = u.id
+  userForm.value = { name: u.name, password: '', permissions: [...u.permissions] }
+  userDialogOpen.value = true
+}
+
+const toggleUserFormPerm = (permName) => {
+  // admin権限は管理者画面から付け外し不可
+  if (permName === 'admin') return
+  const perms = userForm.value.permissions
+  const idx = perms.indexOf(permName)
+  if (idx === -1) perms.push(permName)
+  else perms.splice(idx, 1)
+}
+
+const saveUser = async () => {
+  const id = editingUserId.value
+  if (!id && (!userForm.value.name || !userForm.value.password)) return
+  savingUser.value = true
+  const ok = await run(async () => {
+    if (id) {
+      await $fetch(`/api/admin/users/${id}`, {
+        method: 'PUT',
+        body: { permissions: userForm.value.permissions },
+      })
+    } else {
+      await $fetch('/api/admin/users', { method: 'POST', body: userForm.value })
+    }
     await refreshUsers()
-  }, 'アカウントを作成しました')
-  creatingUser.value = false
+  }, id ? `${userForm.value.name}の権限を更新しました` : 'アカウントを作成しました')
+  savingUser.value = false
+  if (ok) userDialogOpen.value = false
 }
 
 const deleteUser = async (id) => {
   if (!confirm('このアカウントを削除しますか?')) return
-  await run(async () => {
+  const ok = await run(async () => {
     await $fetch(`/api/admin/users/${id}`, { method: 'DELETE' })
     await refreshUsers()
   }, 'アカウントを削除しました')
+  if (ok) userDialogOpen.value = false
 }
 
-const togglePermission = async (targetUser, permName) => {
-  // admin権限は管理者画面から付け外し不可
-  if (permName === 'admin') return
-  const perms = [...targetUser.permissions]
-  const idx = perms.indexOf(permName)
-  if (idx === -1) {
-    perms.push(permName)
-  } else {
-    perms.splice(idx, 1)
-  }
-  await run(async () => {
-    await $fetch(`/api/admin/users/${targetUser.id}`, {
-      method: 'PUT',
-      body: { permissions: perms },
-    })
-    await refreshUsers()
-  }, `${targetUser.name}の権限を更新しました`)
+// --- 権限・タグ・所属の追加(名前だけのポップアップ) ---
+const NAME_KINDS = {
+  permission: { title: '権限の追加', label: '権限名' },
+  tag: { title: 'タグの追加', label: 'タグ名' },
+  affiliation: { title: '所属の追加', label: '所属名' },
+}
+const nameDialogOpen = ref(false)
+const nameKind = ref('tag')
+const nameValue = ref('')
+
+const openNameCreate = (kind) => {
+  nameKind.value = kind
+  nameValue.value = ''
+  nameDialogOpen.value = true
+}
+
+const saveName = async () => {
+  if (!nameValue.value) return
+  const create = { permission: createPermission, tag: createTag, affiliation: createAffiliation }[nameKind.value]
+  if (await create(nameValue.value)) nameDialogOpen.value = false
 }
 
 // --- 権限管理 ---
-const newPermission = ref('')
-
-const createPermission = async () => {
-  if (!newPermission.value) return
-  await run(async () => {
+const createPermission = async (name) => {
+  return run(async () => {
     await $fetch('/api/admin/permissions', {
       method: 'POST',
-      body: { name: newPermission.value },
+      body: { name },
     })
-    newPermission.value = ''
     await refreshPermissions()
   }, '権限を追加しました')
 }
@@ -101,16 +130,12 @@ const deletePermission = async (id) => {
 
 // --- タグ管理 ---
 const { data: tags, refresh: refreshTags } = await useFetch('/api/tags')
-const newTag = ref('')
-
-const createTag = async () => {
-  if (!newTag.value) return
-  await run(async () => {
+const createTag = async (name) => {
+  return run(async () => {
     await $fetch('/api/tags', {
       method: 'POST',
-      body: { name: newTag.value },
+      body: { name },
     })
-    newTag.value = ''
     await refreshTags()
   }, 'タグを追加しました')
 }
@@ -125,21 +150,18 @@ const deleteTag = async (id) => {
 
 // --- 所属管理 ---
 const { data: affiliations, refresh: refreshAffiliationsRaw } = await useFetch('/api/affiliations')
-const newAffiliation = ref('')
 
 const refreshAffiliations = async () => {
   clearNuxtData('affiliations-list')
   await refreshAffiliationsRaw()
 }
 
-const createAffiliation = async () => {
-  if (!newAffiliation.value) return
-  await run(async () => {
+const createAffiliation = async (name) => {
+  return run(async () => {
     await $fetch('/api/affiliations', {
       method: 'POST',
-      body: { name: newAffiliation.value },
+      body: { name },
     })
-    newAffiliation.value = ''
     await refreshAffiliations()
   }, '所属を追加しました')
 }
@@ -172,9 +194,10 @@ const addSeller = (form) => {
 const removeSeller = (form, index) => {
   form.sellers.splice(index, 1)
 }
-const newItem = ref(emptyItemForm())
+// 記入・編集はポップアップで行う(編集中の id が null なら新規作成)
+const itemDialogOpen = ref(false)
 const editingItemId = ref(null)
-const editItem = ref(emptyItemForm())
+const itemForm = ref(emptyItemForm())
 const itemError = ref('')
 
 const afterItemChange = async () => {
@@ -183,23 +206,17 @@ const afterItemChange = async () => {
   await refreshShopItems()
 }
 
-const createItem = async () => {
-  if (!newItem.value.name) return
+const openItemCreate = () => {
   itemError.value = ''
-  try {
-    await $fetch('/api/shop/items', { method: 'POST', body: newItem.value })
-    newItem.value = emptyItemForm()
-    await afterItemChange()
-    show('商品を追加しました')
-  } catch (e) {
-    itemError.value = e?.data?.statusMessage ?? '追加に失敗しました'
-  }
+  editingItemId.value = null
+  itemForm.value = emptyItemForm()
+  itemDialogOpen.value = true
 }
 
-const startEditItem = (item) => {
+const openItemEdit = (item) => {
   itemError.value = ''
   editingItemId.value = item.id
-  editItem.value = {
+  itemForm.value = {
     shop: item.shop,
     name: item.name,
     price: item.price,
@@ -207,15 +224,19 @@ const startEditItem = (item) => {
     description: item.description ?? '',
     sellers: (item.sellers ?? []).map((s) => ({ pcId: s.pcId, amount: s.amount })),
   }
+  itemDialogOpen.value = true
 }
 
-const saveItem = async (id) => {
+const saveItem = async () => {
+  if (!itemForm.value.name) return
+  const id = editingItemId.value
   itemError.value = ''
   try {
-    await $fetch(`/api/shop/items/${id}`, { method: 'PUT', body: editItem.value })
-    editingItemId.value = null
+    if (id) await $fetch(`/api/shop/items/${id}`, { method: 'PUT', body: itemForm.value })
+    else await $fetch('/api/shop/items', { method: 'POST', body: itemForm.value })
+    itemDialogOpen.value = false
     await afterItemChange()
-    show('商品を保存しました')
+    show(id ? '商品を保存しました' : '商品を追加しました')
   } catch (e) {
     itemError.value = e?.data?.statusMessage ?? '保存に失敗しました'
   }
@@ -223,10 +244,11 @@ const saveItem = async (id) => {
 
 const deleteItem = async (id) => {
   if (!confirm('この商品を削除しますか?(購入履歴は残ります)')) return
-  await run(async () => {
+  const ok = await run(async () => {
     await $fetch(`/api/shop/items/${id}`, { method: 'DELETE' })
     await afterItemChange()
   }, '商品を削除しました')
+  if (ok) itemDialogOpen.value = false
 }
 
 // --- 所持金履歴 ---
@@ -287,70 +309,21 @@ const savePayouts = async () => {
     <!-- アカウント管理 -->
     <div v-if="activeTab === 'アカウント管理'" class="tab-content">
       <div class="box">
-        <h2 class="box-title">アカウント作成</h2>
-        <label class="field-label">ID</label>
-        <input v-model="newUser.name" class="field-input" />
-        <label class="field-label">パスワード</label>
-        <input v-model="newUser.password" type="password" class="field-input" />
-        <label class="field-label">初期権限</label>
-        <div class="chip-list">
-          <button
-            v-for="perm in allPermissions ?? []"
-            :key="perm.id"
-            class="chip"
-            :class="{ active: newUser.permissions.includes(perm.name) }"
-            :disabled="perm.name === 'admin'"
-            @click="
-              newUser.permissions.includes(perm.name)
-                ? newUser.permissions.splice(newUser.permissions.indexOf(perm.name), 1)
-                : newUser.permissions.push(perm.name)
-            "
-          >
-            {{ perm.name }}
-          </button>
-        </div>
-        <button class="save-btn" :disabled="creatingUser" @click="createUser">作成</button>
-      </div>
-
-      <div class="box">
         <h2 class="box-title">アカウント一覧</h2>
-        <div v-for="u in users ?? []" :key="u.id" class="user-row">
-          <div class="user-row-header">
-            <span class="user-row-name">{{ u.name }}</span>
-            <button
-              class="delete-btn"
-              :disabled="u.permissions.includes('admin')"
-              @click="deleteUser(u.id)"
-            >
-              削除
-            </button>
-          </div>
-          <div class="chip-list">
-            <button
-              v-for="perm in allPermissions ?? []"
-              :key="perm.id"
-              class="chip"
-              :class="{ active: u.permissions.includes(perm.name) }"
-              :disabled="perm.name === 'admin'"
-              @click="togglePermission(u, perm.name)"
-            >
-              {{ perm.name }}
-            </button>
-          </div>
-        </div>
+        <AccordionList :items="users ?? []" title-key="name">
+          <template #detail="{ item }">
+            <div class="detail">
+              <p class="item-meta">権限: {{ item.permissions.length ? item.permissions.join('、') : 'なし' }}</p>
+              <button class="edit-btn" @click="openUserEdit(item)">編集</button>
+            </div>
+          </template>
+        </AccordionList>
+        <button class="add-btn" @click="openUserCreate">＋ アカウントを作成</button>
       </div>
     </div>
 
     <!-- 権限管理 -->
     <div v-if="activeTab === '権限管理'" class="tab-content">
-      <div class="box">
-        <h2 class="box-title">権限作成</h2>
-        <div class="inline-form">
-          <input v-model="newPermission" class="field-input" placeholder="権限名" />
-          <button class="save-btn" @click="createPermission">追加</button>
-        </div>
-      </div>
-
       <div class="box">
         <h2 class="box-title">権限一覧</h2>
         <div v-for="perm in allPermissions ?? []" :key="perm.id" class="list-row">
@@ -363,130 +336,54 @@ const savePayouts = async () => {
             削除
           </button>
         </div>
+        <button class="add-btn" @click="openNameCreate('permission')">＋ 権限を追加</button>
       </div>
     </div>
 
     <!-- タグ管理 -->
     <div v-if="activeTab === 'タグ管理'" class="tab-content">
       <div class="box">
-        <h2 class="box-title">タグ作成</h2>
-        <div class="inline-form">
-          <input v-model="newTag" class="field-input" placeholder="タグ名" />
-          <button class="save-btn" @click="createTag">追加</button>
-        </div>
-      </div>
-
-      <div class="box">
         <h2 class="box-title">タグ一覧</h2>
         <div v-for="tag in tags ?? []" :key="tag.id" class="list-row">
           <span>{{ tag.name }}</span>
           <button class="delete-btn" @click="deleteTag(tag.id)">削除</button>
         </div>
+        <button class="add-btn" @click="openNameCreate('tag')">＋ タグを追加</button>
       </div>
     </div>
 
     <!-- 所属管理 -->
     <div v-if="activeTab === '所属管理'" class="tab-content">
       <div class="box">
-        <h2 class="box-title">所属作成</h2>
-        <div class="inline-form">
-          <input v-model="newAffiliation" class="field-input" placeholder="所属名" />
-          <button class="save-btn" @click="createAffiliation">追加</button>
-        </div>
-      </div>
-
-      <div class="box">
         <h2 class="box-title">所属一覧</h2>
         <div v-for="a in affiliations ?? []" :key="a.id" class="list-row">
           <span>{{ a.name }}</span>
           <button class="delete-btn" @click="deleteAffiliation(a.id)">削除</button>
         </div>
+        <button class="add-btn" @click="openNameCreate('affiliation')">＋ 所属を追加</button>
       </div>
     </div>
 
     <!-- 商品管理 -->
     <div v-if="activeTab === '商品管理'" class="tab-content">
-      <div class="box">
-        <h2 class="box-title">商品追加</h2>
-        <label class="field-label">店</label>
-        <select v-model="newItem.shop" class="field-input">
-          <option v-for="s in shops" :key="s" :value="s">{{ s }}</option>
-        </select>
-        <label class="field-label">商品名</label>
-        <input v-model="newItem.name" class="field-input" />
-        <label class="field-label">価格({{ MONEY_UNIT }})</label>
-        <input v-model.number="newItem.price" type="number" min="0" class="field-input" />
-        <label class="field-label">在庫(空欄=無制限)</label>
-        <input v-model="newItem.stock" type="number" min="0" class="field-input" />
-        <label class="field-label">説明</label>
-        <textarea v-model="newItem.description" class="field-input" rows="3" />
-        <label class="field-label">販売者(1個売れるごとに入る金額)</label>
-        <div v-for="(seller, i) in newItem.sellers" :key="i" class="seller-row">
-          <select v-model.number="seller.pcId" class="field-input">
-            <option :value="null" disabled>PCを選択</option>
-            <option v-for="pc in allPcs ?? []" :key="pc.id" :value="pc.id">{{ pc.name }}</option>
-          </select>
-          <input v-model.number="seller.amount" type="number" min="0" class="field-input seller-amount" />
-          <button class="delete-btn" @click="removeSeller(newItem, i)">×</button>
-        </div>
-        <button class="edit-btn add-seller" @click="addSeller(newItem)">＋ 販売者を追加</button>
-        <p v-if="itemError && !editingItemId" class="error-text">{{ itemError }}</p>
-        <button class="save-btn" :disabled="!newItem.name" @click="createItem">追加</button>
-      </div>
-
       <div v-for="shop in shops" :key="shop" class="box">
         <h2 class="box-title">{{ shop }}の商品</h2>
-        <div
-          v-for="item in (shopItems ?? []).filter((i) => i.shop === shop)"
-          :key="item.id"
-          class="user-row"
-        >
-          <template v-if="editingItemId === item.id">
-            <label class="field-label">店</label>
-            <select v-model="editItem.shop" class="field-input">
-              <option v-for="s in shops" :key="s" :value="s">{{ s }}</option>
-            </select>
-            <label class="field-label">商品名</label>
-            <input v-model="editItem.name" class="field-input" />
-            <label class="field-label">価格({{ MONEY_UNIT }})</label>
-            <input v-model.number="editItem.price" type="number" min="0" class="field-input" />
-            <label class="field-label">在庫(空欄=無制限)</label>
-            <input v-model="editItem.stock" type="number" min="0" class="field-input" />
-            <label class="field-label">説明</label>
-            <textarea v-model="editItem.description" class="field-input" rows="3" />
-            <label class="field-label">販売者(1個売れるごとに入る金額)</label>
-            <div v-for="(seller, i) in editItem.sellers" :key="i" class="seller-row">
-              <select v-model.number="seller.pcId" class="field-input">
-                <option :value="null" disabled>PCを選択</option>
-                <option v-for="pc in allPcs ?? []" :key="pc.id" :value="pc.id">{{ pc.name }}</option>
-              </select>
-              <input v-model.number="seller.amount" type="number" min="0" class="field-input seller-amount" />
-              <button class="delete-btn" @click="removeSeller(editItem, i)">×</button>
-            </div>
-            <button class="edit-btn add-seller" @click="addSeller(editItem)">＋ 販売者を追加</button>
-            <p v-if="itemError" class="error-text">{{ itemError }}</p>
-            <div class="inline-form">
-              <button class="save-btn" @click="saveItem(item.id)">保存</button>
-              <button class="save-btn cancel" @click="editingItemId = null">キャンセル</button>
+        <AccordionList :items="(shopItems ?? []).filter((i) => i.shop === shop)" title-key="name">
+          <template #detail="{ item }">
+            <div class="detail">
+              <p class="item-meta">
+                {{ formatMoney(item.price) }} / 在庫: {{ item.stock === null ? '無制限' : item.stock }}
+              </p>
+              <p v-if="item.sellers?.length" class="item-meta">
+                販売者: {{ item.sellers.map((s) => `${s.pcName}(${formatMoney(s.amount)})`).join('、') }}
+              </p>
+              <p v-if="item.description" class="item-meta description">{{ item.description }}</p>
+              <button class="edit-btn" @click="openItemEdit(item)">編集</button>
             </div>
           </template>
-          <template v-else>
-            <div class="user-row-header">
-              <span class="user-row-name">{{ item.name }}</span>
-              <div class="inline-form">
-                <button class="edit-btn" @click="startEditItem(item)">編集</button>
-                <button class="delete-btn" @click="deleteItem(item.id)">削除</button>
-              </div>
-            </div>
-            <p class="item-meta">
-              {{ formatMoney(item.price) }} / 在庫: {{ item.stock === null ? '無制限' : item.stock }}
-            </p>
-            <p v-if="item.sellers?.length" class="item-meta">
-              販売者: {{ item.sellers.map((s) => `${s.pcName}(${formatMoney(s.amount)})`).join('、') }}
-            </p>
-          </template>
-        </div>
+        </AccordionList>
       </div>
+      <button class="add-btn add-item" @click="openItemCreate">＋ 商品を追加</button>
 
       <div class="box">
         <h2 class="box-title">購入履歴(最新100件)</h2>
@@ -573,6 +470,95 @@ const savePayouts = async () => {
         <button class="save-btn" @click="savePayouts">保存</button>
       </div>
     </div>
+    <!-- アカウントの作成・編集 -->
+    <FormDialog v-model="userDialogOpen" :title="editingUserId ? 'アカウントの編集' : 'アカウントの作成'">
+      <template v-if="editingUserId">
+        <label class="field-label">ID</label>
+        <p class="dialog-value">{{ userForm.name }}</p>
+      </template>
+      <template v-else>
+        <label class="field-label">ID</label>
+        <input v-model="userForm.name" class="field-input" />
+        <label class="field-label">パスワード</label>
+        <input v-model="userForm.password" type="password" class="field-input" />
+      </template>
+      <label class="field-label">{{ editingUserId ? '権限' : '初期権限' }}</label>
+      <div class="chip-list">
+        <button
+          v-for="perm in allPermissions ?? []"
+          :key="perm.id"
+          class="chip"
+          :class="{ active: userForm.permissions.includes(perm.name) }"
+          :disabled="perm.name === 'admin'"
+          @click="toggleUserFormPerm(perm.name)"
+        >
+          {{ perm.name }}
+        </button>
+      </div>
+
+      <template #actions>
+        <button
+          class="save-btn dlg"
+          :disabled="savingUser || (!editingUserId && (!userForm.name || !userForm.password))"
+          @click="saveUser"
+        >
+          保存
+        </button>
+        <button class="save-btn dlg cancel" @click="userDialogOpen = false">キャンセル</button>
+        <button
+          v-if="editingUserId"
+          class="delete-btn dlg push-right"
+          :disabled="userForm.permissions.includes('admin')"
+          @click="deleteUser(editingUserId)"
+        >
+          削除
+        </button>
+      </template>
+    </FormDialog>
+
+    <!-- 権限・タグ・所属の追加 -->
+    <FormDialog v-model="nameDialogOpen" :title="NAME_KINDS[nameKind].title">
+      <label class="field-label">{{ NAME_KINDS[nameKind].label }}</label>
+      <input v-model="nameValue" class="field-input" @keydown.enter="saveName" />
+
+      <template #actions>
+        <button class="save-btn dlg" :disabled="!nameValue" @click="saveName">追加</button>
+        <button class="save-btn dlg cancel" @click="nameDialogOpen = false">キャンセル</button>
+      </template>
+    </FormDialog>
+
+    <!-- 商品の追加・編集 -->
+    <FormDialog v-model="itemDialogOpen" :title="editingItemId ? '商品の編集' : '商品の追加'">
+      <label class="field-label">店</label>
+      <select v-model="itemForm.shop" class="field-input">
+        <option v-for="s in shops" :key="s" :value="s">{{ s }}</option>
+      </select>
+      <label class="field-label">商品名</label>
+      <input v-model="itemForm.name" class="field-input" />
+      <label class="field-label">価格({{ MONEY_UNIT }})</label>
+      <input v-model.number="itemForm.price" type="number" min="0" class="field-input" />
+      <label class="field-label">在庫(空欄=無制限)</label>
+      <input v-model="itemForm.stock" type="number" min="0" class="field-input" />
+      <label class="field-label">説明</label>
+      <textarea v-model="itemForm.description" class="field-input" rows="3" />
+      <label class="field-label">販売者(1個売れるごとに入る金額)</label>
+      <div v-for="(seller, i) in itemForm.sellers" :key="i" class="seller-row">
+        <select v-model.number="seller.pcId" class="field-input">
+          <option :value="null" disabled>PCを選択</option>
+          <option v-for="pc in allPcs ?? []" :key="pc.id" :value="pc.id">{{ pc.name }}</option>
+        </select>
+        <input v-model.number="seller.amount" type="number" min="0" class="field-input seller-amount" />
+        <button class="delete-btn" @click="removeSeller(itemForm, i)">×</button>
+      </div>
+      <button class="edit-btn add-seller" @click="addSeller(itemForm)">＋ 販売者を追加</button>
+      <p v-if="itemError" class="error-text">{{ itemError }}</p>
+
+      <template #actions>
+        <button class="save-btn dlg" :disabled="!itemForm.name" @click="saveItem">保存</button>
+        <button class="save-btn dlg cancel" @click="itemDialogOpen = false">キャンセル</button>
+        <button v-if="editingItemId" class="delete-btn dlg push-right" @click="deleteItem(editingItemId)">削除</button>
+      </template>
+    </FormDialog>
   </div>
 </template>
 
@@ -882,5 +868,57 @@ const savePayouts = async () => {
   padding: 3px 10px;
   font-size: 0.78rem;
   cursor: pointer;
+}
+
+/* アコーディオンの中身(表示専用) */
+.detail {
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.detail .item-meta {
+  margin: 0;
+}
+
+.description {
+  white-space: pre-line;
+}
+
+.add-btn {
+  width: 100%;
+  box-sizing: border-box;
+  margin-top: 12px;
+  border: 2px dashed var(--color-text, #000);
+  background: var(--color-bg, #fff);
+  padding: 12px;
+  font-size: 0.9rem;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.add-btn.add-item {
+  margin: 0 0 16px;
+}
+
+/* ポップアップ内 */
+.dialog-value {
+  margin: 0;
+  font-weight: bold;
+}
+
+.push-right {
+  margin-left: auto;
+}
+
+.save-btn.dlg {
+  margin-top: 0;
+}
+
+.delete-btn.dlg {
+  padding: 8px 16px;
+  font-size: 0.85rem;
 }
 </style>
