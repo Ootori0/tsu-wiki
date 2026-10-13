@@ -23,6 +23,13 @@ const dailyLimit = computed(() => gamesData.value?.dailyLimit ?? 8)
 const remainingPlays = computed(() => Math.max(0, dailyLimit.value - (gamesData.value?.playsToday ?? 0)))
 
 const bet = ref(100)
+
+// 出納帳のPCは掛金100万円固定
+const LEDGER_BET = 100
+const isLedger = computed(() => selectedPc.value?.money_mode === 'ledger')
+watch(isLedger, (v) => {
+  if (v) bet.value = LEDGER_BET
+}, { immediate: true })
 const betPresets = [100, 500, 1000]
 
 const playing = ref(false)
@@ -143,11 +150,12 @@ const play = async () => {
             :min="betUnit"
             :step="betUnit"
             class="bet-input"
-            :disabled="playing"
+            :disabled="playing || isLedger"
           />
           <span class="bet-unit">{{ MONEY_UNIT }}</span>
         </div>
-        <div class="bet-presets">
+        <p v-if="isLedger" class="ledger-bet-note">出納帳のPCは掛金{{ formatMoney(LEDGER_BET) }}固定です</p>
+        <div v-else class="bet-presets">
           <button
             v-for="p in betPresets"
             :key="p"
@@ -380,6 +388,12 @@ const play = async () => {
 
 .bet-unit {
   font-size: 0.85rem;
+}
+
+.ledger-bet-note {
+  margin: 6px 0 0;
+  font-size: 0.78rem;
+  font-weight: bold;
 }
 
 .bet-presets {

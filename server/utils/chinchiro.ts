@@ -26,6 +26,7 @@ export const DEFAULT_PAYOUTS = {
 
 export const BET_UNIT = 100 // 掛金は100万円単位(所持金は万円単位)
 export const MAX_ROLLS = 3
+export const LEDGER_BET = 100 // 出納帳のPCの掛金(100万円固定)
 export const DAILY_PLAY_LIMIT = 8 // PCごとの1日のプレイ回数上限(日本時間0時に戻る)
 
 // 日本時間の今日0時を、DBの created_at と同じ形式(UTC 'YYYY-MM-DD HH:MM:SS')で返す

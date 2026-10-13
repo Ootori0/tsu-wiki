@@ -1,7 +1,7 @@
 import { getSessionUser } from '../../../utils/session'
 import { isAdmin } from '../../../utils/permission'
 import {
-  BET_UNIT, DAILY_PLAY_LIMIT, loadPayouts, loadDealer, dealerDeltaOf, playChinchiro, countPlaysToday, todayStartUtc,
+  BET_UNIT, DAILY_PLAY_LIMIT, LEDGER_BET, loadPayouts, loadDealer, dealerDeltaOf, playChinchiro, countPlaysToday, todayStartUtc,
 } from '../../../utils/chinchiro'
 
 export default defineEventHandler(async (event) => {
@@ -28,6 +28,10 @@ export default defineEventHandler(async (event) => {
   }
   // 出納帳のPCは残高を確かめない
   const isLedger = pc.money_mode === 'ledger'
+  // 出納帳のPCは掛金を固定する(残高を確かめない代わりに大きく賭けられないようにする)
+  if (isLedger && betNum !== LEDGER_BET) {
+    throw createError({ statusCode: 400, statusMessage: `出納帳のPCの掛金は${LEDGER_BET}万円固定です` })
+  }
   if (!isLedger && pc.money < betNum) {
     throw createError({ statusCode: 409, statusMessage: '所持金が掛金に足りません' })
   }
