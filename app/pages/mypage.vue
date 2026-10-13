@@ -76,24 +76,36 @@ const { data: allTags } = await useCachedFetch('/api/tags', {
 })
 const magicTypes = ['魔法', '魔道具', 'AF', '魔術・その他']
 
-const editingId = ref(null)
-const editForm = ref({
+const emptyMagicForm = () => ({
   type: '魔法', name: '', owner: '', tags: [], cost: '', condition: '', effect: '', visiblePermissions: [],
 })
+
+// 記入・編集はポップアップで行う(編集中の id が null なら新規作成)
+const magicDialogOpen = ref(false)
+const magicEditingId = ref(null)
+const magicForm = ref(emptyMagicForm())
 const saving = ref(false)
 const deleting = ref(false)
-
 const showConfirm = ref(false)
-const pendingDeleteId = ref(null)
 
-const creating = ref(false)
-const newForm = ref({
-  type: '魔法', name: '', owner: '', tags: [], cost: '', condition: '', effect: '', visiblePermissions: [],
-})
+// ポップアップを開いたあと、入力済みの文章に合わせて入力欄の高さを広げる
+const fitTextareas = async () => {
+  await nextTick()
+  document.querySelectorAll('.auto-wrap').forEach((el) => {
+    el.style.height = 'auto'
+    el.style.height = el.scrollHeight + 'px'
+  })
+}
 
-const startEdit = async (item) => {
-  editingId.value = item.id
-  editForm.value = {
+const openMagicCreate = () => {
+  magicEditingId.value = null
+  magicForm.value = emptyMagicForm()
+  magicDialogOpen.value = true
+}
+
+const openMagicEdit = (item) => {
+  magicEditingId.value = item.id
+  magicForm.value = {
     type: item.type,
     name: item.name,
     owner: item.owner,
@@ -103,24 +115,20 @@ const startEdit = async (item) => {
     effect: item.effect,
     visiblePermissions: [...item.visible_permissions],
   }
-
-  await nextTick()
-  document.querySelectorAll('.auto-wrap').forEach((el) => {
-    el.style.height = 'auto'
-    el.style.height = el.scrollHeight + 'px'
-  })
-}
-const cancelEdit = () => {
-  editingId.value = null
+  magicDialogOpen.value = true
+  fitTextareas()
 }
 
-const saveEdit = async (id) => {
+const saveMagic = async () => {
+  if (!magicForm.value.name) return
+  const id = magicEditingId.value
   saving.value = true
   try {
-    await $fetch(`/api/magics/${id}`, { method: 'PUT', body: editForm.value })
-    editingId.value = null
+    if (id) await $fetch(`/api/magics/${id}`, { method: 'PUT', body: magicForm.value })
+    else await $fetch('/api/magics', { method: 'POST', body: magicForm.value })
+    magicDialogOpen.value = false
     await refreshMagics()
-    show('魔法を保存しました')
+    show(id ? '魔法を保存しました' : '魔法を作成しました')
   } catch (e) {
     show(e?.data?.statusMessage ?? '保存に失敗しました', 'error')
   } finally {
@@ -128,50 +136,18 @@ const saveEdit = async (id) => {
   }
 }
 
-const requestDelete = (id) => {
-  pendingDeleteId.value = id
-  showConfirm.value = true
-}
-
 const confirmDelete = async () => {
-  if (!pendingDeleteId.value) return
+  if (!magicEditingId.value) return
   deleting.value = true
   try {
-    await $fetch(`/api/magics/${pendingDeleteId.value}`, { method: 'DELETE' })
-    editingId.value = null
+    await $fetch(`/api/magics/${magicEditingId.value}`, { method: 'DELETE' })
+    magicDialogOpen.value = false
     await refreshMagics()
     show('魔法を削除しました')
   } catch (e) {
     show(e?.data?.statusMessage ?? '削除に失敗しました', 'error')
   } finally {
     deleting.value = false
-    pendingDeleteId.value = null
-  }
-}
-
-const startCreate = () => {
-  creating.value = true
-  newForm.value = {
-    type: '魔法', name: '', owner: '', tags: [], cost: '', condition: '', effect: '', visiblePermissions: [],
-  }
-}
-
-const cancelCreate = () => {
-  creating.value = false
-}
-
-const saveCreate = async () => {
-  if (!newForm.value.name) return
-  saving.value = true
-  try {
-    await $fetch('/api/magics', { method: 'POST', body: newForm.value })
-    creating.value = false
-    await refreshMagics()
-    show('魔法を作成しました')
-  } catch (e) {
-    show(e?.data?.statusMessage ?? '作成に失敗しました', 'error')
-  } finally {
-    saving.value = false
   }
 }
 
@@ -207,8 +183,8 @@ const formPreview = (form) => ({
 })
 
 // 一覧ごと折りたためる見出し(件数つき)
-const magicSectionTitle = computed(() => `あなたの魔法一覧(${(fetchedMagics.value ?? []).length}件)`)
-const pcSectionTitle = computed(() => `あなたのPC一覧(${(fetchedPcs.value ?? []).length}件)`)
+const magicSection = computed(() => [{ id: 'magics', title: 'あなたの魔法一覧', count: (fetchedMagics.value ?? []).length }])
+const pcSection = computed(() => [{ id: 'pcs', title: 'あなたのPC一覧', count: (fetchedPcs.value ?? []).length }])
 
 const myPcItems = computed(() =>
   (fetchedPcs.value ?? []).map((pc) => ({ ...pc, title: pcTitle(pc) }))
@@ -234,21 +210,26 @@ const refreshPcs = async () => {
   await refreshPcsRaw()
 }
 
+// 記入・編集はポップアップで行う(編集中の id が null なら新規作成)
+const pcDialogOpen = ref(false)
 const pcEditingId = ref(null)
-const pcEditForm = ref(emptyPcForm())
-const pcCreating = ref(false)
-const pcNewForm = ref(emptyPcForm())
+const pcForm = ref(emptyPcForm())
 const pcSaving = ref(false)
 const pcDeleting = ref(false)
 const pcError = ref('')
-
 const showPcConfirm = ref(false)
-const pendingPcDeleteId = ref(null)
 
-const startPcEdit = async (item) => {
+const openPcCreate = () => {
+  pcError.value = ''
+  pcEditingId.value = null
+  pcForm.value = emptyPcForm()
+  pcDialogOpen.value = true
+}
+
+const openPcEdit = (item) => {
   pcError.value = ''
   pcEditingId.value = item.id
-  pcEditForm.value = {
+  pcForm.value = {
     name: item.name,
     affiliation: item.affiliation ?? '',
     office: item.office ?? '',
@@ -259,26 +240,21 @@ const startPcEdit = async (item) => {
     showTitle: item.show_title,
     showOffice: item.show_office,
   }
-
-  await nextTick()
-  document.querySelectorAll('.auto-wrap').forEach((el) => {
-    el.style.height = 'auto'
-    el.style.height = el.scrollHeight + 'px'
-  })
+  pcDialogOpen.value = true
+  fitTextareas()
 }
 
-const cancelPcEdit = () => {
-  pcEditingId.value = null
-}
-
-const savePcEdit = async (id) => {
+const savePc = async () => {
+  if (!pcForm.value.name) return
+  const id = pcEditingId.value
   pcError.value = ''
   pcSaving.value = true
   try {
-    await $fetch(`/api/pcs/${id}`, { method: 'PUT', body: pcEditForm.value })
-    pcEditingId.value = null
+    if (id) await $fetch(`/api/pcs/${id}`, { method: 'PUT', body: pcForm.value })
+    else await $fetch('/api/pcs', { method: 'POST', body: pcForm.value })
+    pcDialogOpen.value = false
     await refreshPcs()
-    show('PCを保存しました')
+    show(id ? 'PCを保存しました' : 'PCを作成しました')
   } catch (e) {
     pcError.value = e?.data?.statusMessage ?? '保存に失敗しました'
   } finally {
@@ -286,50 +262,18 @@ const savePcEdit = async (id) => {
   }
 }
 
-const requestPcDelete = (id) => {
-  pendingPcDeleteId.value = id
-  showPcConfirm.value = true
-}
-
 const confirmPcDelete = async () => {
-  if (!pendingPcDeleteId.value) return
+  if (!pcEditingId.value) return
   pcDeleting.value = true
   try {
-    await $fetch(`/api/pcs/${pendingPcDeleteId.value}`, { method: 'DELETE' })
-    pcEditingId.value = null
+    await $fetch(`/api/pcs/${pcEditingId.value}`, { method: 'DELETE' })
+    pcDialogOpen.value = false
     await refreshPcs()
     show('PCを削除しました')
   } catch (e) {
     show(e?.data?.statusMessage ?? '削除に失敗しました', 'error')
   } finally {
     pcDeleting.value = false
-    pendingPcDeleteId.value = null
-  }
-}
-
-const startPcCreate = () => {
-  pcError.value = ''
-  pcCreating.value = true
-  pcNewForm.value = emptyPcForm()
-}
-
-const cancelPcCreate = () => {
-  pcCreating.value = false
-}
-
-const savePcCreate = async () => {
-  if (!pcNewForm.value.name) return
-  pcError.value = ''
-  pcSaving.value = true
-  try {
-    await $fetch('/api/pcs', { method: 'POST', body: pcNewForm.value })
-    pcCreating.value = false
-    await refreshPcs()
-    show('PCを作成しました')
-  } catch (e) {
-    pcError.value = e?.data?.statusMessage ?? '保存に失敗しました'
-  } finally {
-    pcSaving.value = false
   }
 }
 </script>
@@ -395,287 +339,180 @@ const savePcCreate = async () => {
       <span>所持金の増減・履歴</span>
     </button>
 
-    <!-- 自分の魔法一覧 -->
-    <AccordionList :items="[{ id: 'magics', title: magicSectionTitle }]" title-key="title" class="section-accordion">
+    <!-- 自分の魔法一覧(表示はアコーディオン、記入・編集はポップアップ) -->
+    <AccordionList :items="magicSection" class="section-accordion">
+      <template #title="{ item }">
+        <span class="section-title">{{ item.title }}</span>
+        <span class="section-count">{{ item.count }}件</span>
+      </template>
       <template #detail>
         <div class="section-body">
-
-      <p v-if="!(fetchedMagics ?? []).length" class="empty">まだ魔法がありません</p>
-      <AccordionList :items="fetchedMagics ?? []" title-key="name" body-key="effect">
-        <template #detail="{ item }">
-          <div v-if="editingId === item.id" class="edit-form">
-            <label class="edit-label">区分</label>
-            <select v-model="editForm.type" class="edit-input">
-              <option v-for="t in magicTypes" :key="t" :value="t">{{ t }}</option>
-            </select>
-
-            <label class="edit-label">名称</label>
-            <textarea v-model="editForm.name" class="edit-input auto-wrap" rows="1" @input="resize" />
-
-            <label class="edit-label">所持者</label>
-            <textarea v-model="editForm.owner" class="edit-input auto-wrap" rows="1" @input="resize" />
-
-            <label class="edit-label">コスト</label>
-            <textarea v-model="editForm.cost" class="edit-input auto-wrap" rows="1" @input="resize" />
-
-            <label class="edit-label">発動条件</label>
-            <textarea v-model="editForm.condition" class="edit-input auto-wrap" rows="1" @input="resize" />
-
-            <label class="edit-label">効果</label>
-            <textarea v-model="editForm.effect" class="edit-textarea auto-wrap" rows="3" @input="resize" />
-            <p class="markdown-hint">
-            # 見出し **太字** ~~取消線~~ `コード` &gt; 引用 ||スポイラー||
-            </p>
-            <label class="edit-label">タグ</label>
-            <div class="chip-list">
-              <button
-                v-for="tag in allTags ?? []"
-                :key="tag.id"
-                class="chip"
-                :class="{ active: editForm.tags.includes(tag.name) }"
-                @click="toggleFormTag(editForm, tag.name)"
-              >
-                {{ tag.name }}
-              </button>
-            </div>
-
-            <label class="edit-label">閲覧可能権限(空=誰でも閲覧可)</label>
-            <div class="chip-list">
-              <button
-                v-for="perm in allPermsList ?? []"
-                :key="perm.id"
-                class="chip"
-                :class="{ active: editForm.visiblePermissions.includes(perm.name) }"
-                @click="toggleFormPerm(editForm, perm.name)"
-              >
-                {{ perm.name }}
-              </button>
-            </div>
-
-            <div class="edit-actions">
-              <button class="save-btn" :disabled="saving" @click="saveEdit(item.id)">保存</button>
-              <button class="cancel-btn" @click="cancelEdit">キャンセル</button>
-              <button class="delete-btn" :disabled="deleting" @click="requestDelete(item.id)">削除</button>
-            </div>
-          </div>
-
-            <div v-else class="view-mode">
-            <p class="meta-line">区分: {{ item.type }} / 所持者: {{ item.owner || '-' }}</p>
-            <p class="meta-line">コスト: {{ item.cost || '-' }} / 発動条件: {{ item.condition || '-' }}</p>
-            <MarkdownText :text="item.effect" />
-            <button class="edit-btn" @click="startEdit(item)">編集</button>
-            </div>
-        </template>
-      </AccordionList>
-
-      <!-- 新規作成 -->
-      <div class="add-box">
-        <button v-if="!creating" class="add-btn" @click="startCreate">＋ 魔法を作成</button>
-
-        <div v-else class="edit-form">
-          <label class="edit-label">区分</label>
-          <select v-model="newForm.type" class="edit-input">
-            <option v-for="t in magicTypes" :key="t" :value="t">{{ t }}</option>
-          </select>
-            <label class="edit-label">名称</label>
-            <textarea v-model="newForm.name" class="edit-input auto-wrap" rows="1" @input="resize" />
-
-            <label class="edit-label">所持者</label>
-            <textarea v-model="newForm.owner" class="edit-input auto-wrap" rows="1" @input="resize" />
-
-            <label class="edit-label">コスト</label>
-            <textarea v-model="newForm.cost" class="edit-input auto-wrap" rows="1" @input="resize" />
-
-            <label class="edit-label">発動条件</label>
-            <textarea v-model="newForm.condition" class="edit-input auto-wrap" rows="1" @input="resize" />
-
-            <label class="edit-label">効果</label>
-            <textarea v-model="newForm.effect" class="edit-textarea auto-wrap" rows="3" @input="resize" />
-            <p class="markdown-hint">
-            # 見出し **太字** ~~取消線~~ `コード` &gt; 引用 ||スポイラー||
-            </p>
-            <label class="edit-label">タグ</label>
-            <div class="chip-list">
-            <button
-                v-for="tag in allTags ?? []"
-                :key="tag.id"
-                class="chip"
-                :class="{ active: newForm.tags.includes(tag.name) }"
-                @click="toggleFormTag(newForm, tag.name)"
-            >
-              {{ tag.name }}
-            </button>
-          </div>
-
-          <label class="edit-label">閲覧可能権限(空=誰でも閲覧可)</label>
-          <div class="chip-list">
-            <button
-              v-for="perm in allPermsList ?? []"
-              :key="perm.id"
-              class="chip"
-              :class="{ active: newForm.visiblePermissions.includes(perm.name) }"
-              @click="toggleFormPerm(newForm, perm.name)"
-            >
-              {{ perm.name }}
-            </button>
-          </div>
-
-          <div class="edit-actions">
-            <button class="save-btn" :disabled="saving || !newForm.name" @click="saveCreate">保存</button>
-            <button class="cancel-btn" @click="cancelCreate">キャンセル</button>
-          </div>
-        </div>
-      </div>
+          <p v-if="!(fetchedMagics ?? []).length" class="empty">まだ魔法がありません</p>
+          <AccordionList :items="fetchedMagics ?? []" title-key="name">
+            <template #detail="{ item }">
+              <div class="view-mode">
+                <p class="meta-line">区分: {{ item.type }} / 所持者: {{ item.owner || '-' }}</p>
+                <p class="meta-line">コスト: {{ item.cost || '-' }} / 発動条件: {{ item.condition || '-' }}</p>
+                <MarkdownText :text="item.effect" />
+                <button class="edit-btn" @click="openMagicEdit(item)">編集</button>
+              </div>
+            </template>
+          </AccordionList>
+          <button class="add-btn" @click="openMagicCreate">＋ 魔法を作成</button>
         </div>
       </template>
     </AccordionList>
 
-    <!-- 自分のPC一覧 -->
-    <AccordionList :items="[{ id: 'pcs', title: pcSectionTitle }]" title-key="title" class="section-accordion">
+    <!-- 自分のPC一覧(表示はアコーディオン、記入・編集はポップアップ) -->
+    <AccordionList :items="pcSection" class="section-accordion">
+      <template #title="{ item }">
+        <span class="section-title">{{ item.title }}</span>
+        <span class="section-count">{{ item.count }}件</span>
+      </template>
       <template #detail>
         <div class="section-body">
-
-      <p v-if="!myPcItems.length" class="empty">まだPCがありません</p>
-      <AccordionList :items="myPcItems" title-key="title" body-key="memo">
-        <template #detail="{ item }">
-          <div v-if="pcEditingId === item.id" class="edit-form">
-            <label class="edit-label">名前</label>
-            <textarea v-model="pcEditForm.name" class="edit-input auto-wrap" rows="1" @input="resize" />
-
-            <label class="edit-label">画像</label>
-            <p class="markdown-hint">画像アップロードは準備中です</p>
-
-            <label class="edit-label">所属</label>
-            <select v-model="pcEditForm.affiliation" class="edit-input">
-              <option value="">(未設定)</option>
-              <option v-for="a in allAffiliations ?? []" :key="a.id" :value="a.name">{{ a.name }}</option>
-            </select>
-
-            <label class="edit-label">事務所</label>
-            <textarea v-model="pcEditForm.office" class="edit-input auto-wrap" rows="1" @input="resize" />
-
-            <label class="edit-label">級</label>
-            <select v-model.number="pcEditForm.grade" class="edit-input">
-              <option v-for="g in grades" :key="g" :value="g">{{ g }}級</option>
-            </select>
-
-            <label class="check-label">
-              <input v-model="pcEditForm.isRepresentative" type="checkbox" />
-              協会の代表
-            </label>
-
-            <label class="check-label">
-              <input v-model="pcEditForm.isOfficeRepresentative" type="checkbox" />
-              事務所の代表
-            </label>
-
-            <label class="check-label">
-              <input v-model="pcEditForm.showTitle" type="checkbox" />
-              名前と一緒に肩書きを表示
-            </label>
-
-            <label class="check-label">
-              <input v-model="pcEditForm.showOffice" type="checkbox" :disabled="!pcEditForm.showTitle" />
-              肩書きに事務所を表示
-            </label>
-
-            <p class="markdown-hint">表示例: {{ pcTitle(formPreview(pcEditForm)) }}</p>
-
-            <label class="edit-label">メモ</label>
-            <textarea v-model="pcEditForm.memo" class="edit-textarea auto-wrap" rows="3" @input="resize" />
-            <p class="markdown-hint">
-            # 見出し **太字** ~~取消線~~ `コード` &gt; 引用 ||スポイラー||
-            </p>
-            <p v-if="pcError" class="error-text">{{ pcError }}</p>
-
-            <div class="edit-actions">
-              <button class="save-btn" :disabled="pcSaving" @click="savePcEdit(item.id)">保存</button>
-              <button class="cancel-btn" @click="cancelPcEdit">キャンセル</button>
-              <button class="delete-btn" :disabled="pcDeleting" @click="requestPcDelete(item.id)">削除</button>
-            </div>
-          </div>
-
-          <div v-else class="view-mode">
-            <p class="meta-line">
-              所属: {{ item.affiliation || '-' }} / 事務所: {{ item.office || '-' }} / {{ item.grade }}級<template v-if="pcRoles(item)"> / {{ pcRoles(item) }}</template>
-            </p>
-            <MarkdownText :text="item.memo" />
-            <div class="money-row">
-              <span class="money-label">{{ moneyLabel(item) }}</span>
-              <span class="money-value" :class="{ negative: item.money < 0 }">{{ formatBalance(item) }}</span>
-              <button class="money-edit-btn" @click="openMoneyDialog(item.id)">増減・履歴</button>
-            </div>
-            <button class="edit-btn" @click="startPcEdit(item)">編集</button>
-          </div>
-        </template>
-      </AccordionList>
-
-      <!-- 新規作成 -->
-      <div class="add-box">
-        <button v-if="!pcCreating" class="add-btn" @click="startPcCreate">＋ PCを作成</button>
-
-        <div v-else class="edit-form">
-            <label class="edit-label">名前</label>
-            <textarea v-model="pcNewForm.name" class="edit-input auto-wrap" rows="1" @input="resize" />
-
-            <label class="edit-label">画像</label>
-            <p class="markdown-hint">画像アップロードは準備中です</p>
-
-            <label class="edit-label">所属</label>
-            <select v-model="pcNewForm.affiliation" class="edit-input">
-              <option value="">(未設定)</option>
-              <option v-for="a in allAffiliations ?? []" :key="a.id" :value="a.name">{{ a.name }}</option>
-            </select>
-
-            <label class="edit-label">事務所</label>
-            <textarea v-model="pcNewForm.office" class="edit-input auto-wrap" rows="1" @input="resize" />
-
-            <label class="edit-label">級</label>
-            <select v-model.number="pcNewForm.grade" class="edit-input">
-              <option v-for="g in grades" :key="g" :value="g">{{ g }}級</option>
-            </select>
-
-            <label class="edit-label">初期所持金({{ MONEY_UNIT }})</label>
-            <input v-model.number="pcNewForm.money" type="number" step="1" class="edit-input" />
-
-            <label class="check-label">
-              <input v-model="pcNewForm.isRepresentative" type="checkbox" />
-              協会の代表
-            </label>
-
-            <label class="check-label">
-              <input v-model="pcNewForm.isOfficeRepresentative" type="checkbox" />
-              事務所の代表
-            </label>
-
-            <label class="check-label">
-              <input v-model="pcNewForm.showTitle" type="checkbox" />
-              名前と一緒に肩書きを表示
-            </label>
-
-            <label class="check-label">
-              <input v-model="pcNewForm.showOffice" type="checkbox" :disabled="!pcNewForm.showTitle" />
-              肩書きに事務所を表示
-            </label>
-
-            <p class="markdown-hint">表示例: {{ pcTitle(formPreview(pcNewForm)) }}</p>
-
-            <label class="edit-label">メモ</label>
-            <textarea v-model="pcNewForm.memo" class="edit-textarea auto-wrap" rows="3" @input="resize" />
-            <p class="markdown-hint">
-            # 見出し **太字** ~~取消線~~ `コード` &gt; 引用 ||スポイラー||
-            </p>
-            <p v-if="pcError" class="error-text">{{ pcError }}</p>
-
-          <div class="edit-actions">
-            <button class="save-btn" :disabled="pcSaving || !pcNewForm.name" @click="savePcCreate">保存</button>
-            <button class="cancel-btn" @click="cancelPcCreate">キャンセル</button>
-          </div>
-        </div>
-      </div>
+          <p v-if="!myPcItems.length" class="empty">まだPCがありません</p>
+          <AccordionList :items="myPcItems" title-key="title">
+            <template #detail="{ item }">
+              <div class="view-mode">
+                <p class="meta-line">
+                  所属: {{ item.affiliation || '-' }} / 事務所: {{ item.office || '-' }} / {{ item.grade }}級<template v-if="pcRoles(item)"> / {{ pcRoles(item) }}</template>
+                </p>
+                <MarkdownText :text="item.memo" />
+                <div class="money-row">
+                  <span class="money-label">{{ moneyLabel(item) }}</span>
+                  <span class="money-value" :class="{ negative: item.money < 0 }">{{ formatBalance(item) }}</span>
+                  <button class="money-edit-btn" @click="openMoneyDialog(item.id)">増減・履歴</button>
+                </div>
+                <button class="edit-btn" @click="openPcEdit(item)">編集</button>
+              </div>
+            </template>
+          </AccordionList>
+          <button class="add-btn" @click="openPcCreate">＋ PCを作成</button>
         </div>
       </template>
     </AccordionList>
+
+    <!-- 魔法の記入・編集 -->
+    <FormDialog v-model="magicDialogOpen" :title="magicEditingId ? '魔法の編集' : '魔法の作成'">
+      <label class="edit-label">区分</label>
+      <select v-model="magicForm.type" class="edit-input">
+        <option v-for="t in magicTypes" :key="t" :value="t">{{ t }}</option>
+      </select>
+
+      <label class="edit-label">名称</label>
+      <textarea v-model="magicForm.name" class="edit-input auto-wrap" rows="1" @input="resize" />
+
+      <label class="edit-label">所持者</label>
+      <textarea v-model="magicForm.owner" class="edit-input auto-wrap" rows="1" @input="resize" />
+
+      <label class="edit-label">コスト</label>
+      <textarea v-model="magicForm.cost" class="edit-input auto-wrap" rows="1" @input="resize" />
+
+      <label class="edit-label">発動条件</label>
+      <textarea v-model="magicForm.condition" class="edit-input auto-wrap" rows="1" @input="resize" />
+
+      <label class="edit-label">効果</label>
+      <textarea v-model="magicForm.effect" class="edit-textarea auto-wrap" rows="3" @input="resize" />
+      <p class="markdown-hint">
+        # 見出し **太字** ~~取消線~~ `コード` &gt; 引用 ||スポイラー||
+      </p>
+
+      <label class="edit-label">タグ</label>
+      <div class="chip-list">
+        <button
+          v-for="tag in allTags ?? []"
+          :key="tag.id"
+          class="chip"
+          :class="{ active: magicForm.tags.includes(tag.name) }"
+          @click="toggleFormTag(magicForm, tag.name)"
+        >
+          {{ tag.name }}
+        </button>
+      </div>
+
+      <label class="edit-label">閲覧可能権限(空=誰でも閲覧可)</label>
+      <div class="chip-list">
+        <button
+          v-for="perm in allPermsList ?? []"
+          :key="perm.id"
+          class="chip"
+          :class="{ active: magicForm.visiblePermissions.includes(perm.name) }"
+          @click="toggleFormPerm(magicForm, perm.name)"
+        >
+          {{ perm.name }}
+        </button>
+      </div>
+
+      <template #actions>
+        <button class="save-btn" :disabled="saving || !magicForm.name" @click="saveMagic">保存</button>
+        <button class="cancel-btn" @click="magicDialogOpen = false">キャンセル</button>
+        <button v-if="magicEditingId" class="delete-btn" :disabled="deleting" @click="showConfirm = true">削除</button>
+      </template>
+    </FormDialog>
+
+    <!-- PCの記入・編集 -->
+    <FormDialog v-model="pcDialogOpen" :title="pcEditingId ? 'PCの編集' : 'PCの作成'">
+      <label class="edit-label">名前</label>
+      <textarea v-model="pcForm.name" class="edit-input auto-wrap" rows="1" @input="resize" />
+
+      <label class="edit-label">画像</label>
+      <p class="markdown-hint">画像アップロードは準備中です</p>
+
+      <label class="edit-label">所属</label>
+      <select v-model="pcForm.affiliation" class="edit-input">
+        <option value="">(未設定)</option>
+        <option v-for="a in allAffiliations ?? []" :key="a.id" :value="a.name">{{ a.name }}</option>
+      </select>
+
+      <label class="edit-label">事務所</label>
+      <textarea v-model="pcForm.office" class="edit-input auto-wrap" rows="1" @input="resize" />
+
+      <label class="edit-label">級</label>
+      <select v-model.number="pcForm.grade" class="edit-input">
+        <option v-for="g in grades" :key="g" :value="g">{{ g }}級</option>
+      </select>
+
+      <template v-if="!pcEditingId">
+        <label class="edit-label">初期所持金({{ MONEY_UNIT }})</label>
+        <input v-model.number="pcForm.money" type="number" step="1" class="edit-input" />
+      </template>
+
+      <label class="check-label">
+        <input v-model="pcForm.isRepresentative" type="checkbox" />
+        協会の代表
+      </label>
+
+      <label class="check-label">
+        <input v-model="pcForm.isOfficeRepresentative" type="checkbox" />
+        事務所の代表
+      </label>
+
+      <label class="check-label">
+        <input v-model="pcForm.showTitle" type="checkbox" />
+        名前と一緒に肩書きを表示
+      </label>
+
+      <label class="check-label">
+        <input v-model="pcForm.showOffice" type="checkbox" :disabled="!pcForm.showTitle" />
+        肩書きに事務所を表示
+      </label>
+
+      <p class="markdown-hint">表示例: {{ pcTitle(formPreview(pcForm)) }}</p>
+
+      <label class="edit-label">メモ</label>
+      <textarea v-model="pcForm.memo" class="edit-textarea auto-wrap" rows="3" @input="resize" />
+      <p class="markdown-hint">
+        # 見出し **太字** ~~取消線~~ `コード` &gt; 引用 ||スポイラー||
+      </p>
+      <p v-if="pcError" class="error-text">{{ pcError }}</p>
+
+      <template #actions>
+        <button class="save-btn" :disabled="pcSaving || !pcForm.name" @click="savePc">保存</button>
+        <button class="cancel-btn" @click="pcDialogOpen = false">キャンセル</button>
+        <button v-if="pcEditingId" class="delete-btn" :disabled="pcDeleting" @click="showPcConfirm = true">削除</button>
+      </template>
+    </FormDialog>
 
     <ConfirmDialog
       v-model="showConfirm"
@@ -854,12 +691,6 @@ const savePcCreate = async () => {
   opacity: 0.75;
 }
 
-.accordion-body {
-  margin: 6px 0 10px;
-  font-size: 0.9rem;
-  line-height: 1.7;
-  white-space: pre-line;
-}
 
 .edit-btn {
   border: 1px solid var(--color-text, #000);
@@ -869,15 +700,6 @@ const savePcCreate = async () => {
   cursor: pointer;
 }
 
-.edit-form {
-  padding: 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  border: 1px solid var(--color-text, #000);
-  border-left: 6px solid var(--color-accent, #ffd400);
-  box-sizing: border-box;
-}
 
 .edit-label {
   font-size: 0.75rem;
@@ -926,12 +748,48 @@ const savePcCreate = async () => {
   margin-left: auto;
 }
 
+/* 外側の一覧は箱にせず、下線付きの見出しとして見せる(内側の項目だけを箱にする) */
 .section-accordion {
-  margin-bottom: 16px;
+  margin-bottom: 24px;
+}
+
+.section-accordion > :deep(.accordion-item) {
+  border: none;
+  background: none;
+  /* 開いたときの影(AccordionList 側の指定)も付けない */
+  box-shadow: none !important;
+}
+
+.section-accordion > :deep(.accordion-item) > .accordion-header {
+  min-height: 44px;
+  padding: 8px 2px;
+  border-bottom: 2px solid var(--color-text);
+}
+
+@media (hover: hover) {
+  .section-accordion > :deep(.accordion-item) > .accordion-header:hover {
+    background: none;
+    opacity: 0.7;
+  }
+}
+
+.section-accordion > :deep(.accordion-item) > .detail-outer > .detail-inner {
+  border-top: none;
+}
+
+.section-accordion :deep(.accordion-title) .section-title {
+  font-size: 1rem;
+}
+
+.section-count {
+  margin-left: 8px;
+  font-size: 0.75rem;
+  font-weight: normal;
+  opacity: 0.6;
 }
 
 .section-body {
-  padding: 12px;
+  padding: 12px 0 4px;
 }
 
 .money-open-btn {
@@ -985,11 +843,9 @@ const savePcCreate = async () => {
   cursor: pointer;
 }
 
-.add-box {
-  margin-top: 12px;
-}
 
 .add-btn {
+  margin-top: 12px;
   width: 100%;
   box-sizing: border-box;
   border: 2px dashed var(--color-text, #000);
