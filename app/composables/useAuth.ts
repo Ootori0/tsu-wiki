@@ -23,6 +23,8 @@ export const useAuth = () => {
     user.value = null
     checked.value = true
     await navigateTo('/')
+    // 閲覧権限で中身が変わる一覧や自分のPCなど、読み込み済みのデータを捨てる(表示中のページを壊さないよう移動後に行う)
+    clearNuxtData()
   }
 
   // ルートミドルウェア用: サーバー描画時は毎回 Cookie で確認し、ブラウザでは未確認のときだけ問い合わせる

@@ -15,6 +15,8 @@ const login = async () => {
       body: { name: name.value, password: password.value },
     })
     await fetchUser()
+    // 閲覧権限で中身が変わる一覧や前のユーザーのPCなど、読み込み済みのデータを捨てる
+    clearNuxtData()
     await navigateTo('/')
   } catch (e) {
     error.value = 'IDまたはパスワードが違います'

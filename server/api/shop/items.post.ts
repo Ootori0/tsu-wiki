@@ -1,6 +1,7 @@
 import { getSessionUser } from '../../utils/session'
 import { isManager } from '../../utils/permission'
 import { parseShopItemBody, assertSellersExist, sellerInsertStatements } from '../../utils/shop'
+import { invalidateCache } from '../../utils/cache'
 
 export default defineEventHandler(async (event) => {
   const db = event.context.cloudflare.env.tsu_wiki_db
@@ -21,6 +22,8 @@ export default defineEventHandler(async (event) => {
       .bind(item.shop, item.name, item.price, item.stock, item.description),
     ...sellerInsertStatements(db, '(SELECT MAX(id) FROM shop_items)', [], item.sellers),
   ])
+
+  invalidateCache('shop:items')
 
   return { success: true }
 })

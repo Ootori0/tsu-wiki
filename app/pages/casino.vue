@@ -3,7 +3,7 @@ definePageMeta({ middleware: 'auth' })
 
 const { myPcs, refreshMyPcs, selectedPcId, selectedPc } = await useMyPcs()
 
-const { data: payoutData } = await useFetch('/api/casino/chinchiro/payouts', {
+const { data: payoutData } = await useCachedFetch('/api/casino/chinchiro/payouts', {
   key: 'chinchiro-payouts',
 })
 const betUnit = computed(() => payoutData.value?.betUnit ?? 100)

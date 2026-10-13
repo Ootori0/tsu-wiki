@@ -34,7 +34,7 @@ export default defineEventHandler(async (event) => {
       : []),
   ])
 
-  invalidateCache('pcs', 'casino:dealer')
+  invalidateCache('pcs', 'casino:dealer', 'shop:items')
 
   return { id: result.meta.last_row_id, success: true }
 })

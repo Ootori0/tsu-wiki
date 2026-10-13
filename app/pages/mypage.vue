@@ -119,6 +119,8 @@ const saveMagic = async () => {
     else await $fetch('/api/magics', { method: 'POST', body: magicForm.value })
     magicDialogOpen.value = false
     await refreshMagics()
+    // 魔法タブの一覧も次に開いたときに読み込み直す
+    clearNuxtData('magics-list')
     show(id ? '魔法を保存しました' : '魔法を作成しました')
   } catch (e) {
     show(e?.data?.statusMessage ?? '保存に失敗しました', 'error')
@@ -134,6 +136,8 @@ const confirmDelete = async () => {
     await $fetch(`/api/magics/${magicEditingId.value}`, { method: 'DELETE' })
     magicDialogOpen.value = false
     await refreshMagics()
+    // 魔法タブの一覧も次に開いたときに読み込み直す
+    clearNuxtData('magics-list')
     show('魔法を削除しました')
   } catch (e) {
     show(e?.data?.statusMessage ?? '削除に失敗しました', 'error')
