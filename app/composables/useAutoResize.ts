@@ -11,7 +11,10 @@ export function useAutoResize() {
   // ポップアップを開いた直後など、入力済みの文章に合わせて .auto-wrap をまとめて広げる
   const fitAll = async () => {
     await nextTick()
-    document.querySelectorAll('.auto-wrap').forEach(fit)
+    const els = [...document.querySelectorAll('.auto-wrap')]
+    els.forEach(fit)
+    // 広げた結果レイアウトが変わって幅が変わることがあるので、描画後にもう一度合わせる
+    requestAnimationFrame(() => els.forEach(fit))
   }
 
   return { resize, fitAll }

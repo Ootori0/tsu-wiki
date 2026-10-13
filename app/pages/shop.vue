@@ -92,45 +92,45 @@ const buy = async () => {
     </div>
 
 
-    <div class="item-list">
-      <div
-        v-for="item in shopItems"
-        :key="item.id"
-        class="item"
-        :class="{ soldout: item.stock === 0 }"
-      >
-        <div class="item-head">
+    <!-- 名称と値段だけを並べ、開くと詳細と購入欄が出る -->
+    <p v-if="shopItems.length === 0" class="empty">商品がありません</p>
+    <AccordionList :items="shopItems" class="item-list">
+      <template #title="{ item }">
+        <span class="item-head" :class="{ soldout: item.stock === 0 }">
           <span class="item-name">{{ item.name }}</span>
+          <span v-if="item.stock === 0" class="soldout-tag">売り切れ</span>
           <span class="item-price">{{ formatMoney(item.price) }}</span>
-        </div>
-        <p class="item-stock">
-          <template v-if="item.stock === null">在庫: 無制限</template>
-          <template v-else-if="item.stock === 0">売り切れ</template>
-          <template v-else>在庫: {{ item.stock }}</template>
-        </p>
-        <p v-if="item.sellers?.length" class="item-sellers">
-          販売者: {{ item.sellers.map((s) => s.pcName).join('、') }}
-        </p>
-        <MarkdownText v-if="item.description" :text="item.description" />
+        </span>
+      </template>
+      <template #detail="{ item }">
+        <div class="item-detail">
+          <p class="item-stock">
+            <template v-if="item.stock === null">在庫: 無制限</template>
+            <template v-else-if="item.stock === 0">売り切れ</template>
+            <template v-else>在庫: {{ item.stock }}</template>
+          </p>
+          <p v-if="item.sellers?.length" class="item-sellers">
+            販売者: {{ item.sellers.map((s) => s.pcName).join('、') }}
+          </p>
+          <MarkdownText v-if="item.description" :text="item.description" />
 
-        <div v-if="item.stock !== 0 && selectedPc" class="item-buy">
-          <input
-            v-model.number="quantities[item.id]"
-            type="number"
-            min="1"
-            :max="item.stock ?? undefined"
-            placeholder="1"
-            class="qty-input"
-          />
-          <span class="qty-unit">個</span>
-          <button class="buy-btn" :disabled="!canBuy(item) || buying" @click="requestBuy(item)">
-            購入
-          </button>
+          <div v-if="item.stock !== 0 && selectedPc" class="item-buy">
+            <input
+              v-model.number="quantities[item.id]"
+              type="number"
+              min="1"
+              :max="item.stock ?? undefined"
+              placeholder="1"
+              class="qty-input"
+            />
+            <span class="qty-unit">個</span>
+            <button class="buy-btn" :disabled="!canBuy(item) || buying" @click="requestBuy(item)">
+              購入
+            </button>
+          </div>
         </div>
-      </div>
-
-      <p v-if="shopItems.length === 0" class="empty">商品がありません</p>
-    </div>
+      </template>
+    </AccordionList>
 
     <section v-if="selectedPc" class="history">
       <h2 class="history-title">{{ selectedPc.name }}の取引履歴</h2>
@@ -201,47 +201,45 @@ const buy = async () => {
   color: #000;
 }
 
-.item-list {
+.item-head {
   display: flex;
-  flex-direction: column;
-  gap: 12px;
+  align-items: center;
+  gap: 8px;
 }
 
-.item {
-  border: 2px solid var(--color-text, #000);
-  box-shadow: 4px 4px 0 var(--color-text, #000);
-  background: var(--color-bg, #fff);
-  padding: 12px 14px;
-}
-
-.item.soldout {
+.item-head.soldout {
   opacity: 0.5;
 }
 
-.item-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: 10px;
-}
-
 .item-name {
+  flex: 1;
   font-size: 1rem;
   font-weight: bold;
   word-break: break-word;
 }
 
+.soldout-tag {
+  flex-shrink: 0;
+  font-size: 0.7rem;
+  border: 1px solid currentColor;
+  padding: 0 5px;
+}
+
 .item-price {
   flex-shrink: 0;
-  font-size: 1rem;
+  font-size: 0.95rem;
   font-weight: bold;
   background: #000;
   color: var(--color-accent, #ffd400);
   padding: 1px 8px;
 }
 
+.item-detail {
+  padding: 10px 14px 14px;
+}
+
 .item-stock {
-  margin: 4px 0 6px;
+  margin: 0 0 6px;
   font-size: 0.75rem;
   opacity: 0.7;
 }
