@@ -207,8 +207,8 @@ const formPreview = (form) => ({
 })
 
 // 一覧ごと折りたためる見出し(件数つき)
-const magicSectionTitle = computed(() => `あなたの魔法一覧(${(fetchedMagics.value ?? []).length}件)`)
-const pcSectionTitle = computed(() => `あなたのPC一覧(${(fetchedPcs.value ?? []).length}件)`)
+const magicSection = computed(() => [{ id: 'magics', title: 'あなたの魔法一覧', count: (fetchedMagics.value ?? []).length }])
+const pcSection = computed(() => [{ id: 'pcs', title: 'あなたのPC一覧', count: (fetchedPcs.value ?? []).length }])
 
 const myPcItems = computed(() =>
   (fetchedPcs.value ?? []).map((pc) => ({ ...pc, title: pcTitle(pc) }))
@@ -396,7 +396,11 @@ const savePcCreate = async () => {
     </button>
 
     <!-- 自分の魔法一覧 -->
-    <AccordionList :items="[{ id: 'magics', title: magicSectionTitle }]" title-key="title" class="section-accordion">
+    <AccordionList :items="magicSection" class="section-accordion">
+      <template #title="{ item }">
+        <span class="section-title">{{ item.title }}</span>
+        <span class="section-count">{{ item.count }}件</span>
+      </template>
       <template #detail>
         <div class="section-body">
 
@@ -531,7 +535,11 @@ const savePcCreate = async () => {
     </AccordionList>
 
     <!-- 自分のPC一覧 -->
-    <AccordionList :items="[{ id: 'pcs', title: pcSectionTitle }]" title-key="title" class="section-accordion">
+    <AccordionList :items="pcSection" class="section-accordion">
+      <template #title="{ item }">
+        <span class="section-title">{{ item.title }}</span>
+        <span class="section-count">{{ item.count }}件</span>
+      </template>
       <template #detail>
         <div class="section-body">
 
@@ -926,12 +934,48 @@ const savePcCreate = async () => {
   margin-left: auto;
 }
 
+/* 外側の一覧は箱にせず、下線付きの見出しとして見せる(内側の項目だけを箱にする) */
 .section-accordion {
-  margin-bottom: 16px;
+  margin-bottom: 24px;
+}
+
+.section-accordion > :deep(.accordion-item) {
+  border: none;
+  background: none;
+  /* 開いたときの影(AccordionList 側の指定)も付けない */
+  box-shadow: none !important;
+}
+
+.section-accordion > :deep(.accordion-item) > .accordion-header {
+  min-height: 44px;
+  padding: 8px 2px;
+  border-bottom: 2px solid var(--color-text);
+}
+
+@media (hover: hover) {
+  .section-accordion > :deep(.accordion-item) > .accordion-header:hover {
+    background: none;
+    opacity: 0.7;
+  }
+}
+
+.section-accordion > :deep(.accordion-item) > .detail-outer > .detail-inner {
+  border-top: none;
+}
+
+.section-accordion :deep(.accordion-title) .section-title {
+  font-size: 1rem;
+}
+
+.section-count {
+  margin-left: 8px;
+  font-size: 0.75rem;
+  font-weight: normal;
+  opacity: 0.6;
 }
 
 .section-body {
-  padding: 12px;
+  padding: 12px 0 4px;
 }
 
 .money-open-btn {
