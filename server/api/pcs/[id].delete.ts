@@ -25,7 +25,7 @@ export default defineEventHandler(async (event) => {
 
   await db.prepare('DELETE FROM pcs WHERE id = ?').bind(id).run()
 
-  invalidateCache('pcs', 'casino:dealer')
+  invalidateCache('pcs', 'casino:dealer', 'shop:items')
 
   return { success: true, id: Number(id) }
 })

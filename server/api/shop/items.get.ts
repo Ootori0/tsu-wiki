@@ -1,5 +1,6 @@
 import { getSessionUser } from '../../utils/session'
 import { isManager } from '../../utils/permission'
+import { cached } from '../../utils/cache'
 
 // 販売者の金額は admin/KP のみに返す
 export default defineEventHandler(async (event) => {
@@ -8,14 +9,15 @@ export default defineEventHandler(async (event) => {
   const currentUser = await getSessionUser(db, sessionId ?? '')
   const admin = isManager(currentUser?.permissions)
 
-  const [{ results: items }, { results: sellers }] = await db.batch([
+  // 商品と販売者をまとめてキャッシュする(商品の変更・購入・PCの変更で破棄)
+  const [{ results: items }, { results: sellers }] = await cached('shop:items', () => db.batch([
     db.prepare('SELECT * FROM shop_items ORDER BY shop ASC, id DESC'),
     db.prepare(
       `SELECT s.item_id, s.pc_id, s.amount, pcs.name AS pc_name
        FROM shop_item_sellers s JOIN pcs ON pcs.id = s.pc_id
        ORDER BY s.id ASC`
     ),
-  ])
+  ]))
 
   return items.map((item) => ({
     ...item,

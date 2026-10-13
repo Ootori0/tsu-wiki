@@ -1,5 +1,7 @@
 <script setup>
-const { data: fetchedTags } = await useFetch('/api/tags')
+const { data: fetchedTags } = await useCachedFetch('/api/tags', {
+  key: 'tags-list',
+})
 
 const tabs = ['すべて', '魔法', '魔道具', 'AF', '魔術・その他']
 const activeTab = ref('すべて')
@@ -24,13 +26,17 @@ watch(canFilterByPerm, (can) => {
   if (can && !allPermsList.value) loadPerms()
 }, { immediate: true })
 
-const { data: fetchedItems, refresh } = await useCachedFetch('/api/magics', {
-  key: computed(() => `magics-list-${activeTab.value}`),
-  query: computed(() => ({ type: activeTab.value })),
+// 全件を一度だけ読み込み、区分タブの切り替えは手元で絞り込む(タブを替えても再読み込みしない)
+const { data: fetchedItems } = await useCachedFetch('/api/magics', {
+  key: 'magics-list',
 })
 
 const filteredItems = computed(() => {
   let list = fetchedItems.value ?? []
+
+  if (activeTab.value !== 'すべて') {
+    list = list.filter((item) => item.type === activeTab.value)
+  }
 
   if (searchName.value) {
     list = list.filter((item) => item.name.includes(searchName.value))

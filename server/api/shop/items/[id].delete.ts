@@ -1,5 +1,6 @@
 import { getSessionUser } from '../../../utils/session'
 import { isManager } from '../../../utils/permission'
+import { invalidateCache } from '../../../utils/cache'
 
 export default defineEventHandler(async (event) => {
   const db = event.context.cloudflare.env.tsu_wiki_db
@@ -15,6 +16,8 @@ export default defineEventHandler(async (event) => {
     db.prepare('DELETE FROM shop_item_sellers WHERE item_id = ?').bind(id),
     db.prepare('DELETE FROM shop_items WHERE id = ?').bind(id),
   ])
+
+  invalidateCache('shop:items')
 
   return { success: true }
 })

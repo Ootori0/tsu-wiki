@@ -1,5 +1,6 @@
 import { getSessionUser } from '../../utils/session'
 import { isAdmin } from '../../utils/permission'
+import { invalidateCache } from '../../utils/cache'
 
 export default defineEventHandler(async (event) => {
   const db = event.context.cloudflare.env.tsu_wiki_db
@@ -80,5 +81,7 @@ export default defineEventHandler(async (event) => {
   }
 
   const updated = await db.prepare('SELECT money FROM pcs WHERE id = ?').bind(pc.id).first()
+  invalidateCache('shop:items')
+
   return { success: true, money: updated.money }
 })

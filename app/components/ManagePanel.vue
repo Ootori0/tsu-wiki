@@ -130,7 +130,10 @@ const deletePermission = async (id) => {
 }
 
 // --- タグ管理 ---
-const { data: tags, refresh: refreshTags } = await useFetch('/api/tags')
+// 他のページと同じキーで共有し、ページを移動しても読み込み直さない(変更したら refresh で取り直す)
+const { data: tags, refresh: refreshTags } = await useCachedFetch('/api/tags', {
+  key: 'tags-list',
+})
 const createTag = async (name) => {
   return run(async () => {
     await $fetch('/api/tags', {
@@ -150,12 +153,9 @@ const deleteTag = async (id) => {
 }
 
 // --- 所属管理 ---
-const { data: affiliations, refresh: refreshAffiliationsRaw } = await useFetch('/api/affiliations')
-
-const refreshAffiliations = async () => {
-  clearNuxtData('affiliations-list')
-  await refreshAffiliationsRaw()
-}
+const { data: affiliations, refresh: refreshAffiliations } = await useCachedFetch('/api/affiliations', {
+  key: 'affiliations-list',
+})
 
 const createAffiliation = async (name) => {
   return run(async () => {
@@ -184,7 +184,7 @@ const { data: allPurchases, refresh: refreshAllPurchases } = await useFetch('/ap
   key: 'admin-purchases',
 })
 
-const { data: allPcs } = await useFetch('/api/pcs', { key: 'admin-all-pcs' })
+const { data: allPcs } = await useCachedFetch('/api/pcs', { key: 'pcs-list' })
 
 const emptyItemForm = () => ({ shop: '魔法店', name: '', price: 0, stock: '', description: '', sellers: [] })
 

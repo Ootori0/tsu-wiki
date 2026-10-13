@@ -37,7 +37,7 @@ export default defineEventHandler(async (event) => {
     .bind(pc.name, pc.affiliation, pc.office, pc.grade, pc.memo, pc.isRepresentative, pc.isOfficeRepresentative, pc.showTitle, pc.showOffice, id)
     .run()
 
-  invalidateCache('pcs', 'casino:dealer')
+  invalidateCache('pcs', 'casino:dealer', 'shop:items')
 
   return { id: Number(id), success: true }
 })
