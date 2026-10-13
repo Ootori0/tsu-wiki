@@ -11,7 +11,7 @@ export default defineEventHandler(async (event) => {
   }
 
   const { results } = await db
-    .prepare('SELECT * FROM pcs WHERE created_by = ? ORDER BY affiliation ASC, grade ASC, name ASC')
+    .prepare('SELECT * FROM pcs WHERE created_by = ? ORDER BY id DESC')
     .bind(currentUser.id)
     .all()
 

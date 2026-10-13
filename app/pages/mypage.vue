@@ -24,7 +24,7 @@ const saveName = async () => {
   }
 }
 
-const { resize } = useAutoResize()
+const { resize, fitAll: fitTextareas } = useAutoResize()
 // --- パスワード変更 ---
 const passwordAccordionOpen = ref(false)
 const currentPassword = ref('')
@@ -87,15 +87,6 @@ const magicForm = ref(emptyMagicForm())
 const saving = ref(false)
 const deleting = ref(false)
 const showConfirm = ref(false)
-
-// ポップアップを開いたあと、入力済みの文章に合わせて入力欄の高さを広げる
-const fitTextareas = async () => {
-  await nextTick()
-  document.querySelectorAll('.auto-wrap').forEach((el) => {
-    el.style.height = 'auto'
-    el.style.height = el.scrollHeight + 'px'
-  })
-}
 
 const openMagicCreate = () => {
   magicEditingId.value = null
@@ -348,7 +339,7 @@ const confirmPcDelete = async () => {
       <template #detail>
         <div class="section-body">
           <p v-if="!(fetchedMagics ?? []).length" class="empty">まだ魔法がありません</p>
-          <AccordionList :items="fetchedMagics ?? []" title-key="name">
+          <AccordionList :items="fetchedMagics ?? []" title-key="name" class="ruled-list">
             <template #detail="{ item }">
               <div class="view-mode">
                 <p class="meta-line">区分: {{ item.type }} / 所持者: {{ item.owner || '-' }}</p>
@@ -372,7 +363,7 @@ const confirmPcDelete = async () => {
       <template #detail>
         <div class="section-body">
           <p v-if="!myPcItems.length" class="empty">まだPCがありません</p>
-          <AccordionList :items="myPcItems" title-key="title">
+          <AccordionList :items="myPcItems" title-key="title" class="ruled-list">
             <template #detail="{ item }">
               <div class="view-mode">
                 <p class="meta-line">
@@ -748,37 +739,41 @@ const confirmPcDelete = async () => {
   margin-left: auto;
 }
 
-/* 外側の一覧は箱にせず、下線付きの見出しとして見せる(内側の項目だけを箱にする) */
+/* 外側の一覧は箱、内側の項目は罫線で区切った行として見せる */
 .section-accordion {
-  margin-bottom: 24px;
+  margin-bottom: 16px;
 }
 
-.section-accordion > :deep(.accordion-item) {
+.section-accordion :deep(.accordion-title) .section-title {
+  font-size: 1rem;
+}
+
+.ruled-list {
+  gap: 0;
+}
+
+.ruled-list > :deep(.accordion-item) {
   border: none;
+  border-bottom: 1px solid var(--color-text);
   background: none;
   /* 開いたときの影(AccordionList 側の指定)も付けない */
   box-shadow: none !important;
 }
 
-.section-accordion > :deep(.accordion-item) > .accordion-header {
-  min-height: 44px;
-  padding: 8px 2px;
-  border-bottom: 2px solid var(--color-text);
+.ruled-list > :deep(.accordion-item):first-child {
+  border-top: 1px solid var(--color-text);
 }
 
-@media (hover: hover) {
-  .section-accordion > :deep(.accordion-item) > .accordion-header:hover {
-    background: none;
-    opacity: 0.7;
-  }
+.ruled-list > :deep(.accordion-item) > .accordion-header {
+  padding: 10px 4px;
 }
 
-.section-accordion > :deep(.accordion-item) > .detail-outer > .detail-inner {
+.ruled-list > :deep(.accordion-item) > .detail-outer > .detail-inner {
   border-top: none;
 }
 
-.section-accordion :deep(.accordion-title) .section-title {
-  font-size: 1rem;
+.ruled-list :deep(.view-mode) {
+  padding: 0 4px 14px;
 }
 
 .section-count {
@@ -789,7 +784,7 @@ const confirmPcDelete = async () => {
 }
 
 .section-body {
-  padding: 12px 0 4px;
+  padding: 12px;
 }
 
 .money-open-btn {

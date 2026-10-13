@@ -12,7 +12,7 @@ export default defineEventHandler(async (event) => {
 
   // 全件をキャッシュし、区分・閲覧権限での絞り込みはリクエストごとに行う
   const all = await cached('magics', async () => {
-    const { results } = await db.prepare('SELECT * FROM magics ORDER BY sort_order ASC').all()
+    const { results } = await db.prepare('SELECT * FROM magics ORDER BY id DESC').all()
     return results.map((r) => ({
       ...r,
       tags: JSON.parse(r.tags),

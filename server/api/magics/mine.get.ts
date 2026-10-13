@@ -10,7 +10,7 @@ export default defineEventHandler(async (event) => {
   }
 
   const { results } = await db
-    .prepare('SELECT * FROM magics WHERE created_by = ? ORDER BY sort_order ASC')
+    .prepare('SELECT * FROM magics WHERE created_by = ? ORDER BY id DESC')
     .bind(currentUser.id)
     .all()
 

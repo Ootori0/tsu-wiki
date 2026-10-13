@@ -100,6 +100,11 @@ const close = () => {
   gap: 6px;
 }
 
+/* 本文の要素を縦に縮めない(縮むと長文で入力欄が広がらなくなる。はみ出した分は本文をスクロールする) */
+.dialog-body > :slotted(*) {
+  flex-shrink: 0;
+}
+
 .dialog-actions {
   flex-shrink: 0;
   display: flex;
