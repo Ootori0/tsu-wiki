@@ -1,12 +1,12 @@
 import { getSessionUser } from '../../utils/session'
-import { isAdmin } from '../../utils/permission'
+import { isManager } from '../../utils/permission'
 
-// 販売者の金額は admin のみに返す
+// 販売者の金額は admin/KP のみに返す
 export default defineEventHandler(async (event) => {
   const db = event.context.cloudflare.env.tsu_wiki_db
   const sessionId = getCookie(event, 'session_id')
   const currentUser = await getSessionUser(db, sessionId ?? '')
-  const admin = isAdmin(currentUser?.permissions)
+  const admin = isManager(currentUser?.permissions)
 
   const [{ results: items }, { results: sellers }] = await db.batch([
     db.prepare('SELECT * FROM shop_items ORDER BY shop ASC, sort_order ASC, id ASC'),

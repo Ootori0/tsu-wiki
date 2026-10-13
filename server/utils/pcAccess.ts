@@ -10,7 +10,7 @@ export async function requirePcOwner(event, db, id) {
     throw createError({ statusCode: 401, statusMessage: 'ログインが必要です' })
   }
 
-  const pc = await db.prepare('SELECT id, created_by, money FROM pcs WHERE id = ?').bind(id).first()
+  const pc = await db.prepare('SELECT id, created_by, money, money_mode FROM pcs WHERE id = ?').bind(id).first()
   if (!pc) {
     throw createError({ statusCode: 404, statusMessage: 'PCが見つかりません' })
   }

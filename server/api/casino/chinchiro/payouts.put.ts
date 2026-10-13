@@ -1,5 +1,5 @@
 import { getSessionUser } from '../../../utils/session'
-import { isAdmin } from '../../../utils/permission'
+import { isManager } from '../../../utils/permission'
 import { CHINCHIRO_HANDS } from '../../../utils/chinchiro'
 import { invalidateCache } from '../../../utils/cache'
 
@@ -8,8 +8,8 @@ export default defineEventHandler(async (event) => {
   const sessionId = getCookie(event, 'session_id')
   const currentUser = await getSessionUser(db, sessionId ?? '')
 
-  if (!currentUser || !isAdmin(currentUser.permissions)) {
-    throw createError({ statusCode: 403, statusMessage: 'admin権限が必要です' })
+  if (!currentUser || !isManager(currentUser.permissions)) {
+    throw createError({ statusCode: 403, statusMessage: '管理権限(admin/KP)が必要です' })
   }
 
   const { payouts, dealerPcId, dealerShare } = (await readBody(event)) ?? {}

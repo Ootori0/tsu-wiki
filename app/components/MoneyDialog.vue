@@ -55,8 +55,8 @@ const close = () => {
               <option v-for="p in pcs" :key="p.id" :value="p.id">{{ p.name }}</option>
             </select>
             <div class="balance">
-              <span class="balance-name">{{ pc.name }}</span>
-              <span class="balance-value" :class="{ negative: pc.money < 0 }">{{ formatMoney(pc.money) }}</span>
+              <span class="balance-name">{{ pc.name }}<small class="balance-label">{{ moneyLabel(pc) }}</small></span>
+              <span class="balance-value" :class="{ negative: pc.money < 0 }">{{ formatBalance(pc) }}</span>
             </div>
             <PcMoneyPanel :key="pc.id" :pc="pc" hide-head @updated="onUpdated" />
           </template>
@@ -140,6 +140,12 @@ const close = () => {
 .balance-name {
   font-size: 0.85rem;
   font-weight: bold;
+}
+
+.balance-label {
+  margin-left: 8px;
+  font-size: 0.7rem;
+  opacity: 0.8;
 }
 
 .balance-value {

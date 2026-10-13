@@ -1,8 +1,8 @@
 import { getSessionUser } from '../../utils/session'
-import { isAdmin } from '../../utils/permission'
+import { isManager } from '../../utils/permission'
 
-// pcId指定: そのPCの取引履歴(購入=支出、販売者としての収入)(作成者/admin)
-// 指定なし: 全購入履歴と販売者への支払い(adminのみ)
+// pcId指定: そのPCの取引履歴(購入=支出、販売者としての収入)(作成者/admin/KP)
+// 指定なし: 全購入履歴と販売者への支払い(admin/KPのみ)
 export default defineEventHandler(async (event) => {
   const db = event.context.cloudflare.env.tsu_wiki_db
   const sessionId = getCookie(event, 'session_id')
@@ -13,11 +13,11 @@ export default defineEventHandler(async (event) => {
   }
 
   const { pcId } = getQuery(event)
-  const admin = isAdmin(currentUser.permissions)
+  const admin = isManager(currentUser.permissions)
 
   if (!pcId) {
     if (!admin) {
-      throw createError({ statusCode: 403, statusMessage: 'admin権限が必要です' })
+      throw createError({ statusCode: 403, statusMessage: '管理権限(admin/KP)が必要です' })
     }
     const [{ results: purchases }, { results: payouts }] = await db.batch([
       db.prepare(

@@ -9,7 +9,7 @@ export default defineEventHandler(async (event) => {
   const { results } = await db
     .prepare(
       `SELECT * FROM (
-         SELECT 'manual' AS kind, id, amount, reason AS detail, NULL AS sub, created_at
+         SELECT type AS kind, id, amount, reason AS detail, NULL AS sub, created_at
          FROM money_logs WHERE pc_id = ?1
          UNION ALL
          SELECT 'purchase', id, -total, item_name, shop || ' ×' || quantity, created_at

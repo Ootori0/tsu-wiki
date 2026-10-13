@@ -1,5 +1,5 @@
 <script setup>
-import { marked } from 'marked'
+import { Marked } from 'marked'
 import DOMPurify from 'dompurify'
 
 const props = defineProps({
@@ -9,9 +9,18 @@ const props = defineProps({
   },
 })
 
-marked.setOptions({
+const marked = new Marked({
   breaks: true,
   gfm: true,
+  renderer: {
+    // *で囲んだ斜体は使わず、*をそのまま文字として表示する(_ の斜体や **太字** はそのまま)
+    em(token) {
+      if (token.raw.startsWith('*')) {
+        return `*${this.parser.parseInline(token.tokens)}*`
+      }
+      return false
+    },
+  },
 })
 
 const renderedHtml = computed(() => {

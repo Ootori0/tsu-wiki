@@ -1,5 +1,5 @@
 import { getSessionUser } from '../../utils/session'
-import { isAdmin } from '../../utils/permission'
+import { isManager } from '../../utils/permission'
 
 // 全PCの所持金の増減履歴(手動・店の購入/売上・カジノ・ディーラー)。pcId を指定するとそのPCだけ
 export default defineEventHandler(async (event) => {
@@ -7,8 +7,8 @@ export default defineEventHandler(async (event) => {
   const sessionId = getCookie(event, 'session_id')
   const currentUser = await getSessionUser(db, sessionId ?? '')
 
-  if (!currentUser || !isAdmin(currentUser.permissions)) {
-    throw createError({ statusCode: 403, statusMessage: 'admin権限が必要です' })
+  if (!currentUser || !isManager(currentUser.permissions)) {
+    throw createError({ statusCode: 403, statusMessage: '管理権限(admin/KP)が必要です' })
   }
 
   const query = getQuery(event)
@@ -17,7 +17,7 @@ export default defineEventHandler(async (event) => {
   const { results } = await db
     .prepare(
       `SELECT l.*, pcs.name AS pc_name, u.name AS user_name FROM (
-         SELECT 'manual' AS kind, id, pc_id, amount, reason AS detail, NULL AS sub, created_by AS user_id, created_at
+         SELECT type AS kind, id, pc_id, amount, reason AS detail, NULL AS sub, created_by AS user_id, created_at
          FROM money_logs
          UNION ALL
          SELECT 'purchase', id, pc_id, -total, item_name, shop || ' ×' || quantity, purchased_by, created_at

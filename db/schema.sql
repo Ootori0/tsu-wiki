@@ -95,6 +95,7 @@ CREATE TABLE pcs (
   show_title INTEGER NOT NULL DEFAULT 1, -- 0/1 名前と一緒に肩書きを表示するか
   show_office INTEGER NOT NULL DEFAULT 1, -- 0/1 肩書きに事務所を表示するか
   money INTEGER NOT NULL DEFAULT 0, -- 所持金(万円単位。カジノの負けでマイナスになり得る)
+  money_mode TEXT NOT NULL DEFAULT 'money' CHECK (money_mode IN ('money', 'ledger')), -- money: 所持金 / ledger: 出納帳(money は未清算の合計)
   created_at TEXT DEFAULT (datetime('now')),
   updated_at TEXT DEFAULT (datetime('now')),
   FOREIGN KEY (created_by) REFERENCES users(id)
@@ -189,6 +190,7 @@ CREATE TABLE money_logs (
   amount INTEGER NOT NULL, -- 増減額
   balance_after INTEGER NOT NULL, -- 反映後の所持金
   reason TEXT NOT NULL DEFAULT '',
+  type TEXT NOT NULL DEFAULT 'manual', -- manual: 手動の増減 / settle: 出納帳の清算 / mode: 所持金・出納帳の切替
   created_by INTEGER NOT NULL, -- 操作したユーザー
   created_at TEXT DEFAULT (datetime('now'))
 );

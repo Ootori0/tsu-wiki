@@ -23,6 +23,7 @@ const links = computed(() => [
   { to: '/setting', label: '背景設定集', icon: 'mdi-book-open-page-variant' },
   { to: '/faq', label: 'よくある質問,裁定', icon: 'mdi-help-circle-outline' },
   ...(user.value ? [{ to: '/mypage', label: 'マイページ', icon: 'mdi-account-circle' }] : []),
+  ...(user.value?.permissions?.includes('KP') ? [{ to: '/kp', label: 'KP画面', icon: 'mdi-dice-multiple' }] : []),
   ...(user.value?.permissions?.includes('admin') ? [{ to: '/admin', label: '管理者画面', icon: 'mdi-shield-crown' }] : []),
 ])
 
@@ -132,8 +133,8 @@ const handleLogout = async () => {
   padding: 8px;
 }
 
-/* 閉じているときは帯の下のページを押せないようにし、メニューを開いているときだけメニュー内のボタンを押せるようにする */
-.top-bar.drawer-open {
+/* 帯自体はクリックを受けず、ボタンだけ押せるようにする(帯の下のページのボタンを塞がない。メニューを開いているときは下の暗幕が受ける) */
+.top-bar {
   pointer-events: none;
 }
 
@@ -251,13 +252,18 @@ const handleLogout = async () => {
   box-shadow: 2px 2px 0 #000;
 }
 
-.money-btn-enter-active,
-.money-btn-leave-active {
-  transition: opacity 0.2s ease;
+.money-btn-enter-active {
+  transition: transform 0.3s ease, opacity 0.3s ease;
 }
 
+.money-btn-leave-active {
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+
+/* 画面の右外からスライドして入る */
 .money-btn-enter-from,
 .money-btn-leave-to {
+  transform: translateX(calc(100% + 16px));
   opacity: 0;
 }
 

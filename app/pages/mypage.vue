@@ -424,7 +424,7 @@ const savePcCreate = async () => {
             <label class="edit-label">効果</label>
             <textarea v-model="editForm.effect" class="edit-textarea auto-wrap" rows="3" @input="resize" />
             <p class="markdown-hint">
-            # 見出し **太字** *斜体* ~~取消線~~ `コード` &gt; 引用 ||スポイラー||
+            # 見出し **太字** ~~取消線~~ `コード` &gt; 引用 ||スポイラー||
             </p>
             <label class="edit-label">タグ</label>
             <div class="chip-list">
@@ -492,7 +492,7 @@ const savePcCreate = async () => {
             <label class="edit-label">効果</label>
             <textarea v-model="newForm.effect" class="edit-textarea auto-wrap" rows="3" @input="resize" />
             <p class="markdown-hint">
-            # 見出し **太字** *斜体* ~~取消線~~ `コード` &gt; 引用 ||スポイラー||
+            # 見出し **太字** ~~取消線~~ `コード` &gt; 引用 ||スポイラー||
             </p>
             <label class="edit-label">タグ</label>
             <div class="chip-list">
@@ -584,7 +584,7 @@ const savePcCreate = async () => {
             <label class="edit-label">メモ</label>
             <textarea v-model="pcEditForm.memo" class="edit-textarea auto-wrap" rows="3" @input="resize" />
             <p class="markdown-hint">
-            # 見出し **太字** *斜体* ~~取消線~~ `コード` &gt; 引用 ||スポイラー||
+            # 見出し **太字** ~~取消線~~ `コード` &gt; 引用 ||スポイラー||
             </p>
             <p v-if="pcError" class="error-text">{{ pcError }}</p>
 
@@ -601,8 +601,8 @@ const savePcCreate = async () => {
             </p>
             <MarkdownText :text="item.memo" />
             <div class="money-row">
-              <span class="money-label">所持金</span>
-              <span class="money-value" :class="{ negative: item.money < 0 }">{{ formatMoney(item.money) }}</span>
+              <span class="money-label">{{ moneyLabel(item) }}</span>
+              <span class="money-value" :class="{ negative: item.money < 0 }">{{ formatBalance(item) }}</span>
               <button class="money-edit-btn" @click="openMoneyDialog(item.id)">増減・履歴</button>
             </div>
             <button class="edit-btn" @click="startPcEdit(item)">編集</button>
@@ -663,7 +663,7 @@ const savePcCreate = async () => {
             <label class="edit-label">メモ</label>
             <textarea v-model="pcNewForm.memo" class="edit-textarea auto-wrap" rows="3" @input="resize" />
             <p class="markdown-hint">
-            # 見出し **太字** *斜体* ~~取消線~~ `コード` &gt; 引用 ||スポイラー||
+            # 見出し **太字** ~~取消線~~ `コード` &gt; 引用 ||スポイラー||
             </p>
             <p v-if="pcError" class="error-text">{{ pcError }}</p>
 

@@ -25,5 +25,22 @@ export const useAuth = () => {
     await navigateTo('/')
   }
 
-  return { user, checked, fetchUser, ensureUser, logout }
+  // ルートミドルウェア用: サーバー描画時は毎回 Cookie で確認し、ブラウザでは未確認のときだけ問い合わせる
+  // サーバー側では素の $fetch だと Cloudflare の環境(D1)が API に渡らず未ログイン扱いになるため useRequestFetch を使う
+  const loadUserForRoute = async () => {
+    if (import.meta.server) {
+      const requestFetch = useRequestFetch()
+      try {
+        user.value = await requestFetch('/api/auth/me')
+      } catch {
+        user.value = null
+      }
+      checked.value = true
+    } else if (!checked.value) {
+      await fetchUser()
+    }
+    return user.value
+  }
+
+  return { user, checked, fetchUser, ensureUser, loadUserForRoute, logout }
 }
