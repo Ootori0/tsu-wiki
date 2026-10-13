@@ -9,7 +9,7 @@ export default defineEventHandler(async (event) => {
   const admin = isManager(currentUser?.permissions)
 
   const [{ results: items }, { results: sellers }] = await db.batch([
-    db.prepare('SELECT * FROM shop_items ORDER BY shop ASC, sort_order ASC, id ASC'),
+    db.prepare('SELECT * FROM shop_items ORDER BY shop ASC, id DESC'),
     db.prepare(
       `SELECT s.item_id, s.pc_id, s.amount, pcs.name AS pc_name
        FROM shop_item_sellers s JOIN pcs ON pcs.id = s.pc_id
