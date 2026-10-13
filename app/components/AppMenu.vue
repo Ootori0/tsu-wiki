@@ -252,13 +252,18 @@ const handleLogout = async () => {
   box-shadow: 2px 2px 0 #000;
 }
 
-.money-btn-enter-active,
-.money-btn-leave-active {
-  transition: opacity 0.2s ease;
+.money-btn-enter-active {
+  transition: transform 0.3s ease, opacity 0.3s ease;
 }
 
+.money-btn-leave-active {
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+
+/* 画面の右外からスライドして入る */
 .money-btn-enter-from,
 .money-btn-leave-to {
+  transform: translateX(calc(100% + 16px));
   opacity: 0;
 }
 

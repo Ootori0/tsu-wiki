@@ -1,10 +1,20 @@
 <script setup>
-const pages = [
+const { user, ensureUser } = useAuth()
+onMounted(() => ensureUser())
+
+const pages = computed(() => [
   { to: '/pc', label: 'PC', desc: 'キャラクターシートまとめ' },
+  { to: '/pc-tier', label: 'PC級一覧', desc: '級ごとのティア表' },
   { to: '/magic', label: '魔法', desc: '魔法,魔道具,AF,魔術などの総覧' },
+  { to: '/shop', label: '魔法店/武器屋', desc: 'PCの所持金で商品を購入' },
+  { to: '/casino', label: 'カジノ[アーリア]', desc: 'チンチロで所持金を賭ける' },
   { to: '/setting', label: '背景設定集', desc: '背景設定たち' },
   { to: '/faq', label: 'よくある質問,裁定', desc: 'Q&A形式のルール裁定集' },
-]
+  // ログイン中はマイページ、未ログインならログインへ
+  user.value
+    ? { to: '/mypage', label: 'マイページ', desc: '魔法・PC・所持金の管理' }
+    : { to: '/login', label: 'ログイン', desc: 'PCの登録・買い物・カジノに必要です' },
+])
 </script>
 
 <template>
