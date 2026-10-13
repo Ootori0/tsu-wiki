@@ -13,8 +13,8 @@ const selectedId = defineModel({ type: Number, default: null })
       <option v-for="p in pcs" :key="p.id" :value="p.id">{{ p.name }}</option>
     </select>
     <div class="wallet-money">
-      <span class="money-label">所持金</span>
-      <span class="money-value" :class="{ negative: (pc?.money ?? 0) < 0 }">{{ formatMoney(pc?.money) }}</span>
+      <span class="money-label">{{ moneyLabel(pc) }}</span>
+      <span class="money-value" :class="{ negative: (pc?.money ?? 0) < 0 }">{{ formatBalance(pc) }}</span>
     </div>
   </div>
 </template>

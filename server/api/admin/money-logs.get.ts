@@ -17,7 +17,7 @@ export default defineEventHandler(async (event) => {
   const { results } = await db
     .prepare(
       `SELECT l.*, pcs.name AS pc_name, u.name AS user_name FROM (
-         SELECT 'manual' AS kind, id, pc_id, amount, reason AS detail, NULL AS sub, created_by AS user_id, created_at
+         SELECT type AS kind, id, pc_id, amount, reason AS detail, NULL AS sub, created_by AS user_id, created_at
          FROM money_logs
          UNION ALL
          SELECT 'purchase', id, pc_id, -total, item_name, shop || ' ×' || quantity, purchased_by, created_at

@@ -19,14 +19,16 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, statusMessage: '掛金は100万円単位で指定してください' })
   }
 
-  const pc = await db.prepare('SELECT id, created_by, money FROM pcs WHERE id = ?').bind(pcId).first()
+  const pc = await db.prepare('SELECT id, created_by, money, money_mode FROM pcs WHERE id = ?').bind(pcId).first()
   if (!pc) {
     throw createError({ statusCode: 404, statusMessage: 'PCが見つかりません' })
   }
   if (pc.created_by !== currentUser.id && !isAdmin(currentUser.permissions)) {
     throw createError({ statusCode: 403, statusMessage: '自分のPCでのみ遊べます' })
   }
-  if (pc.money < betNum) {
+  // 出納帳のPCは残高を確かめない
+  const isLedger = pc.money_mode === 'ledger'
+  if (!isLedger && pc.money < betNum) {
     throw createError({ statusCode: 409, statusMessage: '所持金が掛金に足りません' })
   }
   if ((await countPlaysToday(db, pc.id)) >= DAILY_PLAY_LIMIT) {
@@ -47,7 +49,7 @@ export default defineEventHandler(async (event) => {
   // (足りなければバッチ全体がロールバック。負けで所持金がマイナスになるのは許容)
   try {
     await db.batch([
-      db.prepare('INSERT INTO balance_checks (money) SELECT money - ? FROM pcs WHERE id = ?').bind(betNum, pc.id),
+      ...(isLedger ? [] : [db.prepare('INSERT INTO balance_checks (money) SELECT money - ? FROM pcs WHERE id = ?').bind(betNum, pc.id)]),
       // 同時に遊ばれても上限を超えないよう、残り回数が0以上であることも同じ仕組みで確かめる
       db
         .prepare(

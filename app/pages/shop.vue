@@ -29,7 +29,8 @@ const canBuy = (item) => {
   const qty = qtyOf(item)
   if (!Number.isInteger(qty) || qty < 1) return false
   if (item.stock !== null && item.stock < qty) return false
-  return selectedPc.value.money >= item.price * qty
+  // 出納帳のPCは残高を確かめない
+  return selectedPc.value.money_mode === 'ledger' || selectedPc.value.money >= item.price * qty
 }
 
 const pending = ref(null)

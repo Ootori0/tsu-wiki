@@ -601,8 +601,8 @@ const savePcCreate = async () => {
             </p>
             <MarkdownText :text="item.memo" />
             <div class="money-row">
-              <span class="money-label">所持金</span>
-              <span class="money-value" :class="{ negative: item.money < 0 }">{{ formatMoney(item.money) }}</span>
+              <span class="money-label">{{ moneyLabel(item) }}</span>
+              <span class="money-value" :class="{ negative: item.money < 0 }">{{ formatBalance(item) }}</span>
               <button class="money-edit-btn" @click="openMoneyDialog(item.id)">増減・履歴</button>
             </div>
             <button class="edit-btn" @click="startPcEdit(item)">編集</button>

@@ -33,7 +33,9 @@ export default defineEventHandler(async (event) => {
   if (item.stock !== null && item.stock < qty) {
     throw createError({ statusCode: 409, statusMessage: '在庫が足りません' })
   }
-  if (pc.money < total) {
+  // 出納帳のPCは実際の所持金がココフォリア側にあるので残高を確かめない
+  const isLedger = pc.money_mode === 'ledger'
+  if (!isLedger && pc.money < total) {
     throw createError({ statusCode: 409, statusMessage: '所持金が足りません' })
   }
 
@@ -50,7 +52,7 @@ export default defineEventHandler(async (event) => {
       db
         .prepare('UPDATE pcs SET money = money - ?, updated_at = datetime(\'now\') WHERE id = ?')
         .bind(total, pc.id),
-      db.prepare('INSERT INTO balance_checks (money) SELECT money FROM pcs WHERE id = ?').bind(pc.id),
+      ...(isLedger ? [] : [db.prepare('INSERT INTO balance_checks (money) SELECT money FROM pcs WHERE id = ?').bind(pc.id)]),
       db.prepare('DELETE FROM balance_checks'),
       db
         .prepare('UPDATE shop_items SET stock = CASE WHEN stock IS NULL THEN NULL ELSE stock - ? END WHERE id = ?')

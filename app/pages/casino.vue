@@ -35,7 +35,7 @@ const betValid = computed(() =>
   Number.isInteger(bet.value) && bet.value >= betUnit.value && bet.value % betUnit.value === 0
 )
 const canPlay = computed(() =>
-  !!selectedPc.value && betValid.value && selectedPc.value.money >= bet.value && remainingPlays.value > 0 && !playing.value
+  !!selectedPc.value && betValid.value && (selectedPc.value.money_mode === 'ledger' || selectedPc.value.money >= bet.value) && remainingPlays.value > 0 && !playing.value
 )
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
@@ -159,7 +159,7 @@ const play = async () => {
           </button>
         </div>
         <p v-if="!betValid" class="error-text">掛金は{{ formatMoney(betUnit) }}単位で指定してください</p>
-        <p v-else-if="selectedPc && selectedPc.money < bet" class="error-text">所持金が掛金に足りません</p>
+        <p v-else-if="selectedPc && selectedPc.money_mode !== 'ledger' && selectedPc.money < bet" class="error-text">所持金が掛金に足りません</p>
         <p v-if="selectedPc && remainingPlays === 0" class="error-text">今日はもう遊べません(1日{{ dailyLimit }}回まで)</p>
         <p v-if="selectedPc" class="plays-left">今日の残り: {{ remainingPlays }} / {{ dailyLimit }}回</p>
         <button class="play-btn" :disabled="!canPlay" @click="play">

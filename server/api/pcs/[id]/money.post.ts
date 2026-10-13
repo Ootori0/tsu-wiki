@@ -6,6 +6,10 @@ export default defineEventHandler(async (event) => {
   const id = Number(getRouterParam(event, 'id'))
   const { currentUser, pc } = await requirePcOwner(event, db, id)
 
+  if (pc.money_mode === 'ledger') {
+    throw createError({ statusCode: 400, statusMessage: '出納帳のPCは手動で増減できません' })
+  }
+
   const { amount, reason } = (await readBody(event)) ?? {}
   const amountNum = Number(amount)
   if (!Number.isInteger(amountNum) || amountNum === 0) {
