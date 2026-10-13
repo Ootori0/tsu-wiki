@@ -94,6 +94,8 @@ const close = () => {
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
+  /* スクロールバーの幅を最初から確保する(後から出ると入力欄が狭まって折り返しが増え、最後の行が欠ける) */
+  scrollbar-gutter: stable;
   padding: 14px;
   display: flex;
   flex-direction: column;
