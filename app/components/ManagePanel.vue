@@ -266,6 +266,43 @@ watch([activeTab, logPcId], () => {
   if (activeTab.value === '所持金履歴') loadMoneyLogs()
 })
 
+// --- 履歴の削除(admin のみ) ---
+const { user } = useAuth()
+const canDeleteHistory = computed(() => !!user.value?.permissions?.includes('admin'))
+
+// 削除で変わり得るもの(所持金・在庫・履歴)を読み込み直す
+const afterHistoryDelete = async () => {
+  clearNuxtData('shop-items')
+  refreshNuxtData('my-pcs-list')
+  await Promise.all([refreshShopItems(), refreshAllPurchases(), activeTab.value === '所持金履歴' ? loadMoneyLogs() : null])
+}
+
+const HISTORY_DELETE_NOTES = {
+  purchase: '購入者に代金を戻し、販売者に入った金額を差し引き、在庫を戻します。',
+  sale: '販売者に入った金額を差し引きます(購入者の代金はそのままです)。',
+  casino: 'プレイヤーとディーラーの両方の増減を取り消します。この勝負はその日のプレイ回数からも外れます。',
+  dealer: 'プレイヤーとディーラーの両方の増減を取り消します。この勝負はその日のプレイ回数からも外れます。',
+}
+
+const deleteHistory = async (kind, id) => {
+  const note = HISTORY_DELETE_NOTES[kind] ?? 'この増減を所持金から取り消します。'
+  if (!confirm(`この履歴を削除しますか?\n${note}\nこの操作は取り消せません。`)) return
+  await run(async () => {
+    await $fetch('/api/admin/history/delete', { method: 'POST', body: { kind, id } })
+    await afterHistoryDelete()
+  }, '履歴を削除し、増減を取り消しました')
+}
+
+const deleteAllHistoryOfPc = async () => {
+  const pc = (allPcs.value ?? []).find((p) => p.id === logPcId.value)
+  if (!pc) return
+  if (!confirm(`${pc.name}の履歴をすべて削除しますか?\n手動の増減・購入・売上・チンチロ(ディーラーとしての勝負も含む)をすべて消し、それぞれの増減を取り消します。購入・チンチロの相手の所持金と商品の在庫も戻ります。\nこの操作は取り消せません。`)) return
+  await run(async () => {
+    await $fetch('/api/admin/history/delete', { method: 'POST', body: { pcId: pc.id, all: true } })
+    await afterHistoryDelete()
+  }, `${pc.name}の履歴をすべて削除しました`)
+}
+
 // --- カジノ設定 ---
 const { data: chinchiroData, refresh: refreshChinchiro } = await useFetch('/api/casino/chinchiro/payouts', {
   key: 'admin-chinchiro-payouts',
@@ -398,7 +435,10 @@ const savePayouts = async () => {
               <br />→ {{ po.pc_name ?? '(削除済みPC)' }} +{{ formatMoney(po.amount) }}
             </template>
           </span>
-          <span class="user-row-name">{{ formatMoney(p.total) }}</span>
+          <span class="purchase-side">
+            <span class="user-row-name">{{ formatMoney(p.total) }}</span>
+            <button v-if="canDeleteHistory" class="delete-btn" @click="deleteHistory('purchase', p.id)">削除</button>
+          </span>
         </div>
       </div>
     </div>
@@ -421,6 +461,7 @@ const savePayouts = async () => {
             <span class="log-amount" :class="{ plus: log.amount > 0, minus: log.amount < 0 }">
               {{ log.amount > 0 ? '+' : '' }}{{ formatMoney(log.amount) }}
             </span>
+            <button v-if="canDeleteHistory" class="delete-btn" @click="deleteHistory(log.kind, log.id)">削除</button>
           </div>
           <div class="item-meta">
             <span class="log-kind">{{ MONEY_LOG_KIND_LABELS[log.kind] }}</span>
@@ -429,6 +470,13 @@ const savePayouts = async () => {
           </div>
         </div>
         <p v-if="!loadingLogs && (moneyLogs ?? []).length === 0" class="empty">履歴はありません</p>
+        <button
+          v-if="canDeleteHistory && logPcId && (moneyLogs ?? []).length"
+          class="delete-btn delete-all"
+          @click="deleteAllHistoryOfPc"
+        >
+          このPCの履歴をすべて削除
+        </button>
       </div>
     </div>
 
@@ -929,5 +977,22 @@ const savePayouts = async () => {
   overflow: hidden;
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+.purchase-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.delete-btn.delete-all {
+  display: block;
+  width: 100%;
+  margin-top: 12px;
+  padding: 10px;
+  font-size: 0.85rem;
+  font-weight: bold;
 }
 </style>
