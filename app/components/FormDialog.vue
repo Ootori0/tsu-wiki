@@ -12,12 +12,32 @@ defineProps({
 const close = () => {
   open.value = false
 }
+
+// スマホでキーボードが出たときは、見えている範囲(visualViewport)に合わせてポップアップを縮め、
+// 入力欄がキーボードの裏に隠れないようにする
+const viewportStyle = ref({})
+const updateViewport = () => {
+  const vv = window.visualViewport
+  if (!vv) return
+  viewportStyle.value = { top: `${vv.offsetTop}px`, height: `${vv.height}px`, bottom: 'auto' }
+}
+
+onMounted(() => {
+  window.visualViewport?.addEventListener('resize', updateViewport)
+  window.visualViewport?.addEventListener('scroll', updateViewport)
+  updateViewport()
+})
+
+onBeforeUnmount(() => {
+  window.visualViewport?.removeEventListener('resize', updateViewport)
+  window.visualViewport?.removeEventListener('scroll', updateViewport)
+})
 </script>
 
 <template>
   <Teleport to="body">
     <Transition name="fade">
-      <div v-if="open" class="overlay" @click.self="close">
+      <div v-if="open" class="overlay" :style="viewportStyle" @click.self="close">
         <div class="dialog" role="dialog" :aria-label="title">
           <div class="dialog-head">
             <span class="dialog-title">{{ title }}</span>
@@ -54,8 +74,7 @@ const close = () => {
 .dialog {
   width: 100%;
   max-width: 440px;
-  max-height: 90vh;
-  max-height: 90dvh;
+  max-height: 100%;
   display: flex;
   flex-direction: column;
   border: 2px solid #000;
