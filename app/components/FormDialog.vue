@@ -21,7 +21,7 @@ const keyboardOpen = ref(false)
 const updateViewport = () => {
   const vv = window.visualViewport
   if (!vv) return
-  viewportStyle.value = { top: `${vv.offsetTop}px`, height: `${vv.height}px`, bottom: 'auto' }
+  viewportStyle.value = { top: `${vv.offsetTop}px`, height: `${vv.height}px`, bottom: 'auto', '--vv-height': `${vv.height}px` }
   // キーボードで画面の高さ自体が縮む端末もあるので、同じ横幅で一番高かったときと比べる(横幅が変わったら画面の向きが変わったとみなす)
   if (window.innerWidth !== fullWidth) {
     fullWidth = window.innerWidth
@@ -168,6 +168,8 @@ onBeforeUnmount(() => {
 
 .overlay.keyboard-open .dialog-body {
   padding: 10px;
+  /* 末尾の行も見えている範囲の中央まで上げられるよう、下に余白を足す */
+  padding-bottom: calc(var(--vv-height, 0px) * 0.5);
 }
 
 .dialog-actions.in-body {

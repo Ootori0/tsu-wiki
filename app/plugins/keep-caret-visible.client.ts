@@ -1,6 +1,6 @@
-// スマホで入力中の行がキーボードの裏に隠れないよう、カーソルのある行が見える位置までスクロールする
-// (ブラウザ任せだと、入力欄が中身に合わせて伸びる場合やポップアップ内で、カーソル行が隠れたままになる)
-const MARGIN = 12
+// スマホで入力中の行がキーボードの裏に隠れないよう、カーソルのある行を見えている範囲の中央に合わせる
+// (最小限だけ動かすと改行・削除のたびに位置が変わって上下に揺れるので、常に同じ位置に置く)
+const ANCHOR = 0.5 // 見えている範囲の上端から何割の位置に置くか
 
 // textarea 内のカーソル位置(入力欄の上端からの距離)を、同じ見た目の写しを作って測る
 function caretOffset(el: HTMLTextAreaElement) {
@@ -68,9 +68,8 @@ function keepCaretVisible(el: Element | null) {
     visibleBottom = Math.min(visibleBottom, box.bottom)
   }
 
-  let delta = 0
-  if (caretBottom > visibleBottom - MARGIN) delta = caretBottom - (visibleBottom - MARGIN)
-  else if (caretTop < visibleTop + MARGIN) delta = caretTop - (visibleTop + MARGIN)
+  const target = visibleTop + (visibleBottom - visibleTop) * ANCHOR
+  const delta = (caretTop + caretBottom) / 2 - target
   if (Math.abs(delta) < 1) return
 
   if (container) container.scrollTop += delta
