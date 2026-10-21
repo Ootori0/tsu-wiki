@@ -1,5 +1,5 @@
-// スマホで入力中の行がキーボードの裏に隠れないよう、カーソルのある行を見えている範囲の中央に合わせる
-// (最小限だけ動かすと改行・削除のたびに位置が変わって上下に揺れるので、常に同じ位置に置く)
+// スマホで入力欄を選んだときやキーボードが出たときに、カーソルのある行を見えている範囲の中央に合わせる
+// (文字の入力・改行・削除のたびには動かさない。入力中の位置はブラウザに任せる)
 const ANCHOR = 0.5 // 見えている範囲の上端から何割の位置に置くか
 
 // textarea 内のカーソル位置(入力欄の上端からの距離)を、同じ見た目の写しを作って測る
@@ -77,11 +77,6 @@ function keepCaretVisible(el: Element | null) {
 }
 
 export default defineNuxtPlugin(() => {
-  // 入力のたび(入力欄の高さ調整のあと)に合わせる
-  document.addEventListener('input', (e) => {
-    requestAnimationFrame(() => keepCaretVisible(e.target as Element))
-  })
-
   // 入力欄を選んだ直後は、キーボードが出きってから合わせる
   document.addEventListener('focusin', (e) => {
     setTimeout(() => keepCaretVisible(e.target as Element), 350)
