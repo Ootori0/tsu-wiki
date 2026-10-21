@@ -13,14 +13,25 @@ const close = () => {
   open.value = false
 }
 
-// スマホでキーボードが出たときは、見えている範囲(visualViewport)に合わせてポップアップを縮め、
-// 入力欄がキーボードの裏に隠れないようにする
+// スマホでキーボードが出たときは、見えている範囲(visualViewport)いっぱいにポップアップを広げ、
+// 入力欄がキーボードの裏に隠れないようにする。文字を書く場所を広く取るため、
+// その間は余白を詰め、保存などのボタン欄は本文の末尾(スクロールした先)に回す
 const viewportStyle = ref({})
+const keyboardOpen = ref(false)
 const updateViewport = () => {
   const vv = window.visualViewport
   if (!vv) return
   viewportStyle.value = { top: `${vv.offsetTop}px`, height: `${vv.height}px`, bottom: 'auto' }
+  // キーボードで画面の高さ自体が縮む端末もあるので、同じ横幅で一番高かったときと比べる(横幅が変わったら画面の向きが変わったとみなす)
+  if (window.innerWidth !== fullWidth) {
+    fullWidth = window.innerWidth
+    fullHeight = 0
+  }
+  fullHeight = Math.max(fullHeight, window.innerHeight)
+  keyboardOpen.value = vv.height < fullHeight * 0.8
 }
+let fullWidth = 0
+let fullHeight = 0
 
 onMounted(() => {
   window.visualViewport?.addEventListener('resize', updateViewport)
@@ -37,7 +48,7 @@ onBeforeUnmount(() => {
 <template>
   <Teleport to="body">
     <Transition name="fade">
-      <div v-if="open" class="overlay" :style="viewportStyle" @click.self="close">
+      <div v-if="open" class="overlay" :class="{ 'keyboard-open': keyboardOpen }" :style="viewportStyle" @click.self="close">
         <div class="dialog" role="dialog" :aria-label="title">
           <div class="dialog-head">
             <span class="dialog-title">{{ title }}</span>
@@ -48,9 +59,12 @@ onBeforeUnmount(() => {
 
           <div class="dialog-body">
             <slot />
+            <div v-if="$slots.actions && keyboardOpen" class="dialog-actions in-body">
+              <slot name="actions" />
+            </div>
           </div>
 
-          <div v-if="$slots.actions" class="dialog-actions">
+          <div v-if="$slots.actions && !keyboardOpen" class="dialog-actions">
             <slot name="actions" />
           </div>
         </div>
@@ -133,6 +147,33 @@ onBeforeUnmount(() => {
   flex-wrap: wrap;
   padding: 10px 14px;
   border-top: 2px solid #000;
+}
+
+/* キーボード表示中: 画面いっぱいに広げ、見出しも細くする */
+.overlay.keyboard-open {
+  padding: 0;
+}
+
+.overlay.keyboard-open .dialog {
+  max-width: none;
+  height: 100%;
+  border-width: 0;
+  box-shadow: none;
+}
+
+.overlay.keyboard-open .dialog-head {
+  padding: 2px 6px 2px 12px;
+  font-size: 0.85rem;
+}
+
+.overlay.keyboard-open .dialog-body {
+  padding: 10px;
+}
+
+.dialog-actions.in-body {
+  flex-shrink: 0;
+  margin: 8px -10px -10px;
+  border-top: 1px dashed var(--color-line, rgba(0, 0, 0, 0.14));
 }
 
 .fade-enter-active,
