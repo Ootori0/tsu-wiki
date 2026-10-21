@@ -521,7 +521,12 @@ const savePayouts = async () => {
       </div>
     </div>
     <!-- アカウントの作成・編集 -->
-    <FormDialog v-model="userDialogOpen" :title="editingUserId ? 'アカウントの編集' : 'アカウントの作成'">
+    <FormDialog
+      v-model="userDialogOpen"
+      :title="editingUserId ? 'アカウントの編集' : 'アカウントの作成'"
+      :save-disabled="savingUser || (!editingUserId && (!userForm.name || !userForm.password))"
+      @save="saveUser"
+    >
       <template v-if="editingUserId">
         <label class="field-label">ID</label>
         <p class="dialog-value">{{ userForm.name }}</p>
@@ -546,18 +551,9 @@ const savePayouts = async () => {
         </button>
       </div>
 
-      <template #actions>
+      <template v-if="editingUserId" #extra>
         <button
-          class="save-btn dlg"
-          :disabled="savingUser || (!editingUserId && (!userForm.name || !userForm.password))"
-          @click="saveUser"
-        >
-          保存
-        </button>
-        <button class="save-btn dlg cancel" @click="userDialogOpen = false">キャンセル</button>
-        <button
-          v-if="editingUserId"
-          class="delete-btn dlg push-right"
+          class="delete-btn dlg"
           :disabled="userForm.permissions.includes('admin')"
           @click="deleteUser(editingUserId)"
         >
@@ -567,18 +563,25 @@ const savePayouts = async () => {
     </FormDialog>
 
     <!-- 権限・タグ・所属の追加 -->
-    <FormDialog v-model="nameDialogOpen" :title="NAME_KINDS[nameKind].title">
+    <FormDialog
+      v-model="nameDialogOpen"
+      :title="NAME_KINDS[nameKind].title"
+      save-label="追加"
+      :save-disabled="!nameValue"
+      @save="saveName"
+    >
       <label class="field-label">{{ NAME_KINDS[nameKind].label }}</label>
       <input v-model="nameValue" class="field-input" @keydown.enter="saveName" />
 
-      <template #actions>
-        <button class="save-btn dlg" :disabled="!nameValue" @click="saveName">追加</button>
-        <button class="save-btn dlg cancel" @click="nameDialogOpen = false">キャンセル</button>
-      </template>
     </FormDialog>
 
     <!-- 商品の追加・編集 -->
-    <FormDialog v-model="itemDialogOpen" :title="editingItemId ? '商品の編集' : '商品の追加'">
+    <FormDialog
+      v-model="itemDialogOpen"
+      :title="editingItemId ? '商品の編集' : '商品の追加'"
+      :save-disabled="!itemForm.name"
+      @save="saveItem"
+    >
       <label class="field-label">店</label>
       <select v-model="itemForm.shop" class="field-input">
         <option v-for="s in shops" :key="s" :value="s">{{ s }}</option>
@@ -603,10 +606,8 @@ const savePayouts = async () => {
       <button class="edit-btn add-seller" @click="addSeller(itemForm)">＋ 販売者を追加</button>
       <p v-if="itemError" class="error-text">{{ itemError }}</p>
 
-      <template #actions>
-        <button class="save-btn dlg" :disabled="!itemForm.name" @click="saveItem">保存</button>
-        <button class="save-btn dlg cancel" @click="itemDialogOpen = false">キャンセル</button>
-        <button v-if="editingItemId" class="delete-btn dlg push-right" @click="deleteItem(editingItemId)">削除</button>
+      <template v-if="editingItemId" #extra>
+        <button class="delete-btn dlg" @click="deleteItem(editingItemId)">削除</button>
       </template>
     </FormDialog>
   </div>
@@ -959,13 +960,7 @@ const savePayouts = async () => {
   font-weight: bold;
 }
 
-.push-right {
-  margin-left: auto;
-}
 
-.save-btn.dlg {
-  margin-top: 0;
-}
 
 .delete-btn.dlg {
   padding: 8px 16px;

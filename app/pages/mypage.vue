@@ -389,7 +389,12 @@ const confirmPcDelete = async () => {
     </AccordionList>
 
     <!-- 魔法の記入・編集 -->
-    <FormDialog v-model="magicDialogOpen" :title="magicEditingId ? '魔法の編集' : '魔法の作成'">
+    <FormDialog
+      v-model="magicDialogOpen"
+      :title="magicEditingId ? '魔法の編集' : '魔法の作成'"
+      :save-disabled="saving || !magicForm.name"
+      @save="saveMagic"
+    >
       <label class="edit-label">区分</label>
       <select v-model="magicForm.type" class="edit-input">
         <option v-for="t in magicTypes" :key="t" :value="t">{{ t }}</option>
@@ -439,15 +444,18 @@ const confirmPcDelete = async () => {
         </button>
       </div>
 
-      <template #actions>
-        <button class="save-btn" :disabled="saving || !magicForm.name" @click="saveMagic">保存</button>
-        <button class="cancel-btn" @click="magicDialogOpen = false">キャンセル</button>
-        <button v-if="magicEditingId" class="delete-btn" :disabled="deleting" @click="showConfirm = true">削除</button>
+      <template v-if="magicEditingId" #extra>
+        <button class="delete-btn" :disabled="deleting" @click="showConfirm = true">削除</button>
       </template>
     </FormDialog>
 
     <!-- PCの記入・編集 -->
-    <FormDialog v-model="pcDialogOpen" :title="pcEditingId ? 'PCの編集' : 'PCの作成'">
+    <FormDialog
+      v-model="pcDialogOpen"
+      :title="pcEditingId ? 'PCの編集' : 'PCの作成'"
+      :save-disabled="pcSaving || !pcForm.name"
+      @save="savePc"
+    >
       <label class="edit-label">名前</label>
       <textarea v-model="pcForm.name" class="edit-input auto-wrap" rows="1" @input="resize" />
 
@@ -502,10 +510,8 @@ const confirmPcDelete = async () => {
       </p>
       <p v-if="pcError" class="error-text">{{ pcError }}</p>
 
-      <template #actions>
-        <button class="save-btn" :disabled="pcSaving || !pcForm.name" @click="savePc">保存</button>
-        <button class="cancel-btn" @click="pcDialogOpen = false">キャンセル</button>
-        <button v-if="pcEditingId" class="delete-btn" :disabled="pcDeleting" @click="showPcConfirm = true">削除</button>
+      <template v-if="pcEditingId" #extra>
+        <button class="delete-btn" :disabled="pcDeleting" @click="showPcConfirm = true">削除</button>
       </template>
     </FormDialog>
 
@@ -725,13 +731,6 @@ const confirmPcDelete = async () => {
   flex-wrap: wrap;
 }
 
-.cancel-btn {
-  border: 1px solid var(--color-text, #000);
-  background: var(--color-bg, #fff);
-  padding: 6px 14px;
-  font-size: 0.85rem;
-  cursor: pointer;
-}
 
 .delete-btn {
   border: 1px solid #c00;
@@ -740,7 +739,6 @@ const confirmPcDelete = async () => {
   padding: 6px 14px;
   font-size: 0.85rem;
   cursor: pointer;
-  margin-left: auto;
 }
 
 /* 外側の一覧は箱、内側の項目は罫線で区切った行として見せる */
