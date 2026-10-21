@@ -28,8 +28,6 @@ export default defineNuxtConfig({
   app: {
     head: {
       title: 'tsu-wiki',
-      // Android でキーボードが出たときに画面の高さを縮める(全画面のポップアップがキーボードの上に収まる)
-      viewport: 'width=device-width, initial-scale=1, interactive-widget=resizes-content',
       meta: [
         { name: 'description', content: 'ツァラトゥストラはかく語りきwiki' },
 

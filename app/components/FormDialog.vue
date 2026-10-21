@@ -17,32 +17,12 @@ const emit = defineEmits(['save'])
 const close = () => {
   open.value = false
 }
-
-// 全画面表示をキーボードを除いた見えている範囲に合わせる(iPhone はキーボードで画面の高さが変わらないため)
-const viewportHeight = ref(null)
-const updateViewport = () => {
-  viewportHeight.value = window.visualViewport ? `${window.visualViewport.height}px` : null
-}
-
-onMounted(() => {
-  window.visualViewport?.addEventListener('resize', updateViewport)
-  updateViewport()
-})
-
-onBeforeUnmount(() => {
-  window.visualViewport?.removeEventListener('resize', updateViewport)
-})
 </script>
 
 <template>
   <Teleport to="body">
     <Transition name="fade">
-      <div
-        v-if="open"
-        class="overlay"
-        :style="viewportHeight ? { '--viewport-height': viewportHeight } : null"
-        @click.self="close"
-      >
+      <div v-if="open" class="overlay" @click.self="close">
         <div class="dialog" role="dialog" :aria-label="title">
           <div class="dialog-head">
             <button class="head-btn head-cancel" @click="close">キャンセル</button>
@@ -193,8 +173,6 @@ onBeforeUnmount(() => {
   .overlay {
     padding: 0;
     align-items: stretch;
-    height: var(--viewport-height, 100dvh);
-    bottom: auto;
   }
 
   .dialog {
