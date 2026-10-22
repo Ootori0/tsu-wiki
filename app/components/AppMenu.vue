@@ -13,6 +13,19 @@ onMounted(() => {
 
 const drawer = ref(false)
 
+// 開いたメニューの幅: 画面の85%(広い画面では400pxまで)
+const drawerWidth = ref(300)
+const updateDrawerWidth = () => {
+  drawerWidth.value = Math.round(Math.min(window.innerWidth * 0.85, 400))
+}
+onMounted(() => {
+  updateDrawerWidth()
+  window.addEventListener('resize', updateDrawerWidth)
+})
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', updateDrawerWidth)
+})
+
 const links = computed(() => [
   { to: '/', label: '表紙', icon: 'mdi-home' },
   { to: '/pc', label: 'PC', icon: 'mdi-account' },
@@ -75,6 +88,7 @@ const handleLogout = async () => {
       v-model="drawer"
       temporary
       fixed
+      :width="drawerWidth"
       class="drawer-menu"
     >
       <!-- ログイン状態表示エリア(ドロワー上部) -->
@@ -95,7 +109,7 @@ const handleLogout = async () => {
 
       <v-divider class="mb-2"></v-divider>
 
-      <v-list v-model:selected="selected" density="compact" nav>
+      <v-list v-model:selected="selected" nav>
         <v-list-item
           v-for="link in links"
           :key="link.to"
@@ -107,11 +121,11 @@ const handleLogout = async () => {
           @click="drawer = false"
         >
           <template #prepend>
-            <v-icon :style="{ opacity: 1 }" color="theme-color">
+            <v-icon :style="{ opacity: 1 }" color="theme-color" size="26">
               {{ link.icon }}
             </v-icon>
           </template>
-          <v-list-item-title class="font-weight-bold ml-2">
+          <v-list-item-title class="drawer-item-title font-weight-bold ml-3">
             {{ link.label }}
           </v-list-item-title>
         </v-list-item>
@@ -140,8 +154,8 @@ const handleLogout = async () => {
 
 .hamburger-box {
   pointer-events: auto;
-  width: 44px;
-  height: 44px;
+  width: 52px;
+  height: 52px;
   cursor: pointer;
   flex-shrink: 0;
 }
@@ -207,8 +221,15 @@ const handleLogout = async () => {
 .hamburger-lines:not(.active) .line-2 { transition-delay: 0.08s; }
 .hamburger-lines:not(.active) .line-3 { transition-delay: 0s; }
 
-.drawer-menu {
-  max-width: 280px;
+/* 項目を大きく、行を高くして押しやすくする */
+.drawer-menu :deep(.v-list-item) {
+  min-height: 54px;
+  margin-bottom: 2px;
+}
+
+.drawer-item-title {
+  font-size: 1.05rem;
+  line-height: 1.4;
 }
 
 .drawer-menu :deep(.v-list) {
@@ -217,7 +238,7 @@ const handleLogout = async () => {
 
 /* ログイン状態表示エリア */
 .drawer-account-area {
-  padding: 60px 16px 12px;
+  padding: 72px 20px 14px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -231,7 +252,7 @@ const handleLogout = async () => {
 }
 
 .drawer-user-name {
-  font-size: 0.9rem;
+  font-size: 1rem;
   font-weight: bold;
   color: var(--color-text, #000);
 }
