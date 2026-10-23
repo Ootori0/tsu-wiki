@@ -186,7 +186,11 @@ const { data: allPurchases, refresh: refreshAllPurchases } = await useFetch('/ap
 
 const { data: allPcs } = await useCachedFetch('/api/pcs', { key: 'pcs-list' })
 
-const emptyItemForm = () => ({ shop: '魔法店', name: '', price: 0, stock: '', description: '', sellers: [] })
+const emptyItemForm = () => ({
+  shop: '魔法店', name: '', price: 0, stock: '', description: '', sellers: [],
+  // 割引販売(通常販売とは別の価格・在庫・販売者)
+  discountEnabled: false, discountPrice: 0, discountStock: 0, discountSellers: [],
+})
 
 const addSeller = (form) => {
   form.sellers.push({ pcId: null, amount: 0 })
@@ -224,6 +228,10 @@ const openItemEdit = (item) => {
     stock: item.stock ?? '',
     description: item.description ?? '',
     sellers: (item.sellers ?? []).map((s) => ({ pcId: s.pcId, amount: s.amount })),
+    discountEnabled: item.discount_price !== null,
+    discountPrice: item.discount_price ?? 0,
+    discountStock: item.discount_stock ?? 0,
+    discountSellers: (item.discountSellers ?? []).map((s) => ({ pcId: s.pcId, amount: s.amount })),
   }
   itemDialogOpen.value = true
   fitAll()
@@ -416,6 +424,12 @@ const savePayouts = async () => {
               <p v-if="item.sellers?.length" class="item-meta">
                 販売者: {{ item.sellers.map((s) => `${s.pcName}(${formatMoney(s.amount)})`).join('、') }}
               </p>
+              <p v-if="item.discount_price !== null" class="item-meta discount-meta">
+                割引: {{ formatMoney(item.discount_price) }} / 割引の在庫: {{ item.discount_stock }}{{ item.discount_stock > 0 ? '(割引販売中)' : '(終了・通常販売中)' }}
+                <template v-if="item.discountSellers?.length">
+                  <br />割引の販売者: {{ item.discountSellers.map((s) => `${s.pcName}(${formatMoney(s.amount)})`).join('、') }}
+                </template>
+              </p>
               <p v-if="item.description" class="item-meta description">{{ item.description }}</p>
               <button class="edit-btn" @click="openItemEdit(item)">編集</button>
             </div>
@@ -430,7 +444,7 @@ const savePayouts = async () => {
         <div v-for="p in allPurchases ?? []" :key="p.id" class="list-row">
           <span class="item-meta">
             {{ formatDateTime(p.created_at) }}<br />
-            {{ p.pc_name ?? '(削除済みPC)' }}: [{{ p.shop }}] {{ p.item_name }} ×{{ p.quantity }}
+            {{ p.pc_name ?? '(削除済みPC)' }}: [{{ p.shop }}] {{ p.item_name }}{{ p.discount ? '(割引)' : '' }} ×{{ p.quantity }}
             <template v-for="po in p.payouts" :key="po.purchase_id + po.pc_name">
               <br />→ {{ po.pc_name ?? '(削除済みPC)' }} +{{ formatMoney(po.amount) }}
             </template>
@@ -604,6 +618,29 @@ const savePayouts = async () => {
         <button class="delete-btn" @click="removeSeller(itemForm, i)">×</button>
       </div>
       <button class="edit-btn add-seller" @click="addSeller(itemForm)">＋ 販売者を追加</button>
+
+      <!-- 割引販売: 割引の在庫が残っている間は通常販売より優先し、なくなったら通常販売に戻る -->
+      <label class="check-label discount-toggle">
+        <input v-model="itemForm.discountEnabled" type="checkbox" />
+        割引販売をする
+      </label>
+      <div v-if="itemForm.discountEnabled" class="discount-box">
+        <p class="item-meta">割引の在庫が残っている間は割引価格で売り、なくなると通常販売に戻ります。割引中は割引の残り個数までしか買えません。</p>
+        <label class="field-label">割引価格({{ MONEY_UNIT }})</label>
+        <input v-model.number="itemForm.discountPrice" type="number" min="0" class="field-input" />
+        <label class="field-label">割引の在庫(通常の在庫とは別)</label>
+        <input v-model.number="itemForm.discountStock" type="number" min="0" class="field-input" />
+        <label class="field-label">割引の販売者(割引で1個売れるごとに入る金額)</label>
+        <div v-for="(seller, i) in itemForm.discountSellers" :key="i" class="seller-row">
+          <select v-model.number="seller.pcId" class="field-input">
+            <option :value="null" disabled>PCを選択</option>
+            <option v-for="pc in allPcs ?? []" :key="pc.id" :value="pc.id">{{ pc.name }}</option>
+          </select>
+          <input v-model.number="seller.amount" type="number" min="0" class="field-input seller-amount" />
+          <button class="delete-btn" @click="itemForm.discountSellers.splice(i, 1)">×</button>
+        </div>
+        <button class="edit-btn add-seller" @click="itemForm.discountSellers.push({ pcId: null, amount: 0 })">＋ 割引の販売者を追加</button>
+      </div>
       <p v-if="itemError" class="error-text">{{ itemError }}</p>
 
       <template v-if="editingItemId" #extra>
@@ -988,6 +1025,35 @@ const savePayouts = async () => {
   margin-top: 12px;
   padding: 10px;
   font-size: 0.85rem;
+  font-weight: bold;
+}
+
+.check-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+  font-weight: bold;
+}
+
+.discount-toggle {
+  margin-top: 14px;
+}
+
+.discount-box {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px dashed var(--color-text, #000);
+  background: var(--color-accent-soft, #fff7cc);
+}
+
+.discount-box .field-label {
+  margin-top: 4px;
+}
+
+.discount-meta {
   font-weight: bold;
 }
 </style>
