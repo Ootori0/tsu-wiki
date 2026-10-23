@@ -109,6 +109,8 @@ CREATE TABLE shop_items (
   price INTEGER NOT NULL CHECK (price >= 0),
   stock INTEGER CHECK (stock IS NULL OR stock >= 0), -- NULL=無制限
   description TEXT NOT NULL DEFAULT '',
+  discount_price INTEGER CHECK (discount_price IS NULL OR discount_price >= 0), -- 割引価格(NULL=割引なし)
+  discount_stock INTEGER NOT NULL DEFAULT 0 CHECK (discount_stock >= 0), -- 割引の在庫(残っている間は通常販売より優先)
   sort_order INTEGER DEFAULT 0,
   created_at TEXT DEFAULT (datetime('now')),
   updated_at TEXT DEFAULT (datetime('now'))
@@ -124,6 +126,7 @@ CREATE TABLE purchases (
   quantity INTEGER NOT NULL,
   total INTEGER NOT NULL,
   purchased_by INTEGER NOT NULL, -- 操作したユーザー
+  discount INTEGER NOT NULL DEFAULT 0, -- 割引販売で買ったか(0/1)
   created_at TEXT DEFAULT (datetime('now'))
 );
 
@@ -134,6 +137,17 @@ CREATE TABLE shop_item_sellers (
   item_id INTEGER NOT NULL,
   pc_id INTEGER NOT NULL,
   amount INTEGER NOT NULL CHECK (amount >= 0), -- 1個売れるごとに販売者へ入る金額
+  UNIQUE (item_id, pc_id),
+  FOREIGN KEY (item_id) REFERENCES shop_items(id) ON DELETE CASCADE,
+  FOREIGN KEY (pc_id) REFERENCES pcs(id) ON DELETE CASCADE
+);
+
+-- 割引販売の販売者(通常販売の販売者とは別に設定する)
+CREATE TABLE shop_item_discount_sellers (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  item_id INTEGER NOT NULL,
+  pc_id INTEGER NOT NULL,
+  amount INTEGER NOT NULL CHECK (amount >= 0), -- 割引で1個売れるごとに販売者へ入る金額
   UNIQUE (item_id, pc_id),
   FOREIGN KEY (item_id) REFERENCES shop_items(id) ON DELETE CASCADE,
   FOREIGN KEY (pc_id) REFERENCES pcs(id) ON DELETE CASCADE

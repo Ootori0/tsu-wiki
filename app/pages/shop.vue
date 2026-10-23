@@ -24,13 +24,21 @@ const shopItems = computed(() =>
 const quantities = ref({})
 const qtyOf = (item) => quantities.value[item.id] ?? 1
 
+// 割引の在庫が残っている間は割引販売(割引価格・割引の在庫)、なくなったら通常販売
+const onDiscount = (item) => item.discount_price !== null && item.discount_stock > 0
+const priceOf = (item) => (onDiscount(item) ? item.discount_price : item.price)
+// 買える残り個数(null は無制限)。割引中は割引の残り個数まで
+const remainingOf = (item) => (onDiscount(item) ? item.discount_stock : item.stock)
+const soldOut = (item) => remainingOf(item) === 0
+
 const canBuy = (item) => {
   if (!selectedPc.value) return false
   const qty = qtyOf(item)
   if (!Number.isInteger(qty) || qty < 1) return false
-  if (item.stock !== null && item.stock < qty) return false
+  const remaining = remainingOf(item)
+  if (remaining !== null && remaining < qty) return false
   // 出納帳のPCは残高を確かめない
-  return selectedPc.value.money_mode === 'ledger' || selectedPc.value.money >= item.price * qty
+  return selectedPc.value.money_mode === 'ledger' || selectedPc.value.money >= priceOf(item) * qty
 }
 
 const pending = ref(null)
@@ -39,24 +47,24 @@ const buying = ref(false)
 const { show } = useToast()
 
 const requestBuy = (item) => {
-  pending.value = { item, quantity: qtyOf(item) }
+  pending.value = { item, quantity: qtyOf(item), discount: onDiscount(item), price: priceOf(item) }
   showConfirm.value = true
 }
 
 const confirmMessage = computed(() => {
   if (!pending.value) return ''
-  const { item, quantity } = pending.value
-  return `${selectedPc.value?.name}で「${item.name}」を${quantity}個、合計${formatMoney(item.price * quantity)}で購入しますか?`
+  const { item, quantity, discount, price } = pending.value
+  return `${selectedPc.value?.name}で「${item.name}」を${quantity}個、${discount ? '割引価格で' : ''}合計${formatMoney(price * quantity)}で購入しますか?`
 })
 
 const buy = async () => {
   if (!pending.value || !selectedPc.value) return
-  const { item, quantity } = pending.value
+  const { item, quantity, discount } = pending.value
   buying.value = true
   try {
     await $fetch('/api/shop/purchase', {
       method: 'POST',
-      body: { pcId: selectedPc.value.id, itemId: item.id, quantity },
+      body: { pcId: selectedPc.value.id, itemId: item.id, quantity, discount },
     })
     show(`「${item.name}」を${quantity}個購入しました`)
     quantities.value[item.id] = 1
@@ -96,30 +104,37 @@ const buy = async () => {
     <p v-if="shopItems.length === 0" class="empty">商品がありません</p>
     <AccordionList :items="shopItems" class="item-list">
       <template #title="{ item }">
-        <span class="item-head" :class="{ soldout: item.stock === 0 }">
+        <span class="item-head" :class="{ soldout: soldOut(item) }">
           <span class="item-name">{{ item.name }}</span>
-          <span v-if="item.stock === 0" class="soldout-tag">売り切れ</span>
-          <span class="item-price">{{ formatMoney(item.price) }}</span>
+          <span v-if="soldOut(item)" class="soldout-tag">売り切れ</span>
+          <template v-if="onDiscount(item)">
+            <span class="discount-tag">割引</span>
+            <s class="regular-price">{{ formatMoney(item.price) }}</s>
+          </template>
+          <span class="item-price" :class="{ discount: onDiscount(item) }">{{ formatMoney(priceOf(item)) }}</span>
         </span>
       </template>
       <template #detail="{ item }">
         <div class="item-detail">
-          <p class="item-stock">
+          <p v-if="onDiscount(item)" class="discount-note">
+            割引販売中: 残り{{ item.discount_stock }}個(なくなると通常価格{{ formatMoney(item.price) }}に戻ります)
+          </p>
+          <p v-else class="item-stock">
             <template v-if="item.stock === null">在庫: 無制限</template>
             <template v-else-if="item.stock === 0">売り切れ</template>
             <template v-else>在庫: {{ item.stock }}</template>
           </p>
-          <p v-if="item.sellers?.length" class="item-sellers">
-            販売者: {{ item.sellers.map((s) => s.pcName).join('、') }}
+          <p v-if="(onDiscount(item) ? item.discountSellers : item.sellers)?.length" class="item-sellers">
+            販売者: {{ (onDiscount(item) ? item.discountSellers : item.sellers).map((s) => s.pcName).join('、') }}
           </p>
           <MarkdownText v-if="item.description" :text="item.description" />
 
-          <div v-if="item.stock !== 0 && selectedPc" class="item-buy">
+          <div v-if="!soldOut(item) && selectedPc" class="item-buy">
             <input
               v-model.number="quantities[item.id]"
               type="number"
               min="1"
-              :max="item.stock ?? undefined"
+              :max="remainingOf(item) ?? undefined"
               placeholder="1"
               class="qty-input"
             />
@@ -232,6 +247,33 @@ const buy = async () => {
   background: #000;
   color: var(--color-accent, #ffd400);
   padding: 1px 8px;
+}
+
+.discount-tag {
+  flex-shrink: 0;
+  font-size: 0.7rem;
+  font-weight: bold;
+  padding: 0 5px;
+  background: var(--color-error, #c62828);
+  color: #fff;
+}
+
+.regular-price {
+  flex-shrink: 0;
+  font-size: 0.75rem;
+  opacity: 0.6;
+}
+
+.item-price.discount {
+  color: #fff;
+  background: var(--color-error, #c62828);
+}
+
+.discount-note {
+  margin: 0 0 6px;
+  font-size: 0.78rem;
+  font-weight: bold;
+  color: var(--color-error, #c62828);
 }
 
 .item-detail {

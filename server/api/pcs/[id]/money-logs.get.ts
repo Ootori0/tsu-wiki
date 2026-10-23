@@ -12,10 +12,10 @@ export default defineEventHandler(async (event) => {
          SELECT type AS kind, id, amount, reason AS detail, NULL AS sub, created_at
          FROM money_logs WHERE pc_id = ?1
          UNION ALL
-         SELECT 'purchase', id, -total, item_name, shop || ' ×' || quantity, created_at
+         SELECT 'purchase', id, -total, item_name || CASE WHEN discount = 1 THEN '(割引)' ELSE '' END, shop || ' ×' || quantity, created_at
          FROM purchases WHERE pc_id = ?1
          UNION ALL
-         SELECT 'sale', po.id, po.amount, pu.item_name, pu.shop || ' ×' || pu.quantity, po.created_at
+         SELECT 'sale', po.id, po.amount, pu.item_name || CASE WHEN pu.discount = 1 THEN '(割引)' ELSE '' END, pu.shop || ' ×' || pu.quantity, po.created_at
          FROM purchase_payouts po JOIN purchases pu ON pu.id = po.purchase_id
          WHERE po.pc_id = ?1
          UNION ALL

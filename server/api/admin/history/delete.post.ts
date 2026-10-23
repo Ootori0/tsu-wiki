@@ -5,7 +5,7 @@ import { invalidateCache } from '../../../utils/cache'
 // 履歴の削除(admin のみ)。削除する履歴の所持金の増減を取り消してから記録を消す
 // body: { kind, id } で1件、{ pcId, all: true } でそのPCの履歴をすべて
 //   kind: manual/settle/mode … 所持金の手動増減など(money_logs)
-//         purchase …… 購入(販売者への支払いも取り消し、在庫を戻す)
+//         purchase …… 購入(販売者への支払いも取り消し、在庫を戻す。割引で買ったものは割引の在庫へ)
 //         sale ……… 販売者への支払い1件
 //         casino/dealer … チンチロの勝負(プレイヤーとディーラーの両方の増減を取り消す)
 export default defineEventHandler(async (event) => {
@@ -92,10 +92,14 @@ const TARGETS = {
         `UPDATE pcs SET money = money + (SELECT total FROM purchases WHERE id = ?1)
          WHERE id = (SELECT pc_id FROM purchases WHERE id = ?1)`
       ).bind(id),
-      // 在庫を戻す(無制限の商品・削除済みの商品はそのまま)
+      // 在庫を戻す(割引で買ったものは割引の在庫へ。無制限の商品・削除済みの商品はそのまま)
       db.prepare(
         `UPDATE shop_items SET stock = stock + (SELECT quantity FROM purchases WHERE id = ?1)
-         WHERE stock IS NOT NULL AND id = (SELECT item_id FROM purchases WHERE id = ?1)`
+         WHERE stock IS NOT NULL AND id = (SELECT item_id FROM purchases WHERE id = ?1 AND discount = 0)`
+      ).bind(id),
+      db.prepare(
+        `UPDATE shop_items SET discount_stock = discount_stock + (SELECT quantity FROM purchases WHERE id = ?1)
+         WHERE id = (SELECT item_id FROM purchases WHERE id = ?1 AND discount = 1)`
       ).bind(id),
       db.prepare('DELETE FROM purchase_payouts WHERE purchase_id = ?').bind(id),
       db.prepare('DELETE FROM purchases WHERE id = ?').bind(id),
@@ -146,9 +150,15 @@ function deleteAllOfPc(db, pcId) {
     ).bind(pcId),
     db.prepare(
       `UPDATE shop_items SET stock = stock + (
-         SELECT COALESCE(SUM(quantity), 0) FROM purchases WHERE pc_id = ?1 AND item_id = shop_items.id
+         SELECT COALESCE(SUM(quantity), 0) FROM purchases WHERE pc_id = ?1 AND discount = 0 AND item_id = shop_items.id
        )
-       WHERE stock IS NOT NULL AND id IN (SELECT item_id FROM purchases WHERE pc_id = ?1)`
+       WHERE stock IS NOT NULL AND id IN (SELECT item_id FROM purchases WHERE pc_id = ?1 AND discount = 0)`
+    ).bind(pcId),
+    db.prepare(
+      `UPDATE shop_items SET discount_stock = discount_stock + (
+         SELECT COALESCE(SUM(quantity), 0) FROM purchases WHERE pc_id = ?1 AND discount = 1 AND item_id = shop_items.id
+       )
+       WHERE id IN (SELECT item_id FROM purchases WHERE pc_id = ?1 AND discount = 1)`
     ).bind(pcId),
     db.prepare('DELETE FROM purchase_payouts WHERE purchase_id IN (SELECT id FROM purchases WHERE pc_id = ?)').bind(pcId),
     db.prepare('DELETE FROM purchases WHERE pc_id = ?').bind(pcId),

@@ -1,7 +1,7 @@
 export const SHOPS = ['魔法店', '武器屋']
 
 export function parseShopItemBody(body) {
-  const { shop, name, price, stock, description, sellers } = body ?? {}
+  const { shop, name, price, stock, description, sellers, discountEnabled, discountPrice, discountStock, discountSellers } = body ?? {}
 
   if (!SHOPS.includes(shop)) {
     throw createError({ statusCode: 400, statusMessage: '店の種類が不正です' })
@@ -24,6 +24,20 @@ export function parseShopItemBody(body) {
     }
   }
 
+  // 割引販売(通常販売とは別の価格・在庫・販売者)
+  let discount = { price: null, stock: 0, sellers: [] }
+  if (discountEnabled) {
+    const dPrice = Number(discountPrice)
+    if (!Number.isInteger(dPrice) || dPrice < 0) {
+      throw createError({ statusCode: 400, statusMessage: '割引価格は0以上の整数で指定してください' })
+    }
+    const dStock = Number(discountStock)
+    if (!Number.isInteger(dStock) || dStock < 0) {
+      throw createError({ statusCode: 400, statusMessage: '割引の在庫は0以上の整数で指定してください' })
+    }
+    discount = { price: dPrice, stock: dStock, sellers: parseSellers(discountSellers) }
+  }
+
   return {
     shop,
     name,
@@ -31,7 +45,13 @@ export function parseShopItemBody(body) {
     stock: stockNum,
     description: description ?? '',
     sellers: parseSellers(sellers),
+    discount,
   }
+}
+
+// 割引販売中か(割引が設定されていて、割引の在庫が残っている)
+export function isDiscountActive(item) {
+  return item.discount_price !== null && item.discount_price !== undefined && item.discount_stock > 0
 }
 
 // 販売者: [{ pcId, amount }] (amount は1個売れるごとに入る金額)
@@ -64,10 +84,10 @@ export async function assertSellersExist(db, sellers) {
   }
 }
 
-export function sellerInsertStatements(db, itemIdExpr, itemIdParams, sellers) {
+export function sellerInsertStatements(db, itemIdExpr, itemIdParams, sellers, table = 'shop_item_sellers') {
   return sellers.map((s) =>
     db
-      .prepare(`INSERT INTO shop_item_sellers (item_id, pc_id, amount) VALUES (${itemIdExpr}, ?, ?)`)
+      .prepare(`INSERT INTO ${table} (item_id, pc_id, amount) VALUES (${itemIdExpr}, ?, ?)`)
       .bind(...itemIdParams, s.pcId, s.amount)
   )
 }

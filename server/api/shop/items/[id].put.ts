@@ -14,19 +14,22 @@ export default defineEventHandler(async (event) => {
 
   const id = Number(getRouterParam(event, 'id'))
   const item = parseShopItemBody(await readBody(event))
-  await assertSellersExist(db, item.sellers)
+  await assertSellersExist(db, [...item.sellers, ...item.discount.sellers])
 
   // 販売者は全件入れ替え
   await db.batch([
     db
       .prepare(
         `UPDATE shop_items
-         SET shop = ?, name = ?, price = ?, stock = ?, description = ?, updated_at = datetime('now')
+         SET shop = ?, name = ?, price = ?, stock = ?, description = ?,
+             discount_price = ?, discount_stock = ?, updated_at = datetime('now')
          WHERE id = ?`
       )
-      .bind(item.shop, item.name, item.price, item.stock, item.description, id),
+      .bind(item.shop, item.name, item.price, item.stock, item.description, item.discount.price, item.discount.stock, id),
     db.prepare('DELETE FROM shop_item_sellers WHERE item_id = ?').bind(id),
+    db.prepare('DELETE FROM shop_item_discount_sellers WHERE item_id = ?').bind(id),
     ...sellerInsertStatements(db, '?', [id], item.sellers),
+    ...sellerInsertStatements(db, '?', [id], item.discount.sellers, 'shop_item_discount_sellers'),
   ])
 
   invalidateCache('shop:items')

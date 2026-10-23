@@ -13,14 +13,18 @@ export default defineEventHandler(async (event) => {
   }
 
   const item = parseShopItemBody(await readBody(event))
-  await assertSellersExist(db, item.sellers)
+  await assertSellersExist(db, [...item.sellers, ...item.discount.sellers])
 
   // 商品と販売者を同じトランザクションで登録(販売者の item_id は直前に追加した商品)
   await db.batch([
     db
-      .prepare('INSERT INTO shop_items (shop, name, price, stock, description) VALUES (?, ?, ?, ?, ?)')
-      .bind(item.shop, item.name, item.price, item.stock, item.description),
+      .prepare(
+        `INSERT INTO shop_items (shop, name, price, stock, description, discount_price, discount_stock)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`
+      )
+      .bind(item.shop, item.name, item.price, item.stock, item.description, item.discount.price, item.discount.stock),
     ...sellerInsertStatements(db, '(SELECT MAX(id) FROM shop_items)', [], item.sellers),
+    ...sellerInsertStatements(db, '(SELECT MAX(id) FROM shop_items)', [], item.discount.sellers, 'shop_item_discount_sellers'),
   ])
 
   invalidateCache('shop:items')
