@@ -33,5 +33,7 @@ export default defineEventHandler(async (event) => {
   ])
 
   const updated = await db.prepare('SELECT money FROM pcs WHERE id = ?').bind(pc.id).first()
-  return { success: true, money: updated.money }
+  // 直前の増減の取り消しに使う
+  const log = await db.prepare('SELECT MAX(id) AS id FROM money_logs WHERE pc_id = ? AND created_by = ?').bind(pc.id, currentUser.id).first()
+  return { success: true, money: updated.money, logId: log?.id ?? null }
 })

@@ -100,6 +100,7 @@ const onConfirm = () => {
 }
 
 .confirm-message {
+  white-space: pre-line;
   margin: 0 0 20px;
   font-size: 0.9rem;
   line-height: 1.6;

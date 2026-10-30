@@ -1,5 +1,10 @@
 <script setup>
 const { toasts, dismiss } = useToast()
+
+const runAction = (t) => {
+  dismiss(t.id)
+  t.action.handler()
+}
 </script>
 
 <template>
@@ -14,6 +19,7 @@ const { toasts, dismiss } = useToast()
     >
       <span class="toast-icon">{{ t.type === 'error' ? '!' : '✓' }}</span>
       <span>{{ t.message }}</span>
+      <button v-if="t.action" class="toast-action" @click.stop="runAction(t)">{{ t.action.label }}</button>
     </div>
   </TransitionGroup>
 </template>
@@ -44,6 +50,18 @@ const { toasts, dismiss } = useToast()
   box-shadow: 3px 3px 0 var(--color-text);
   padding: 10px 14px;
   font-size: 0.9rem;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.toast-action {
+  flex-shrink: 0;
+  margin-left: 4px;
+  border: 1px solid var(--color-text);
+  background: var(--color-text);
+  color: var(--color-accent);
+  padding: 4px 10px;
+  font-size: 0.8rem;
   font-weight: bold;
   cursor: pointer;
 }
