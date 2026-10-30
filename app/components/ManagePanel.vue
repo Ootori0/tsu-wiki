@@ -290,6 +290,37 @@ const HISTORY_DELETE_NOTES = {
   sale: '販売者に入った金額を差し引きます(購入者の代金はそのままです)。',
   casino: 'プレイヤーとディーラーの両方の増減を取り消します。この勝負はその日のプレイ回数からも外れます。',
   dealer: 'プレイヤーとディーラーの両方の増減を取り消します。この勝負はその日のプレイ回数からも外れます。',
+  casino_month: 'この月計にまとめた勝負すべてについて、プレイヤーとディーラーの両方の増減を取り消します。',
+  dealer_month: 'この月計にまとめた勝負すべてについて、プレイヤーとディーラーの両方の増減を取り消します。',
+}
+
+// --- カジノ履歴の圧縮(admin のみ) ---
+const compressInfo = ref(null)
+const compressing = ref(false)
+const loadCompressInfo = async () => {
+  if (!canDeleteHistory.value) return
+  try {
+    compressInfo.value = await $fetch('/api/admin/casino/compress')
+  } catch {
+    compressInfo.value = null
+  }
+}
+watch(activeTab, (tab) => {
+  if (tab === 'カジノ設定') loadCompressInfo()
+}, { immediate: true })
+
+const compressCasino = async () => {
+  const info = compressInfo.value
+  if (!info?.compressible) return
+  if (!confirm(`${info.keepDays}日より前のチンチロの勝負${info.compressible}件を、PC・月ごとの月計にまとめますか?\n所持金は変わりません。まとめた勝負の出目や役は見られなくなります。\nこの操作は取り消せません。`)) return
+  compressing.value = true
+  await run(async () => {
+    const res = await $fetch('/api/admin/casino/compress', { method: 'POST' })
+    await loadCompressInfo()
+    if (activeTab.value === '所持金履歴') await loadMoneyLogs()
+    return res
+  }, 'カジノの履歴を圧縮しました')
+  compressing.value = false
 }
 
 const deleteHistory = async (kind, id) => {
@@ -496,6 +527,17 @@ const savePayouts = async () => {
 
     <!-- カジノ設定 -->
     <div v-if="activeTab === 'カジノ設定'" class="tab-content">
+      <div v-if="canDeleteHistory" class="box">
+        <h2 class="box-title">履歴の圧縮</h2>
+        <p class="item-meta">
+          {{ compressInfo?.keepDays ?? 7 }}日より前のチンチロの勝負を、PC・ディーラー・月ごとの月計(回数・掛金の合計・増減の合計)にまとめます。所持金は変わりません。まとめた勝負の出目や役は見られなくなります。
+        </p>
+        <p class="item-meta">
+          圧縮できる勝負: {{ compressInfo?.compressible ?? '-' }}件 / 月計: {{ compressInfo?.monthly ?? '-' }}件
+        </p>
+        <button class="save-btn" :disabled="compressing || !compressInfo?.compressible" @click="compressCasino">圧縮する</button>
+      </div>
+
       <div class="box">
         <h2 class="box-title">ディーラー</h2>
         <p class="item-meta">プレイヤーの負け額の割合分を受け取り、勝ち額の割合分を支払います(所持金はマイナスになり得ます)。</p>

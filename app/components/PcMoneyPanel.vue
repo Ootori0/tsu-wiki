@@ -377,7 +377,9 @@ const submit = async (sign) => {
 }
 
 .log-kind.casino,
-.log-kind.dealer {
+.log-kind.dealer,
+.log-kind.casino_month,
+.log-kind.dealer_month {
   background: #000;
   color: var(--color-accent, #ffd400);
 }

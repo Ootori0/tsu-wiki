@@ -8,6 +8,7 @@ import { invalidateCache } from '../../../utils/cache'
 //         purchase …… 購入(販売者への支払いも取り消し、在庫を戻す。割引で買ったものは割引の在庫へ)
 //         sale ……… 販売者への支払い1件
 //         casino/dealer … チンチロの勝負(プレイヤーとディーラーの両方の増減を取り消す)
+//         casino_month/dealer_month … 圧縮したチンチロの月計(同上)
 export default defineEventHandler(async (event) => {
   const db = event.context.cloudflare.env.tsu_wiki_db
   const sessionId = getCookie(event, 'session_id')
@@ -73,6 +74,22 @@ const game = {
   ],
 }
 
+// 圧縮した月計(プレイヤーとディーラーの両方の増減を取り消す)
+const monthly = {
+  table: 'chinchiro_monthly',
+  statements: (db, id) => [
+    db.prepare(
+      `UPDATE pcs SET money = money - (SELECT net_total FROM chinchiro_monthly WHERE id = ?1)
+       WHERE id = (SELECT pc_id FROM chinchiro_monthly WHERE id = ?1)`
+    ).bind(id),
+    db.prepare(
+      `UPDATE pcs SET money = money - (SELECT dealer_delta_total FROM chinchiro_monthly WHERE id = ?1)
+       WHERE id = (SELECT dealer_pc_id FROM chinchiro_monthly WHERE id = ?1)`
+    ).bind(id),
+    db.prepare('DELETE FROM chinchiro_monthly WHERE id = ?').bind(id),
+  ],
+}
+
 const TARGETS = {
   manual: moneyLog,
   settle: moneyLog,
@@ -117,6 +134,8 @@ const TARGETS = {
   },
   casino: game,
   dealer: game,
+  casino_month: monthly,
+  dealer_month: monthly,
 }
 
 // そのPCの所持金履歴に出ているものをすべて、1件ずつ消したときと同じ扱いで消す
@@ -179,5 +198,22 @@ function deleteAllOfPc(db, pcId) {
        WHERE id IN (SELECT dealer_pc_id FROM chinchiro_games WHERE pc_id = ?1 OR dealer_pc_id = ?1)`
     ).bind(pcId),
     db.prepare('DELETE FROM chinchiro_games WHERE pc_id = ?1 OR dealer_pc_id = ?1').bind(pcId),
+
+    // 圧縮した月計も同じ扱い
+    db.prepare(
+      `UPDATE pcs SET money = money - (
+         SELECT COALESCE(SUM(net_total), 0) FROM chinchiro_monthly
+         WHERE (pc_id = ?1 OR dealer_pc_id = ?1) AND pc_id = pcs.id
+       )
+       WHERE id IN (SELECT pc_id FROM chinchiro_monthly WHERE pc_id = ?1 OR dealer_pc_id = ?1)`
+    ).bind(pcId),
+    db.prepare(
+      `UPDATE pcs SET money = money - (
+         SELECT COALESCE(SUM(dealer_delta_total), 0) FROM chinchiro_monthly
+         WHERE (pc_id = ?1 OR dealer_pc_id = ?1) AND dealer_pc_id = pcs.id
+       )
+       WHERE id IN (SELECT dealer_pc_id FROM chinchiro_monthly WHERE pc_id = ?1 OR dealer_pc_id = ?1)`
+    ).bind(pcId),
+    db.prepare('DELETE FROM chinchiro_monthly WHERE pc_id = ?1 OR dealer_pc_id = ?1').bind(pcId),
   ]
 }
