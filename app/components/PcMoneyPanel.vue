@@ -6,6 +6,7 @@ const props = defineProps({
 })
 const emit = defineEmits(['updated'])
 const { show } = useToast()
+const { showWithUndo } = useUndo()
 
 const amount = ref(null)
 const reason = ref('')
@@ -76,11 +77,16 @@ const submit = async (sign) => {
   error.value = ''
   saving.value = true
   try {
-    await $fetch(`/api/pcs/${props.pc.id}/money`, {
+    const res = await $fetch(`/api/pcs/${props.pc.id}/money`, {
       method: 'POST',
       body: { amount: sign * amount.value, reason: reason.value },
     })
-    show(`所持金を${sign > 0 ? '+' : '-'}${formatMoney(amount.value)}しました`)
+    showWithUndo(`所持金を${sign > 0 ? '+' : '-'}${formatMoney(amount.value)}しました`, 'manual', res.logId, async () => {
+      // 所持金ダイアログを閉じたあとに取り消しても、各画面の所持金が最新になるようにする
+      refreshNuxtData('my-pcs-list')
+      emit('updated')
+      if (showLogs.value) await refreshLogs()
+    })
     amount.value = null
     reason.value = ''
     emit('updated')

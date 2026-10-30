@@ -100,7 +100,9 @@ export default defineEventHandler(async (event) => {
   }
 
   const updated = await db.prepare('SELECT money FROM pcs WHERE id = ?').bind(pc.id).first()
+  // 直前の購入の取り消しに使う
+  const purchase = await db.prepare('SELECT MAX(id) AS id FROM purchases WHERE pc_id = ? AND purchased_by = ?').bind(pc.id, currentUser.id).first()
   invalidateCache('shop:items')
 
-  return { success: true, money: updated.money }
+  return { success: true, money: updated.money, purchaseId: purchase?.id ?? null }
 })
