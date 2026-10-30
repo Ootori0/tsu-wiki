@@ -32,6 +32,15 @@ watch(isLedger, (v) => {
 }, { immediate: true })
 const betPresets = [100, 500, 1000]
 
+// 入力欄は掛金の単位(100万円)の何倍かを入れる(「3」で300万円)。下2桁の「00」は入力欄の後ろに固定で表示する
+const betCount = computed({
+  get: () => bet.value / betUnit.value,
+  set: (v) => {
+    bet.value = typeof v === 'number' ? v * betUnit.value : NaN
+  },
+})
+const betSuffix = computed(() => String(betUnit.value).replace(/^1/, ''))
+
 const playing = ref(false)
 const errorMessage = ref('')
 const shownRolls = ref([]) // 演出で表示済みの出目
@@ -142,17 +151,18 @@ const play = async () => {
 
       <!-- 掛金 -->
       <div class="bet">
-        <label class="bet-label">掛金({{ betUnit }}{{ MONEY_UNIT }}単位)</label>
+        <label class="bet-label">掛金({{ betUnit }}{{ MONEY_UNIT }}単位・百の位から入力)</label>
         <div class="bet-row">
           <input
-            v-model.number="bet"
+            v-model.number="betCount"
             type="number"
-            :min="betUnit"
-            :step="betUnit"
+            inputmode="numeric"
+            min="1"
+            step="1"
             class="bet-input"
             :disabled="playing || isLedger"
           />
-          <span class="bet-unit">{{ MONEY_UNIT }}</span>
+          <span class="bet-unit"><span class="bet-suffix">{{ betSuffix }}</span>{{ MONEY_UNIT }}</span>
         </div>
         <p v-if="isLedger" class="ledger-bet-note">出納帳のPCは掛金{{ formatMoney(LEDGER_BET) }}固定です</p>
         <div v-else class="bet-presets">
@@ -388,6 +398,13 @@ const play = async () => {
 
 .bet-unit {
   font-size: 0.85rem;
+}
+
+/* 入力欄の後ろに続く固定の「00」(入力した数字と同じ大きさで並べる) */
+.bet-suffix {
+  font-size: 16px;
+  font-weight: bold;
+  margin-left: -2px;
 }
 
 .ledger-bet-note {
