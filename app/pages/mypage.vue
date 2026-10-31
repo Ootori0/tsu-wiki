@@ -179,11 +179,9 @@ const formPreview = (form) => ({
   show_office: form.showOffice,
 })
 
-// 魔法: 自分のPCが所持者のものはそのPCの中に出し、「あなたの魔法一覧」には自由記述の所持者のものだけ出す
-const myPcIds = computed(() => new Set((fetchedPcs.value ?? []).map((pc) => pc.id)))
-const freeMagics = computed(() => (fetchedMagics.value ?? []).filter((m) => !myPcIds.value.has(m.owner_pc_id)))
+// 魔法: 「あなたの魔法一覧」にはすべて出し、自分のPCが所持者のものはそのPCの中にも出す
 const magicsOf = (pcId) => (fetchedMagics.value ?? []).filter((m) => m.owner_pc_id === pcId)
-const magicSection = computed(() => [{ id: 'magics', title: 'あなたの魔法一覧', count: freeMagics.value.length }])
+const magicSection = computed(() => [{ id: 'magics', title: 'あなたの魔法一覧', count: (fetchedMagics.value ?? []).length }])
 
 const myPcItems = computed(() =>
   (fetchedPcs.value ?? []).map((pc) => ({ ...pc, title: pcTitle(pc) }))
@@ -567,11 +565,11 @@ const confirmPcDelete = async () => {
       </template>
       <template #detail>
         <div class="section-body">
-          <p v-if="!freeMagics.length" class="empty">まだ魔法がありません(PCが所持者の魔法はそのPCの中に出ます)</p>
-          <AccordionList :items="freeMagics" title-key="name" class="ruled-list">
+          <p v-if="!(fetchedMagics ?? []).length" class="empty">まだ魔法がありません</p>
+          <AccordionList :items="fetchedMagics ?? []" title-key="name" class="ruled-list">
             <template #detail="{ item }">
               <div class="view-mode">
-                <p class="meta-line">区分: {{ item.type }} / 所持者: {{ item.owner || '-' }}</p>
+                <p class="meta-line">区分: {{ item.type }} / 所持者: {{ item.owner_pc_name || item.owner || '-' }}</p>
                 <p class="meta-line">コスト: {{ item.cost || '-' }} / 発動条件: {{ item.condition || '-' }}</p>
                 <MarkdownText :text="item.effect" />
                 <button class="edit-btn" @click="openMagicEdit(item)">編集</button>
