@@ -30,14 +30,15 @@ export default defineEventHandler(async (event) => {
   await db
     .prepare(
       `UPDATE pcs
-       SET name = ?, affiliation = ?, office = ?, grade = ?, memo = ?, is_representative = ?, is_office_representative = ?,
+       SET name = ?, affiliation = ?, office = ?, grade = ?, memo = ?, items = ?, is_representative = ?, is_office_representative = ?,
            show_title = ?, show_office = ?, updated_at = datetime('now')
        WHERE id = ?`
     )
-    .bind(pc.name, pc.affiliation, pc.office, pc.grade, pc.memo, pc.isRepresentative, pc.isOfficeRepresentative, pc.showTitle, pc.showOffice, id)
+    .bind(pc.name, pc.affiliation, pc.office, pc.grade, pc.memo, pc.items, pc.isRepresentative, pc.isOfficeRepresentative, pc.showTitle, pc.showOffice, id)
     .run()
 
-  invalidateCache('pcs', 'casino:dealer', 'shop:items')
+  // 魔法の所持者にPC名を出しているので魔法のキャッシュも破棄する
+  invalidateCache('pcs', 'casino:dealer', 'shop:items', 'magics')
 
   return { id: Number(id), success: true }
 })

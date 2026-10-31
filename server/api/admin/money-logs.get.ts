@@ -26,12 +26,22 @@ export default defineEventHandler(async (event) => {
          SELECT 'sale', po.id, po.pc_id, po.amount, pu.item_name || CASE WHEN pu.discount = 1 THEN '(割引)' ELSE '' END, pu.shop || ' ×' || pu.quantity, pu.purchased_by, po.created_at
          FROM purchase_payouts po JOIN purchases pu ON pu.id = po.purchase_id
          UNION ALL
-         SELECT 'casino', id, pc_id, net, hand, bet, played_by, created_at
-         FROM chinchiro_games
-         UNION ALL
-         SELECT 'dealer', g.id, g.dealer_pc_id, g.dealer_delta, g.hand, p.name, g.played_by, g.created_at
-         FROM chinchiro_games g LEFT JOIN pcs p ON p.id = g.pc_id
-         WHERE g.dealer_pc_id IS NOT NULL
+         -- D1 は UNION を5つまでしか重ねられないので、カジノ関係は1つにまとめる
+         SELECT * FROM (
+           SELECT 'casino', id, pc_id, net, hand, bet, played_by, created_at
+           FROM chinchiro_games
+           UNION ALL
+           SELECT 'dealer', g.id, g.dealer_pc_id, g.dealer_delta, g.hand, p.name, g.played_by, g.created_at
+           FROM chinchiro_games g LEFT JOIN pcs p ON p.id = g.pc_id
+           WHERE g.dealer_pc_id IS NOT NULL
+           UNION ALL
+           SELECT 'casino_month', id, pc_id, net_total, month, plays || '/' || bet_total, NULL, created_at
+           FROM chinchiro_monthly
+           UNION ALL
+           SELECT 'dealer_month', m.id, m.dealer_pc_id, m.dealer_delta_total, m.month || '/' || m.plays, p.name, NULL, m.created_at
+           FROM chinchiro_monthly m LEFT JOIN pcs p ON p.id = m.pc_id
+           WHERE m.dealer_pc_id != 0
+         )
        ) l
        LEFT JOIN pcs ON pcs.id = l.pc_id
        LEFT JOIN users u ON u.id = l.user_id

@@ -56,7 +56,8 @@ CREATE TABLE magics (
   visible_permissions TEXT NOT NULL DEFAULT '[]', -- JSON配列(閲覧可能権限)
   created_by INTEGER NOT NULL,
   name TEXT NOT NULL,
-  owner TEXT,
+  owner TEXT, -- 所持者(自由記述)
+  owner_pc_id INTEGER, -- 所持者を自分のPCにしたとき、そのPC(NULL なら owner の自由記述)
   tags TEXT NOT NULL DEFAULT '[]', -- JSON配列
   cost TEXT,
   condition TEXT,
@@ -90,6 +91,7 @@ CREATE TABLE pcs (
   office TEXT NOT NULL DEFAULT '', -- 事務所(自由記述)
   grade INTEGER NOT NULL DEFAULT 10 CHECK (grade BETWEEN 1 AND 10),
   memo TEXT,
+  items TEXT NOT NULL DEFAULT '', -- 持ち物(自由記述)
   is_representative INTEGER NOT NULL DEFAULT 0, -- 0/1 協会の代表
   is_office_representative INTEGER NOT NULL DEFAULT 0, -- 0/1 事務所の代表
   show_title INTEGER NOT NULL DEFAULT 1, -- 0/1 名前と一緒に肩書きを表示するか
@@ -190,6 +192,24 @@ CREATE TABLE chinchiro_games (
 );
 
 CREATE INDEX idx_chinchiro_games_pc ON chinchiro_games(pc_id);
+
+-- チンチロの古い勝負記録を、PC・ディーラー・月(日本時間)ごとにまとめた月計
+-- 管理者画面の「履歴の圧縮」で、7日より前の勝負を chinchiro_games からここへ移す
+CREATE TABLE chinchiro_monthly (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  pc_id INTEGER NOT NULL, -- プレイヤー
+  dealer_pc_id INTEGER NOT NULL DEFAULT 0, -- ディーラー(0=なし)
+  month TEXT NOT NULL, -- 'YYYY-MM'(日本時間)
+  plays INTEGER NOT NULL, -- 勝負の回数
+  bet_total INTEGER NOT NULL, -- 掛金の合計
+  net_total INTEGER NOT NULL, -- プレイヤーの所持金の増減の合計
+  dealer_delta_total INTEGER NOT NULL, -- ディーラーの所持金の増減の合計
+  created_at TEXT NOT NULL, -- まとめた勝負のうち最後の日時(履歴の並び順に使う)
+  UNIQUE (pc_id, dealer_pc_id, month)
+);
+
+CREATE INDEX idx_chinchiro_monthly_pc ON chinchiro_monthly(pc_id);
+CREATE INDEX idx_chinchiro_monthly_dealer ON chinchiro_monthly(dealer_pc_id);
 
 -- カジノの設定(dealer_pc_id: ディーラーPC / dealer_share: ディーラーの負担・受取割合(%))
 CREATE TABLE casino_settings (

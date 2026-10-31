@@ -9,6 +9,7 @@ import { HISTORY_TARGETS, deleteAllHistoryOfPc } from '../../../utils/historyRev
 //         purchase …… 購入(販売者への支払いも取り消し、在庫を戻す。割引で買ったものは割引の在庫へ)
 //         sale ……… 販売者への支払い1件
 //         casino/dealer … チンチロの勝負(プレイヤーとディーラーの両方の増減を取り消す)
+//         casino_month/dealer_month … 圧縮したチンチロの月計(同上)
 export default defineEventHandler(async (event) => {
   const db = event.context.cloudflare.env.tsu_wiki_db
   const sessionId = getCookie(event, 'session_id')

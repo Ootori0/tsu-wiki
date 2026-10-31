@@ -19,12 +19,22 @@ export default defineEventHandler(async (event) => {
          FROM purchase_payouts po JOIN purchases pu ON pu.id = po.purchase_id
          WHERE po.pc_id = ?1
          UNION ALL
-         SELECT 'casino', id, net, hand, bet, created_at
-         FROM chinchiro_games WHERE pc_id = ?1
-         UNION ALL
-         SELECT 'dealer', g.id, g.dealer_delta, g.hand, pcs.name, g.created_at
-         FROM chinchiro_games g LEFT JOIN pcs ON pcs.id = g.pc_id
-         WHERE g.dealer_pc_id = ?1
+         -- D1 は UNION を5つまでしか重ねられないので、カジノ関係は1つにまとめる
+         SELECT * FROM (
+           SELECT 'casino', id, net, hand, bet, created_at
+           FROM chinchiro_games WHERE pc_id = ?1
+           UNION ALL
+           SELECT 'dealer', g.id, g.dealer_delta, g.hand, pcs.name, g.created_at
+           FROM chinchiro_games g LEFT JOIN pcs ON pcs.id = g.pc_id
+           WHERE g.dealer_pc_id = ?1
+           UNION ALL
+           SELECT 'casino_month', id, net_total, month, plays || '/' || bet_total, created_at
+           FROM chinchiro_monthly WHERE pc_id = ?1
+           UNION ALL
+           SELECT 'dealer_month', m.id, m.dealer_delta_total, m.month || '/' || m.plays, pcs.name, m.created_at
+           FROM chinchiro_monthly m LEFT JOIN pcs ON pcs.id = m.pc_id
+           WHERE m.dealer_pc_id = ?1
+         )
        ) ORDER BY created_at DESC, id DESC LIMIT 100`
     )
     .bind(id)

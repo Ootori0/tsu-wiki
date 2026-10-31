@@ -147,7 +147,7 @@ const togglePerm = (permName) => {
     <AccordionList :items="filteredItems" title-key="name">
       <template #detail="{ item }">
         <div class="magic-detail">
-          <p class="meta-line">区分: {{ item.type }} / 使用者: {{ item.owner || '-' }}</p>
+          <p class="meta-line">区分: {{ item.type }} / 使用者: {{ item.owner_pc_name || item.owner || '-' }}</p>
           <p class="meta-line">コスト: {{ item.cost || '-' }} / 発動条件: {{ item.condition || '-' }}</p>
           <MarkdownText :text="item.effect" />
         </div>
