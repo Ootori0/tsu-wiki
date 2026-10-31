@@ -226,6 +226,12 @@ const pcToForm = (pc) => ({
   showOffice: !!pc.show_office,
 })
 
+// 閲覧モード / 編集モード(すべてのPCをまとめて切り替える)
+const pcEditMode = ref(false)
+watch(pcEditMode, (editing) => {
+  if (editing) fitTextareas()
+})
+
 const drafts = ref({}) // PCのid → 書き換え中の内容
 const baselines = ref({}) // PCのid → 書き換える前の内容
 const isDirty = (id) => !!drafts.value[id] && JSON.stringify(drafts.value[id]) !== JSON.stringify(baselines.value[id])
@@ -406,31 +412,14 @@ const confirmPcDelete = async () => {
       <span>所持金の増減・履歴</span>
     </button>
 
-    <!-- 自分の魔法一覧(表示はアコーディオン、記入・編集はポップアップ) -->
-    <AccordionList :items="magicSection" class="section-accordion">
-      <template #title="{ item }">
-        <span class="section-title">{{ item.title }}</span>
-        <span class="section-count">{{ item.count }}件</span>
-      </template>
-      <template #detail>
-        <div class="section-body">
-          <p v-if="!freeMagics.length" class="empty">まだ魔法がありません(PCが所持者の魔法はそのPCの中に出ます)</p>
-          <AccordionList :items="freeMagics" title-key="name" class="ruled-list">
-            <template #detail="{ item }">
-              <div class="view-mode">
-                <p class="meta-line">区分: {{ item.type }} / 所持者: {{ item.owner || '-' }}</p>
-                <p class="meta-line">コスト: {{ item.cost || '-' }} / 発動条件: {{ item.condition || '-' }}</p>
-                <MarkdownText :text="item.effect" />
-                <button class="edit-btn" @click="openMagicEdit(item)">編集</button>
-              </div>
-            </template>
-          </AccordionList>
-          <button class="add-btn" @click="openMagicCreate">＋ 魔法を作成</button>
-        </div>
-      </template>
-    </AccordionList>
-
-    <!-- 自分のPC: PCごとに一番外のアコーディオン。中でそのまま書き換え、画面左下の「保存」で保存する -->
+    <!-- 自分のPC: PCごとに一番外のアコーディオン。編集モードでは中でそのまま書き換え、画面左下の「保存」で保存する -->
+    <div class="pc-heading">
+      <h2 class="pc-heading-title">あなたのPC</h2>
+      <div class="mode-switch" role="group" aria-label="表示の切り替え">
+        <button class="mode-btn" :class="{ active: !pcEditMode }" @click="pcEditMode = false">閲覧</button>
+        <button class="mode-btn" :class="{ active: pcEditMode }" @click="pcEditMode = true">編集</button>
+      </div>
+    </div>
     <p v-if="!myPcItems.length" class="empty">まだPCがありません</p>
     <AccordionList :items="myPcItems" title-key="title" multiple class="pc-list">
       <template #title="{ item }">
@@ -438,7 +427,24 @@ const confirmPcDelete = async () => {
         <span v-if="dirtyIds.includes(item.id)" class="dirty-mark">未保存</span>
       </template>
       <template #detail="{ item }">
-        <div v-if="drafts[item.id]" class="pc-edit">
+        <!-- 閲覧モード -->
+        <div v-if="!pcEditMode" class="pc-view">
+          <p class="meta-line">
+            所属: {{ item.affiliation || '-' }} / 事務所: {{ item.office || '-' }} / {{ item.grade }}級<template v-if="pcRoles(item)"> / {{ pcRoles(item) }}</template>
+          </p>
+          <template v-if="item.memo">
+            <p class="view-label">メモ</p>
+            <MarkdownText :text="item.memo" />
+          </template>
+          <template v-if="item.items">
+            <p class="view-label">持ち物</p>
+            <MarkdownText :text="item.items" />
+          </template>
+          <p v-if="dirtyIds.includes(item.id)" class="dirty-note">保存していない変更があります(編集モードで確認できます)</p>
+        </div>
+
+        <!-- 編集モード -->
+        <div v-else-if="drafts[item.id]" class="pc-edit">
           <label class="edit-label">名前</label>
           <textarea v-model="drafts[item.id].name" class="edit-input auto-wrap" rows="1" @input="resize" />
 
@@ -490,6 +496,10 @@ const confirmPcDelete = async () => {
             # 見出し **太字** ~~取消線~~ `コード` &gt; 引用 ||スポイラー||
           </p>
 
+        </div>
+
+        <!-- 所持金とこのPCの魔法(閲覧・編集のどちらでも出す) -->
+        <div class="pc-common">
           <div class="money-row">
             <span class="money-label">{{ moneyLabel(item) }}</span>
             <span class="money-value" :class="{ negative: item.money < 0 }">{{ formatBalance(item) }}</span>
@@ -512,11 +522,35 @@ const confirmPcDelete = async () => {
             <button class="add-btn" @click="openMagicCreate(item.id)">＋ このPCの魔法を作成</button>
           </div>
 
-          <button class="delete-btn pc-delete" :disabled="pcDeleting" @click="requestPcDelete(item.id)">このPCを削除</button>
+          <button v-if="pcEditMode" class="delete-btn pc-delete" :disabled="pcDeleting" @click="requestPcDelete(item.id)">このPCを削除</button>
         </div>
       </template>
     </AccordionList>
     <button class="add-btn" @click="openPcCreate">＋ PCを作成</button>
+
+    <!-- 自分の魔法一覧(表示はアコーディオン、記入・編集はポップアップ) -->
+    <AccordionList :items="magicSection" class="section-accordion">
+      <template #title="{ item }">
+        <span class="section-title">{{ item.title }}</span>
+        <span class="section-count">{{ item.count }}件</span>
+      </template>
+      <template #detail>
+        <div class="section-body">
+          <p v-if="!freeMagics.length" class="empty">まだ魔法がありません(PCが所持者の魔法はそのPCの中に出ます)</p>
+          <AccordionList :items="freeMagics" title-key="name" class="ruled-list">
+            <template #detail="{ item }">
+              <div class="view-mode">
+                <p class="meta-line">区分: {{ item.type }} / 所持者: {{ item.owner || '-' }}</p>
+                <p class="meta-line">コスト: {{ item.cost || '-' }} / 発動条件: {{ item.condition || '-' }}</p>
+                <MarkdownText :text="item.effect" />
+                <button class="edit-btn" @click="openMagicEdit(item)">編集</button>
+              </div>
+            </template>
+          </AccordionList>
+          <button class="add-btn" @click="openMagicCreate">＋ 魔法を作成</button>
+        </div>
+      </template>
+    </AccordionList>
 
     <!-- 保存していないPCの変更があるときだけ、画面左下に出す -->
     <Transition name="save-bar">
@@ -891,7 +925,7 @@ const confirmPcDelete = async () => {
 
 /* 外側の一覧は箱、内側の項目は罫線で区切った行として見せる */
 .section-accordion {
-  margin-bottom: 16px;
+  margin: 24px 0 16px;
 }
 
 .section-accordion :deep(.accordion-title) .section-title {
@@ -1126,5 +1160,68 @@ const confirmPcDelete = async () => {
 .save-bar-leave-to {
   transform: translateY(20px);
   opacity: 0;
+}
+
+/* ---------- あなたのPC: 見出しと閲覧/編集の切り替え ---------- */
+.pc-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 24px 0 10px;
+  padding-bottom: 4px;
+  border-bottom: 2px solid var(--color-text, #000);
+}
+
+.pc-heading-title {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.mode-switch {
+  display: flex;
+  border: 1px solid var(--color-text, #000);
+}
+
+.mode-btn {
+  border: none;
+  background: var(--color-bg, #fff);
+  color: var(--color-text, #000);
+  padding: 5px 14px;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.mode-btn + .mode-btn {
+  border-left: 1px solid var(--color-text, #000);
+}
+
+.mode-btn.active {
+  background: var(--color-text, #000);
+  color: var(--color-accent, #ffd400);
+  font-weight: bold;
+}
+
+.pc-view {
+  padding: 12px 14px 0;
+}
+
+.view-label {
+  margin: 10px 0 2px;
+  font-size: 0.75rem;
+  font-weight: bold;
+}
+
+.dirty-note {
+  margin: 8px 0 0;
+  font-size: 0.78rem;
+  font-weight: bold;
+  color: var(--color-error, #c62828);
+}
+
+.pc-common {
+  display: flex;
+  flex-direction: column;
+  padding: 0 14px 14px;
 }
 </style>
