@@ -545,7 +545,7 @@ const confirmPcDelete = async () => {
       <label class="edit-label">所持者</label>
       <select v-model="magicForm.ownerPcId" class="edit-input">
         <option :value="null">自由記述</option>
-        <option v-for="pc in fetchedPcs ?? []" :key="pc.id" :value="pc.id">{{ pc.name }}(自分のPC)</option>
+        <option v-for="pc in fetchedPcs ?? []" :key="pc.id" :value="pc.id">{{ pc.name }}</option>
       </select>
       <textarea
         v-if="magicForm.ownerPcId === null"
