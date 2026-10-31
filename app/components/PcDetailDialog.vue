@@ -49,6 +49,10 @@ const pc = defineModel({ type: Object, default: null })
         <div v-if="pc.memo" class="detail-memo">
           <MarkdownText :text="pc.memo" />
         </div>
+        <div v-if="pc.items" class="detail-memo">
+          <p class="detail-items-label">持ち物</p>
+          <MarkdownText :text="pc.items" />
+        </div>
       </div>
     </div>
   </Transition>
@@ -187,6 +191,12 @@ const pc = defineModel({ type: Object, default: null })
 
 .role {
   display: block;
+}
+
+.detail-items-label {
+  margin: 0 0 4px;
+  font-size: 0.75rem;
+  font-weight: bold;
 }
 
 .detail-memo {

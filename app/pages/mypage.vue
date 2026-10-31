@@ -77,7 +77,7 @@ const { data: allTags } = await useCachedFetch('/api/tags', {
 const magicTypes = ['魔法', '魔道具', 'AF', '魔術・その他']
 
 const emptyMagicForm = () => ({
-  type: '魔法', name: '', owner: '', tags: [], cost: '', condition: '', effect: '', visiblePermissions: [],
+  type: '魔法', name: '', owner: '', ownerPcId: null, tags: [], cost: '', condition: '', effect: '', visiblePermissions: [],
 })
 
 // 記入・編集はポップアップで行う(編集中の id が null なら新規作成)
@@ -88,9 +88,10 @@ const saving = ref(false)
 const deleting = ref(false)
 const showConfirm = ref(false)
 
-const openMagicCreate = () => {
+// ownerPcId を渡すと、所持者がそのPCの状態で開く(PCの中の「このPCの魔法を作成」)
+const openMagicCreate = (ownerPcId = null) => {
   magicEditingId.value = null
-  magicForm.value = emptyMagicForm()
+  magicForm.value = { ...emptyMagicForm(), ownerPcId: typeof ownerPcId === 'number' ? ownerPcId : null }
   magicDialogOpen.value = true
 }
 
@@ -100,6 +101,7 @@ const openMagicEdit = (item) => {
     type: item.type,
     name: item.name,
     owner: item.owner,
+    ownerPcId: item.owner_pc_id ?? null,
     tags: [...item.tags],
     cost: item.cost,
     condition: item.condition,
@@ -177,9 +179,11 @@ const formPreview = (form) => ({
   show_office: form.showOffice,
 })
 
-// 一覧ごと折りたためる見出し(件数つき)
-const magicSection = computed(() => [{ id: 'magics', title: 'あなたの魔法一覧', count: (fetchedMagics.value ?? []).length }])
-const pcSection = computed(() => [{ id: 'pcs', title: 'あなたのPC一覧', count: (fetchedPcs.value ?? []).length }])
+// 魔法: 自分のPCが所持者のものはそのPCの中に出し、「あなたの魔法一覧」には自由記述の所持者のものだけ出す
+const myPcIds = computed(() => new Set((fetchedPcs.value ?? []).map((pc) => pc.id)))
+const freeMagics = computed(() => (fetchedMagics.value ?? []).filter((m) => !myPcIds.value.has(m.owner_pc_id)))
+const magicsOf = (pcId) => (fetchedMagics.value ?? []).filter((m) => m.owner_pc_id === pcId)
+const magicSection = computed(() => [{ id: 'magics', title: 'あなたの魔法一覧', count: freeMagics.value.length }])
 
 const myPcItems = computed(() =>
   (fetchedPcs.value ?? []).map((pc) => ({ ...pc, title: pcTitle(pc) }))
@@ -193,6 +197,7 @@ const emptyPcForm = () => ({
   grade: 10,
   money: 0,
   memo: '',
+  items: '',
   isRepresentative: false,
   isOfficeRepresentative: false,
   showTitle: true,
@@ -202,54 +207,111 @@ const emptyPcForm = () => ({
 const refreshPcs = async () => {
   // PCタブの一覧キャッシュも破棄して次回表示時に再取得させる
   clearNuxtData('pcs-list')
+  // 魔法の所持者にPC名を出しているので魔法タブの一覧も読み込み直させる
+  clearNuxtData('magics-list')
   await refreshPcsRaw()
 }
 
-// 記入・編集はポップアップで行う(編集中の id が null なら新規作成)
+// --- PCの編集: アコーディオンの中でそのまま書き換え、画面左下の「保存」でまとめて保存する ---
+const pcToForm = (pc) => ({
+  name: pc.name,
+  affiliation: pc.affiliation ?? '',
+  office: pc.office ?? '',
+  grade: pc.grade,
+  memo: pc.memo ?? '',
+  items: pc.items ?? '',
+  isRepresentative: !!pc.is_representative,
+  isOfficeRepresentative: !!pc.is_office_representative,
+  showTitle: !!pc.show_title,
+  showOffice: !!pc.show_office,
+})
+
+const drafts = ref({}) // PCのid → 書き換え中の内容
+const baselines = ref({}) // PCのid → 書き換える前の内容
+const isDirty = (id) => !!drafts.value[id] && JSON.stringify(drafts.value[id]) !== JSON.stringify(baselines.value[id])
+const dirtyIds = computed(() => Object.keys(drafts.value).map(Number).filter(isDirty))
+
+// 読み込み直したら、書き換えていないPCは最新の内容に合わせる(書き換え中のものはそのまま残す)
+watch(fetchedPcs, async (pcs) => {
+  const nextDrafts = {}
+  const nextBases = {}
+  for (const pc of pcs ?? []) {
+    if (isDirty(pc.id)) {
+      nextDrafts[pc.id] = drafts.value[pc.id]
+      nextBases[pc.id] = baselines.value[pc.id]
+    } else {
+      nextDrafts[pc.id] = pcToForm(pc)
+      nextBases[pc.id] = pcToForm(pc)
+    }
+  }
+  drafts.value = nextDrafts
+  baselines.value = nextBases
+  if (import.meta.client) fitTextareas()
+}, { immediate: true })
+
+onMounted(() => fitTextareas())
+
+const savingDrafts = ref(false)
+const saveDrafts = async () => {
+  const ids = dirtyIds.value
+  const unnamed = ids.find((id) => !drafts.value[id].name.trim())
+  if (unnamed) {
+    show('名前が空のPCがあります', 'error')
+    return
+  }
+  savingDrafts.value = true
+  try {
+    for (const id of ids) {
+      await $fetch(`/api/pcs/${id}`, { method: 'PUT', body: drafts.value[id] })
+      baselines.value[id] = JSON.parse(JSON.stringify(drafts.value[id]))
+    }
+    await Promise.all([refreshPcs(), refreshMagics()])
+    show('PCを保存しました')
+  } catch (e) {
+    show(e?.data?.statusMessage ?? '保存に失敗しました', 'error')
+  } finally {
+    savingDrafts.value = false
+  }
+}
+
+const revertDrafts = async () => {
+  for (const id of dirtyIds.value) {
+    drafts.value[id] = JSON.parse(JSON.stringify(baselines.value[id]))
+  }
+  fitTextareas()
+}
+
+// 保存していない変更があるときは、ページを離れる前に確かめる
+onBeforeRouteLeave(() => {
+  if (dirtyIds.value.length && !confirm('保存していないPCの変更があります。保存せずに移動しますか?')) return false
+})
+const warnBeforeUnload = (e) => {
+  if (dirtyIds.value.length) e.preventDefault()
+}
+onMounted(() => window.addEventListener('beforeunload', warnBeforeUnload))
+onBeforeUnmount(() => window.removeEventListener('beforeunload', warnBeforeUnload))
+
+// --- PCの新規作成はポップアップ ---
 const pcDialogOpen = ref(false)
-const pcEditingId = ref(null)
 const pcForm = ref(emptyPcForm())
 const pcSaving = ref(false)
-const pcDeleting = ref(false)
 const pcError = ref('')
-const showPcConfirm = ref(false)
 
 const openPcCreate = () => {
   pcError.value = ''
-  pcEditingId.value = null
   pcForm.value = emptyPcForm()
   pcDialogOpen.value = true
 }
 
-const openPcEdit = (item) => {
-  pcError.value = ''
-  pcEditingId.value = item.id
-  pcForm.value = {
-    name: item.name,
-    affiliation: item.affiliation ?? '',
-    office: item.office ?? '',
-    grade: item.grade,
-    memo: item.memo ?? '',
-    isRepresentative: item.is_representative,
-    isOfficeRepresentative: item.is_office_representative,
-    showTitle: item.show_title,
-    showOffice: item.show_office,
-  }
-  pcDialogOpen.value = true
-  fitTextareas()
-}
-
 const savePc = async () => {
   if (!pcForm.value.name) return
-  const id = pcEditingId.value
   pcError.value = ''
   pcSaving.value = true
   try {
-    if (id) await $fetch(`/api/pcs/${id}`, { method: 'PUT', body: pcForm.value })
-    else await $fetch('/api/pcs', { method: 'POST', body: pcForm.value })
+    await $fetch('/api/pcs', { method: 'POST', body: pcForm.value })
     pcDialogOpen.value = false
     await refreshPcs()
-    show(id ? 'PCを保存しました' : 'PCを作成しました')
+    show('PCを作成しました')
   } catch (e) {
     pcError.value = e?.data?.statusMessage ?? '保存に失敗しました'
   } finally {
@@ -257,18 +319,28 @@ const savePc = async () => {
   }
 }
 
+// --- PCの削除 ---
+const pcDeleting = ref(false)
+const showPcConfirm = ref(false)
+const pendingPcDeleteId = ref(null)
+const requestPcDelete = (id) => {
+  pendingPcDeleteId.value = id
+  showPcConfirm.value = true
+}
+
 const confirmPcDelete = async () => {
-  if (!pcEditingId.value) return
+  const id = pendingPcDeleteId.value
+  if (!id) return
   pcDeleting.value = true
   try {
-    await $fetch(`/api/pcs/${pcEditingId.value}`, { method: 'DELETE' })
-    pcDialogOpen.value = false
-    await refreshPcs()
+    await $fetch(`/api/pcs/${id}`, { method: 'DELETE' })
+    await Promise.all([refreshPcs(), refreshMagics()])
     show('PCを削除しました')
   } catch (e) {
     show(e?.data?.statusMessage ?? '削除に失敗しました', 'error')
   } finally {
     pcDeleting.value = false
+    pendingPcDeleteId.value = null
   }
 }
 </script>
@@ -342,8 +414,8 @@ const confirmPcDelete = async () => {
       </template>
       <template #detail>
         <div class="section-body">
-          <p v-if="!(fetchedMagics ?? []).length" class="empty">まだ魔法がありません</p>
-          <AccordionList :items="fetchedMagics ?? []" title-key="name" class="ruled-list">
+          <p v-if="!freeMagics.length" class="empty">まだ魔法がありません(PCが所持者の魔法はそのPCの中に出ます)</p>
+          <AccordionList :items="freeMagics" title-key="name" class="ruled-list">
             <template #detail="{ item }">
               <div class="view-mode">
                 <p class="meta-line">区分: {{ item.type }} / 所持者: {{ item.owner || '-' }}</p>
@@ -358,35 +430,102 @@ const confirmPcDelete = async () => {
       </template>
     </AccordionList>
 
-    <!-- 自分のPC一覧(表示はアコーディオン、記入・編集はポップアップ) -->
-    <AccordionList :items="pcSection" class="section-accordion">
+    <!-- 自分のPC: PCごとに一番外のアコーディオン。中でそのまま書き換え、画面左下の「保存」で保存する -->
+    <p v-if="!myPcItems.length" class="empty">まだPCがありません</p>
+    <AccordionList :items="myPcItems" title-key="title" multiple class="pc-list">
       <template #title="{ item }">
-        <span class="section-title">{{ item.title }}</span>
-        <span class="section-count">{{ item.count }}件</span>
+        <span>{{ item.title }}</span>
+        <span v-if="dirtyIds.includes(item.id)" class="dirty-mark">未保存</span>
       </template>
-      <template #detail>
-        <div class="section-body">
-          <p v-if="!myPcItems.length" class="empty">まだPCがありません</p>
-          <AccordionList :items="myPcItems" title-key="title" class="ruled-list">
-            <template #detail="{ item }">
-              <div class="view-mode">
-                <p class="meta-line">
-                  所属: {{ item.affiliation || '-' }} / 事務所: {{ item.office || '-' }} / {{ item.grade }}級<template v-if="pcRoles(item)"> / {{ pcRoles(item) }}</template>
-                </p>
-                <MarkdownText :text="item.memo" />
-                <div class="money-row">
-                  <span class="money-label">{{ moneyLabel(item) }}</span>
-                  <span class="money-value" :class="{ negative: item.money < 0 }">{{ formatBalance(item) }}</span>
-                  <button class="money-edit-btn" @click="openMoneyDialog(item.id)">増減・履歴</button>
+      <template #detail="{ item }">
+        <div v-if="drafts[item.id]" class="pc-edit">
+          <label class="edit-label">名前</label>
+          <textarea v-model="drafts[item.id].name" class="edit-input auto-wrap" rows="1" @input="resize" />
+
+          <div class="pc-grid">
+            <div>
+              <label class="edit-label">所属</label>
+              <select v-model="drafts[item.id].affiliation" class="edit-input">
+                <option value="">(未設定)</option>
+                <option v-for="a in allAffiliations ?? []" :key="a.id" :value="a.name">{{ a.name }}</option>
+              </select>
+            </div>
+            <div>
+              <label class="edit-label">級</label>
+              <select v-model.number="drafts[item.id].grade" class="edit-input">
+                <option v-for="g in grades" :key="g" :value="g">{{ g }}級</option>
+              </select>
+            </div>
+          </div>
+
+          <label class="edit-label">事務所</label>
+          <textarea v-model="drafts[item.id].office" class="edit-input auto-wrap" rows="1" @input="resize" />
+
+          <div class="check-grid">
+            <label class="check-label">
+              <input v-model="drafts[item.id].isRepresentative" type="checkbox" />
+              協会の代表
+            </label>
+            <label class="check-label">
+              <input v-model="drafts[item.id].isOfficeRepresentative" type="checkbox" />
+              事務所の代表
+            </label>
+            <label class="check-label">
+              <input v-model="drafts[item.id].showTitle" type="checkbox" />
+              名前と一緒に肩書きを表示
+            </label>
+            <label class="check-label">
+              <input v-model="drafts[item.id].showOffice" type="checkbox" :disabled="!drafts[item.id].showTitle" />
+              肩書きに事務所を表示
+            </label>
+          </div>
+          <p class="markdown-hint">表示例: {{ pcTitle(formPreview(drafts[item.id])) }}</p>
+
+          <label class="edit-label">メモ</label>
+          <textarea v-model="drafts[item.id].memo" class="edit-textarea auto-wrap" rows="3" @input="resize" />
+
+          <label class="edit-label">持ち物</label>
+          <textarea v-model="drafts[item.id].items" class="edit-textarea auto-wrap" rows="2" placeholder="例: 杖、回復薬×2" @input="resize" />
+          <p class="markdown-hint">
+            # 見出し **太字** ~~取消線~~ `コード` &gt; 引用 ||スポイラー||
+          </p>
+
+          <div class="money-row">
+            <span class="money-label">{{ moneyLabel(item) }}</span>
+            <span class="money-value" :class="{ negative: item.money < 0 }">{{ formatBalance(item) }}</span>
+            <button class="money-edit-btn" @click="openMoneyDialog(item.id)">増減・履歴</button>
+          </div>
+
+          <!-- このPCが所持者の魔法 -->
+          <div class="pc-magics">
+            <h3 class="pc-magics-title">このPCの魔法<span class="section-count">{{ magicsOf(item.id).length }}件</span></h3>
+            <AccordionList :items="magicsOf(item.id)" title-key="name" class="ruled-list">
+              <template #detail="{ item: magic }">
+                <div class="view-mode">
+                  <p class="meta-line">区分: {{ magic.type }}</p>
+                  <p class="meta-line">コスト: {{ magic.cost || '-' }} / 発動条件: {{ magic.condition || '-' }}</p>
+                  <MarkdownText :text="magic.effect" />
+                  <button class="edit-btn" @click="openMagicEdit(magic)">編集</button>
                 </div>
-                <button class="edit-btn" @click="openPcEdit(item)">編集</button>
-              </div>
-            </template>
-          </AccordionList>
-          <button class="add-btn" @click="openPcCreate">＋ PCを作成</button>
+              </template>
+            </AccordionList>
+            <button class="add-btn" @click="openMagicCreate(item.id)">＋ このPCの魔法を作成</button>
+          </div>
+
+          <button class="delete-btn pc-delete" :disabled="pcDeleting" @click="requestPcDelete(item.id)">このPCを削除</button>
         </div>
       </template>
     </AccordionList>
+    <button class="add-btn" @click="openPcCreate">＋ PCを作成</button>
+
+    <!-- 保存していないPCの変更があるときだけ、画面左下に出す -->
+    <Transition name="save-bar">
+      <div v-if="dirtyIds.length" class="save-bar" role="status">
+        <span class="save-bar-text">未保存の変更</span>
+        <button class="save-bar-btn" :disabled="savingDrafts" @click="revertDrafts">戻す</button>
+        <button class="save-bar-btn primary" :disabled="savingDrafts" @click="saveDrafts">保存</button>
+      </div>
+    </Transition>
 
     <!-- 魔法の記入・編集 -->
     <FormDialog
@@ -404,7 +543,18 @@ const confirmPcDelete = async () => {
       <textarea v-model="magicForm.name" class="edit-input auto-wrap" rows="1" @input="resize" />
 
       <label class="edit-label">所持者</label>
-      <textarea v-model="magicForm.owner" class="edit-input auto-wrap" rows="1" @input="resize" />
+      <select v-model="magicForm.ownerPcId" class="edit-input">
+        <option :value="null">自由記述</option>
+        <option v-for="pc in fetchedPcs ?? []" :key="pc.id" :value="pc.id">{{ pc.name }}(自分のPC)</option>
+      </select>
+      <textarea
+        v-if="magicForm.ownerPcId === null"
+        v-model="magicForm.owner"
+        class="edit-input auto-wrap"
+        rows="1"
+        placeholder="所持者を自由に記入"
+        @input="resize"
+      />
 
       <label class="edit-label">コスト</label>
       <textarea v-model="magicForm.cost" class="edit-input auto-wrap" rows="1" @input="resize" />
@@ -452,7 +602,7 @@ const confirmPcDelete = async () => {
     <!-- PCの記入・編集 -->
     <FormDialog
       v-model="pcDialogOpen"
-      :title="pcEditingId ? 'PCの編集' : 'PCの作成'"
+      title="PCの作成"
       :save-disabled="pcSaving || !pcForm.name"
       @save="savePc"
     >
@@ -476,10 +626,8 @@ const confirmPcDelete = async () => {
         <option v-for="g in grades" :key="g" :value="g">{{ g }}級</option>
       </select>
 
-      <template v-if="!pcEditingId">
-        <label class="edit-label">初期所持金({{ MONEY_UNIT }})</label>
-        <input v-model.number="pcForm.money" type="number" step="1" class="edit-input" />
-      </template>
+      <label class="edit-label">初期所持金({{ MONEY_UNIT }})</label>
+      <input v-model.number="pcForm.money" type="number" step="1" class="edit-input" />
 
       <label class="check-label">
         <input v-model="pcForm.isRepresentative" type="checkbox" />
@@ -505,14 +653,13 @@ const confirmPcDelete = async () => {
 
       <label class="edit-label">メモ</label>
       <textarea v-model="pcForm.memo" class="edit-textarea auto-wrap" rows="3" @input="resize" />
+
+      <label class="edit-label">持ち物</label>
+      <textarea v-model="pcForm.items" class="edit-textarea auto-wrap" rows="2" @input="resize" />
       <p class="markdown-hint">
         # 見出し **太字** ~~取消線~~ `コード` &gt; 引用 ||スポイラー||
       </p>
       <p v-if="pcError" class="error-text">{{ pcError }}</p>
-
-      <template v-if="pcEditingId" #extra>
-        <button class="delete-btn" :disabled="pcDeleting" @click="showPcConfirm = true">削除</button>
-      </template>
     </FormDialog>
 
     <ConfirmDialog
@@ -535,7 +682,8 @@ const confirmPcDelete = async () => {
 .page {
   max-width: 480px;
   margin: 0 auto;
-  padding: 72px 16px 48px;
+  /* 下は画面左下の保存バーに隠れないよう広めに空ける */
+  padding: 72px 16px 96px;
   box-sizing: border-box;
 }
 
@@ -865,5 +1013,118 @@ const confirmPcDelete = async () => {
   font-size: 0.7rem;
   opacity: 0.6;
   margin: 2px 0 0;
+}
+
+/* ---------- PC(一番外のアコーディオン。中でそのまま編集) ---------- */
+.pc-list {
+  margin-bottom: 4px;
+}
+
+.dirty-mark {
+  margin-left: 8px;
+  padding: 0 6px;
+  font-size: 0.68rem;
+  font-weight: bold;
+  background: var(--color-accent, #ffd400);
+  border: 1px solid var(--color-text, #000);
+  vertical-align: middle;
+}
+
+.pc-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 14px 14px;
+}
+
+.pc-edit .edit-label {
+  margin-top: 4px;
+}
+
+.pc-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.pc-grid > div {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.check-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.pc-magics {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 2px solid var(--color-text, #000);
+}
+
+.pc-magics-title {
+  margin: 0 0 8px;
+  font-size: 0.9rem;
+}
+
+.pc-delete {
+  align-self: flex-end;
+  margin-top: 16px;
+}
+
+/* ---------- 画面左下の保存バー ---------- */
+.save-bar {
+  position: fixed;
+  left: 16px;
+  bottom: 16px;
+  z-index: 1500;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px 8px 14px;
+  background: #000;
+  color: var(--color-accent, #ffd400);
+  box-shadow: 4px 4px 0 var(--color-accent, #ffd400);
+  max-width: calc(100vw - 32px);
+}
+
+.save-bar-text {
+  font-size: 0.85rem;
+  font-weight: bold;
+  margin-right: 4px;
+}
+
+.save-bar-btn {
+  border: 1px solid var(--color-accent, #ffd400);
+  background: transparent;
+  color: var(--color-accent, #ffd400);
+  padding: 6px 12px;
+  font-size: 0.85rem;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.save-bar-btn.primary {
+  background: var(--color-accent, #ffd400);
+  color: #000;
+}
+
+.save-bar-btn:disabled {
+  opacity: 0.5;
+}
+
+.save-bar-enter-active,
+.save-bar-leave-active {
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+
+.save-bar-enter-from,
+.save-bar-leave-to {
+  transform: translateY(20px);
+  opacity: 0;
 }
 </style>

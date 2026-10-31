@@ -1,6 +1,7 @@
 import { getSessionUser } from '../../utils/session'
 import { isAdmin } from '../../utils/permission'
 import { invalidateCache } from '../../utils/cache'
+import { resolveMagicOwner } from '../../utils/magic'
 
 export default defineEventHandler(async (event) => {
   const db = event.context.cloudflare.env.tsu_wiki_db
@@ -31,18 +32,20 @@ export default defineEventHandler(async (event) => {
   if (!type || !name) {
     throw createError({ statusCode: 400, statusMessage: 'type and name are required' })
   }
+  const ownerInfo = await resolveMagicOwner(db, body, existing.created_by)
 
   await db
     .prepare(
       `UPDATE magics
-       SET type = ?, visible_permissions = ?, name = ?, owner = ?, tags = ?, cost = ?, condition = ?, effect = ?, updated_at = datetime('now')
+       SET type = ?, visible_permissions = ?, name = ?, owner = ?, owner_pc_id = ?, tags = ?, cost = ?, condition = ?, effect = ?, updated_at = datetime('now')
        WHERE id = ?`
     )
     .bind(
       type,
       JSON.stringify(visiblePermissions ?? []),
       name,
-      owner ?? '',
+      ownerInfo.owner,
+      ownerInfo.ownerPcId,
       JSON.stringify(tags ?? []),
       cost ?? '',
       condition ?? '',

@@ -1,6 +1,7 @@
 import { getSessionUser } from '../utils/session'
 import { canView } from '../utils/permission'
 import { cached } from '../utils/cache'
+import { MAGIC_SELECT } from '../utils/magic'
 
 export default defineEventHandler(async (event) => {
   const db = event.context.cloudflare.env.tsu_wiki_db
@@ -12,7 +13,7 @@ export default defineEventHandler(async (event) => {
 
   // 全件をキャッシュし、区分・閲覧権限での絞り込みはリクエストごとに行う
   const all = await cached('magics', async () => {
-    const { results } = await db.prepare('SELECT * FROM magics ORDER BY id DESC').all()
+    const { results } = await db.prepare(`${MAGIC_SELECT} ORDER BY magics.id DESC`).all()
     return results.map((r) => ({
       ...r,
       tags: JSON.parse(r.tags),

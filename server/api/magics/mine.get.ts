@@ -1,4 +1,5 @@
 import { getSessionUser } from '../../utils/session'
+import { MAGIC_SELECT } from '../../utils/magic'
 
 export default defineEventHandler(async (event) => {
   const db = event.context.cloudflare.env.tsu_wiki_db
@@ -10,7 +11,7 @@ export default defineEventHandler(async (event) => {
   }
 
   const { results } = await db
-    .prepare('SELECT * FROM magics WHERE created_by = ? ORDER BY id DESC')
+    .prepare(`${MAGIC_SELECT} WHERE magics.created_by = ? ORDER BY magics.id DESC`)
     .bind(currentUser.id)
     .all()
 

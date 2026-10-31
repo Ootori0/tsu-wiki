@@ -23,9 +23,13 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 403, statusMessage: '削除権限がありません' })
   }
 
-  await db.prepare('DELETE FROM pcs WHERE id = ?').bind(id).run()
+  await db.batch([
+    // このPCを所持者にしていた魔法は、所持者をPC名の自由記述に戻す
+    db.prepare('UPDATE magics SET owner = ?, owner_pc_id = NULL WHERE owner_pc_id = ?').bind(existing.name, id),
+    db.prepare('DELETE FROM pcs WHERE id = ?').bind(id),
+  ])
 
-  invalidateCache('pcs', 'casino:dealer', 'shop:items')
+  invalidateCache('pcs', 'casino:dealer', 'shop:items', 'magics')
 
   return { success: true, id: Number(id) }
 })

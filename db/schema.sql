@@ -56,7 +56,8 @@ CREATE TABLE magics (
   visible_permissions TEXT NOT NULL DEFAULT '[]', -- JSON配列(閲覧可能権限)
   created_by INTEGER NOT NULL,
   name TEXT NOT NULL,
-  owner TEXT,
+  owner TEXT, -- 所持者(自由記述)
+  owner_pc_id INTEGER, -- 所持者を自分のPCにしたとき、そのPC(NULL なら owner の自由記述)
   tags TEXT NOT NULL DEFAULT '[]', -- JSON配列
   cost TEXT,
   condition TEXT,
@@ -90,6 +91,7 @@ CREATE TABLE pcs (
   office TEXT NOT NULL DEFAULT '', -- 事務所(自由記述)
   grade INTEGER NOT NULL DEFAULT 10 CHECK (grade BETWEEN 1 AND 10),
   memo TEXT,
+  items TEXT NOT NULL DEFAULT '', -- 持ち物(自由記述)
   is_representative INTEGER NOT NULL DEFAULT 0, -- 0/1 協会の代表
   is_office_representative INTEGER NOT NULL DEFAULT 0, -- 0/1 事務所の代表
   show_title INTEGER NOT NULL DEFAULT 1, -- 0/1 名前と一緒に肩書きを表示するか

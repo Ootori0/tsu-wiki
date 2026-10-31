@@ -1,6 +1,6 @@
 export function parsePcBody(body) {
   const {
-    name, affiliation, office, grade, memo, money,
+    name, affiliation, office, grade, memo, items, money,
     isRepresentative, isOfficeRepresentative, showTitle, showOffice,
   } = body ?? {}
 
@@ -25,6 +25,7 @@ export function parsePcBody(body) {
     office: office ?? '',
     grade: gradeNum,
     memo: memo ?? '',
+    items: items ?? '',
     isRepresentative: isRepresentative ? 1 : 0,
     isOfficeRepresentative: isOfficeRepresentative ? 1 : 0,
     showTitle: showTitle === false ? 0 : 1,
