@@ -22,12 +22,21 @@ const props = defineProps({
     type: Array,
     default: () => [],
   },
+  // 閉じる前に呼ぶ(item を受け取り、false か false に解決する Promise を返すと閉じない)
+  beforeClose: {
+    type: Function,
+    default: null,
+  },
 })
 
 const openIds = ref(new Set(props.defaultOpen))
 const isOpen = (id) => openIds.value.has(id)
 
-const toggle = (id) => {
+const toggle = async (id) => {
+  if (isOpen(id) && props.beforeClose) {
+    const item = props.items.find((i) => i.id === id)
+    if ((await props.beforeClose(item)) === false) return
+  }
   const next = new Set(props.multiple ? openIds.value : [])
   if (isOpen(id)) next.delete(id)
   else next.add(id)

@@ -226,11 +226,37 @@ const pcToForm = (pc) => ({
   showOffice: !!pc.show_office,
 })
 
-// 閲覧モード / 編集モード(すべてのPCをまとめて切り替える)
-const pcEditMode = ref(false)
-watch(pcEditMode, (editing) => {
+// 閲覧モード / 編集モード(PCごとに切り替える)
+const editingPcIds = ref([])
+const isEditing = (id) => editingPcIds.value.includes(id)
+const setEditing = (id, editing) => {
+  editingPcIds.value = editing
+    ? [...new Set([...editingPcIds.value, id])]
+    : editingPcIds.value.filter((x) => x !== id)
   if (editing) fitTextareas()
+}
+
+// 編集モードのPCのアコーディオンを閉じるときは確認する(OKなら閲覧モードに戻して閉じる)
+const closeConfirm = ref({ open: false, pc: null, resolve: null })
+const beforeClosePc = (pc) => {
+  if (!isEditing(pc.id)) return true
+  return new Promise((resolve) => {
+    closeConfirm.value = { open: true, pc, resolve }
+  })
+}
+const closeConfirmMessage = computed(() => {
+  const pc = closeConfirm.value.pc
+  if (!pc) return ''
+  return isDirty(pc.id)
+    ? `「${pc.name}」の編集を終えて閉じますか?\n保存していない変更は残っているので、左下の保存バーから保存できます。`
+    : `「${pc.name}」の編集を終えて閉じますか?`
 })
+const answerCloseConfirm = (ok) => {
+  const { pc, resolve } = closeConfirm.value
+  if (ok && pc) setEditing(pc.id, false)
+  closeConfirm.value = { open: false, pc: null, resolve: null }
+  resolve?.(ok)
+}
 
 const drafts = ref({}) // PCのid → 書き換え中の内容
 const baselines = ref({}) // PCのid → 書き換える前の内容
@@ -415,20 +441,25 @@ const confirmPcDelete = async () => {
     <!-- 自分のPC: PCごとに一番外のアコーディオン。編集モードでは中でそのまま書き換え、画面左下の「保存」で保存する -->
     <div class="pc-heading">
       <h2 class="pc-heading-title">あなたのPC</h2>
-      <div class="mode-switch" role="group" aria-label="表示の切り替え">
-        <button class="mode-btn" :class="{ active: !pcEditMode }" @click="pcEditMode = false">閲覧</button>
-        <button class="mode-btn" :class="{ active: pcEditMode }" @click="pcEditMode = true">編集</button>
-      </div>
     </div>
     <p v-if="!myPcItems.length" class="empty">まだPCがありません</p>
-    <AccordionList :items="myPcItems" title-key="title" multiple class="pc-list">
+    <AccordionList :items="myPcItems" title-key="title" multiple :before-close="beforeClosePc" class="pc-list">
       <template #title="{ item }">
         <span>{{ item.title }}</span>
+        <span v-if="isEditing(item.id)" class="editing-mark">編集中</span>
         <span v-if="dirtyIds.includes(item.id)" class="dirty-mark">未保存</span>
       </template>
       <template #detail="{ item }">
+        <!-- このPCの閲覧/編集の切り替え -->
+        <div class="pc-mode-row">
+          <div class="mode-switch" role="group" aria-label="表示の切り替え">
+            <button class="mode-btn" :class="{ active: !isEditing(item.id) }" @click="setEditing(item.id, false)">閲覧</button>
+            <button class="mode-btn" :class="{ active: isEditing(item.id) }" @click="setEditing(item.id, true)">編集</button>
+          </div>
+        </div>
+
         <!-- 閲覧モード -->
-        <div v-if="!pcEditMode" class="pc-view">
+        <div v-if="!isEditing(item.id)" class="pc-view">
           <p class="meta-line">
             所属: {{ item.affiliation || '-' }} / 事務所: {{ item.office || '-' }} / {{ item.grade }}級<template v-if="pcRoles(item)"> / {{ pcRoles(item) }}</template>
           </p>
@@ -522,7 +553,7 @@ const confirmPcDelete = async () => {
             <button class="add-btn" @click="openMagicCreate(item.id)">＋ このPCの魔法を作成</button>
           </div>
 
-          <button v-if="pcEditMode" class="delete-btn pc-delete" :disabled="pcDeleting" @click="requestPcDelete(item.id)">このPCを削除</button>
+          <button v-if="isEditing(item.id)" class="delete-btn pc-delete" :disabled="pcDeleting" @click="requestPcDelete(item.id)">このPCを削除</button>
         </div>
       </template>
     </AccordionList>
@@ -701,6 +732,16 @@ const confirmPcDelete = async () => {
       title="魔法の削除"
       message="この魔法を削除します。この操作は取り消せません。よろしいですか?"
       @confirm="confirmDelete"
+    />
+
+    <ConfirmDialog
+      :model-value="closeConfirm.open"
+      title="編集を終える"
+      confirm-label="閉じる"
+      :danger="false"
+      :message="closeConfirmMessage"
+      @confirm="answerCloseConfirm(true)"
+      @cancel="answerCloseConfirm(false)"
     />
 
     <ConfirmDialog
@@ -1202,8 +1243,24 @@ const confirmPcDelete = async () => {
   font-weight: bold;
 }
 
+.pc-mode-row {
+  display: flex;
+  justify-content: flex-end;
+  padding: 10px 14px 0;
+}
+
+.editing-mark {
+  margin-left: 8px;
+  padding: 0 6px;
+  font-size: 0.68rem;
+  font-weight: bold;
+  background: #000;
+  color: var(--color-accent, #ffd400);
+  vertical-align: middle;
+}
+
 .pc-view {
-  padding: 12px 14px 0;
+  padding: 8px 14px 0;
 }
 
 .view-label {
