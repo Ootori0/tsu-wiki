@@ -263,14 +263,27 @@ const deleteItem = async (id) => {
 
 // --- 所持金履歴 ---
 const logPcId = ref(null)
+// 種別での絞り込み(空=すべて)
+const logCategory = ref('')
+const LOG_CATEGORIES = [
+  { value: '', label: 'すべての種別' },
+  { value: 'manual', label: '手動の増減' },
+  { value: 'magic_shop', label: '魔法店' },
+  { value: 'weapon_shop', label: '武器屋' },
+  { value: 'casino', label: 'カジノ' },
+  { value: 'ledger', label: '清算・切替' },
+]
 const { data: moneyLogs, execute: loadMoneyLogs, pending: loadingLogs } = await useFetch('/api/admin/money-logs', {
   key: 'admin-money-logs',
-  query: computed(() => (logPcId.value ? { pcId: logPcId.value } : {})),
+  query: computed(() => ({
+    ...(logPcId.value ? { pcId: logPcId.value } : {}),
+    ...(logCategory.value ? { category: logCategory.value } : {}),
+  })),
   immediate: false,
   watch: false,
 })
 // タブを開いたとき・PCを切り替えたときに読み込む
-watch([activeTab, logPcId], () => {
+watch([activeTab, logPcId, logCategory], () => {
   if (activeTab.value === '所持金履歴') loadMoneyLogs()
 })
 
@@ -499,6 +512,9 @@ const savePayouts = async () => {
           </select>
           <button class="edit-btn" :disabled="loadingLogs" @click="loadMoneyLogs()">再読み込み</button>
         </div>
+        <select v-model="logCategory" class="field-input category-select" aria-label="種別">
+          <option v-for="c in LOG_CATEGORIES" :key="c.value" :value="c.value">{{ c.label }}</option>
+        </select>
         <div v-for="log in moneyLogs ?? []" :key="`${log.kind}-${log.id}`" class="log-row">
           <div class="log-top">
             <span class="item-meta">{{ formatDateTime(log.created_at) }}</span>
@@ -516,7 +532,7 @@ const savePayouts = async () => {
         </div>
         <p v-if="!loadingLogs && (moneyLogs ?? []).length === 0" class="empty">履歴はありません</p>
         <button
-          v-if="canDeleteHistory && logPcId && (moneyLogs ?? []).length"
+          v-if="canDeleteHistory && logPcId && !logCategory && (moneyLogs ?? []).length"
           class="delete-btn delete-all"
           @click="deleteAllHistoryOfPc"
         >
@@ -1097,5 +1113,9 @@ const savePayouts = async () => {
 
 .discount-meta {
   font-weight: bold;
+}
+
+.category-select {
+  margin: 8px 0 4px;
 }
 </style>
