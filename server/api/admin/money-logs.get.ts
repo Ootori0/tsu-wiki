@@ -13,6 +13,15 @@ export default defineEventHandler(async (event) => {
 
   const query = getQuery(event)
   const pcId = query.pcId ? Number(query.pcId) : null
+  // 種別での絞り込み(決まった条件だけを使う)
+  const CATEGORY_WHERE = {
+    manual: "l.kind = 'manual'",
+    magic_shop: "l.kind IN ('purchase', 'sale') AND l.sub LIKE '魔法店%'",
+    weapon_shop: "l.kind IN ('purchase', 'sale') AND l.sub LIKE '武器屋%'",
+    casino: "l.kind IN ('casino', 'dealer', 'casino_month', 'dealer_month')",
+    ledger: "l.kind IN ('settle', 'mode')",
+  }
+  const categoryWhere = CATEGORY_WHERE[query.category] ?? '1 = 1'
 
   const { results } = await db
     .prepare(
@@ -45,7 +54,7 @@ export default defineEventHandler(async (event) => {
        ) l
        LEFT JOIN pcs ON pcs.id = l.pc_id
        LEFT JOIN users u ON u.id = l.user_id
-       WHERE ?1 IS NULL OR l.pc_id = ?1
+       WHERE (?1 IS NULL OR l.pc_id = ?1) AND ${categoryWhere}
        ORDER BY l.created_at DESC, l.id DESC
        LIMIT 200`
     )
