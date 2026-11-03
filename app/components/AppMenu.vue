@@ -29,7 +29,6 @@ onBeforeUnmount(() => {
 const links = computed(() => [
   { to: '/', label: '表紙', icon: 'mdi-home' },
   { to: '/pc', label: 'PC', icon: 'mdi-account' },
-  { to: '/pc-tier', label: 'PC級一覧', icon: 'mdi-format-list-numbered' },
   { to: '/magic', label: '魔法', icon: 'mdi-magic-staff' },
   { to: '/shop', label: '魔法店/武器屋', icon: 'mdi-store' },
   { to: '/casino', label: 'カジノ[アーリア]', icon: 'mdi-cards-playing' },
