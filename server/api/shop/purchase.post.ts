@@ -40,6 +40,8 @@ export default defineEventHandler(async (event) => {
       statusMessage: useDiscount ? '割引販売が始まりました。価格を確認してください' : '割引販売が終わりました。価格を確認してください',
     })
   }
+  // N個セット販売: 個数・価格・在庫・販売者への支払いはセット単位。所持品には「セットの個数×セット数」を入れる
+  const setSize = item.set_size ?? 1
   const unitPrice = useDiscount ? item.discount_price : item.price
   const total = unitPrice * qty
   if (useDiscount) {
@@ -79,14 +81,21 @@ export default defineEventHandler(async (event) => {
             .bind(qty, item.id),
       db
         .prepare(
-          `INSERT INTO purchases (pc_id, item_id, shop, item_name, price, quantity, total, purchased_by, discount)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          `INSERT INTO purchases (pc_id, item_id, shop, item_name, price, quantity, total, purchased_by, discount, set_size)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
         )
-        .bind(pc.id, item.id, item.shop, item.name, unitPrice, qty, total, currentUser.id, useDiscount ? 1 : 0),
+        .bind(pc.id, item.id, item.shop, item.name, unitPrice, qty, total, currentUser.id, useDiscount ? 1 : 0, setSize),
       // 買ったものを所持品に入れる(同じ商品を持っていれば個数を足す)
+      // 荷物と倉庫に分けて持っていることもあるので、足すのは1行だけ(商品で決めた区分の行を優先)
       db
-        .prepare('UPDATE pc_items SET quantity = quantity + ? WHERE pc_id = ? AND shop_item_id = ?')
-        .bind(qty, pc.id, item.id),
+        .prepare(
+          `UPDATE pc_items SET quantity = quantity + ?
+           WHERE id = (
+             SELECT id FROM pc_items WHERE pc_id = ? AND shop_item_id = ?
+             ORDER BY (category = ?) DESC, id ASC LIMIT 1
+           )`
+        )
+        .bind(qty * setSize, pc.id, item.id, item.item_category ?? 'storage'),
       db
         .prepare(
           `INSERT INTO pc_items (pc_id, name, quantity, size, per_slot, category, effect, modifiers, shop_item_id)
@@ -94,7 +103,7 @@ export default defineEventHandler(async (event) => {
            WHERE NOT EXISTS (SELECT 1 FROM pc_items WHERE pc_id = ? AND shop_item_id = ?)`
         )
         .bind(
-          pc.id, item.name, qty, item.item_size ?? 'none', item.item_per_slot ?? 1, item.item_category ?? 'storage',
+          pc.id, item.name, qty * setSize, item.item_size ?? 'none', item.item_per_slot ?? 1, item.item_category ?? 'storage',
           item.description ?? '', item.item_modifiers ?? '{}', item.id, pc.id, item.id,
         ),
       // 販売者へ「1個あたりの金額×個数」を支払う

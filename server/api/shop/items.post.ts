@@ -20,12 +20,12 @@ export default defineEventHandler(async (event) => {
     db
       .prepare(
         `INSERT INTO shop_items (shop, name, price, stock, description, discount_price, discount_stock,
-           item_size, item_per_slot, item_category, item_modifiers)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+           item_size, item_per_slot, item_category, item_modifiers, set_size)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
       .bind(
         item.shop, item.name, item.price, item.stock, item.description, item.discount.price, item.discount.stock,
-        item.asItem.size, item.asItem.perSlot, item.asItem.category, item.asItem.modifiers,
+        item.asItem.size, item.asItem.perSlot, item.asItem.category, item.asItem.modifiers, item.setSize,
       ),
     ...sellerInsertStatements(db, '(SELECT MAX(id) FROM shop_items)', [], item.sellers),
     ...sellerInsertStatements(db, '(SELECT MAX(id) FROM shop_items)', [], item.discount.sellers, 'shop_item_discount_sellers'),

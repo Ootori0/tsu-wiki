@@ -76,9 +76,14 @@ export const HISTORY_TARGETS = {
       ).bind(id),
       // 所持品に入れた分を減らす(0個になったら所持品から外す)
       db.prepare(
-        `UPDATE pc_items SET quantity = MAX(0, quantity - (SELECT quantity FROM purchases WHERE id = ?1))
-         WHERE pc_id = (SELECT pc_id FROM purchases WHERE id = ?1)
-           AND shop_item_id = (SELECT item_id FROM purchases WHERE id = ?1)`
+        `UPDATE pc_items SET quantity = MAX(0, quantity - (SELECT quantity * set_size FROM purchases WHERE id = ?1))
+         WHERE id = (
+           -- 荷物と倉庫に分けて持っていることもあるので、一番多く持っている行から減らす
+           SELECT id FROM pc_items
+           WHERE pc_id = (SELECT pc_id FROM purchases WHERE id = ?1)
+             AND shop_item_id = (SELECT item_id FROM purchases WHERE id = ?1)
+           ORDER BY quantity DESC, id ASC LIMIT 1
+         )`
       ).bind(id),
       db.prepare(
         `DELETE FROM pc_items WHERE quantity = 0
@@ -149,9 +154,13 @@ export function deleteAllHistoryOfPc(db, pcId) {
     // 所持品に入れた分を減らす(0個になったら所持品から外す)
     db.prepare(
       `UPDATE pc_items SET quantity = MAX(0, quantity - (
-         SELECT COALESCE(SUM(quantity), 0) FROM purchases WHERE pc_id = ?1 AND item_id = pc_items.shop_item_id
+         SELECT COALESCE(SUM(quantity * set_size), 0) FROM purchases WHERE pc_id = ?1 AND item_id = pc_items.shop_item_id
        ))
-       WHERE pc_id = ?1 AND shop_item_id IS NOT NULL`
+       WHERE id IN (
+         -- 商品ごとに一番多く持っている1行から減らす(荷物と倉庫に分けて持っていることもあるため)
+         SELECT (SELECT x.id FROM pc_items x WHERE x.pc_id = ?1 AND x.shop_item_id = g.shop_item_id ORDER BY x.quantity DESC, x.id ASC LIMIT 1)
+         FROM (SELECT DISTINCT shop_item_id FROM pc_items WHERE pc_id = ?1 AND shop_item_id IS NOT NULL) g
+       )`
     ).bind(pcId),
     db.prepare('DELETE FROM pc_items WHERE pc_id = ? AND shop_item_id IS NOT NULL AND quantity = 0').bind(pcId),
     db.prepare('DELETE FROM purchase_payouts WHERE purchase_id IN (SELECT id FROM purchases WHERE pc_id = ?)').bind(pcId),
