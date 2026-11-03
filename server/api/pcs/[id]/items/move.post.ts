@@ -29,6 +29,9 @@ export default defineEventHandler(async (event) => {
       throw createError({ statusCode: 400, statusMessage: '移動の指定が不正です' })
     }
     if (src.category === m.category) continue
+    if (src.shop_item_id && (src.category === 'equipment' || m.category === 'equipment')) {
+      throw createError({ statusCode: 400, statusMessage: `「${src.name}」は店の商品なので、荷物と倉庫の間でしか移せません` })
+    }
     const qty = m.quantity === undefined ? src.quantity : Number(m.quantity)
     if (!Number.isInteger(qty) || qty < 1 || qty > src.quantity) {
       throw createError({ statusCode: 400, statusMessage: `「${src.name}」は1〜${src.quantity}個の範囲で移してください` })

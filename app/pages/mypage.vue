@@ -808,7 +808,13 @@ const confirmPcDelete = async () => {
             </div>
             <p class="cat-note">{{ cat.note }}</p>
             <div v-for="it in itemsOf(item.pcItems, cat.value)" :key="it.id" class="pc-item-line">
-            <button class="pc-item-row" @click="openItemEdit(item.id, it)">
+            <!-- 店で買った品物は編集できない(荷物と倉庫の出し入れだけ) -->
+            <component
+              :is="it.shop_item_id ? 'div' : 'button'"
+              class="pc-item-row"
+              :class="{ locked: it.shop_item_id }"
+              @click="!it.shop_item_id && openItemEdit(item.id, it)"
+            >
               <span class="pc-item-top">
                 <span class="pc-item-name">{{ it.name }}<span class="pc-item-qty">×{{ it.quantity }}</span></span>
                 <span v-if="it.shop_item_id" class="pc-item-tag">店</span>
@@ -819,7 +825,7 @@ const confirmPcDelete = async () => {
                 {{ modifiersText(it.modifiers) }}<template v-if="cat.value !== 'equipment'">(装備・装飾品にすると反映)</template>
               </span>
               <span v-if="it.effect" class="pc-item-effect">{{ it.effect }}</span>
-            </button>
+            </component>
             <!-- 荷物と倉庫の間の出し入れ(個数を選んで「移動を確定」) -->
             <div v-if="cat.value !== 'equipment'" class="move-ctl">
               <button
@@ -1745,6 +1751,10 @@ const confirmPcDelete = async () => {
   color: var(--color-text, #000);
   padding: 8px 2px;
   cursor: pointer;
+}
+
+.pc-item-row.locked {
+  cursor: default;
 }
 
 .pc-item-top {
