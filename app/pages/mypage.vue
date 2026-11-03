@@ -222,6 +222,7 @@ const pcToForm = (pc) => ({
   isOfficeRepresentative: !!pc.is_office_representative,
   showTitle: !!pc.show_title,
   showOffice: !!pc.show_office,
+  stats: Object.fromEntries(STAT_KEYS.map((k) => [k, pc.stats?.[k] ?? ''])),
 })
 
 // 閲覧モード / 編集モード(PCごとに切り替える)
@@ -320,6 +321,87 @@ const warnBeforeUnload = (e) => {
 }
 onMounted(() => window.addEventListener('beforeunload', warnBeforeUnload))
 onBeforeUnmount(() => window.removeEventListener('beforeunload', warnBeforeUnload))
+
+// --- 所持品(追加・編集はポップアップ。保存するとすぐ反映) ---
+const emptyItemForm = () => ({
+  name: '', quantity: 1, size: 'small', perSlot: 1, consumable: false, effect: '',
+  modifiers: Object.fromEntries(STAT_KEYS.map((k) => [k, ''])),
+})
+const itemDialog = ref({ open: false, pcId: null, itemId: null })
+const itemForm = ref(emptyItemForm())
+const itemSaving = ref(false)
+const showItemConfirm = ref(false)
+
+const openItemCreate = (pcId) => {
+  itemDialog.value = { open: true, pcId, itemId: null }
+  itemForm.value = emptyItemForm()
+}
+
+const openItemEdit = (pcId, item) => {
+  itemDialog.value = { open: true, pcId, itemId: item.id }
+  itemForm.value = {
+    name: item.name,
+    quantity: item.quantity,
+    size: item.size,
+    perSlot: item.per_slot,
+    consumable: item.consumable,
+    effect: item.effect ?? '',
+    modifiers: Object.fromEntries(STAT_KEYS.map((k) => [k, item.modifiers?.[k] ?? ''])),
+  }
+  fitTextareas()
+}
+
+const saveItem = async () => {
+  const { pcId, itemId } = itemDialog.value
+  if (!itemForm.value.name.trim()) return
+  itemSaving.value = true
+  try {
+    if (itemId) await $fetch(`/api/pc-items/${itemId}`, { method: 'PUT', body: itemForm.value })
+    else await $fetch(`/api/pcs/${pcId}/items`, { method: 'POST', body: itemForm.value })
+    itemDialog.value.open = false
+    await refreshPcsRaw()
+    show(itemId ? '所持品を保存しました' : '所持品を追加しました')
+  } catch (e) {
+    show(e?.data?.statusMessage ?? '保存に失敗しました', 'error')
+  } finally {
+    itemSaving.value = false
+  }
+}
+
+const deleteItem = async () => {
+  const { itemId } = itemDialog.value
+  if (!itemId) return
+  try {
+    await $fetch(`/api/pc-items/${itemId}`, { method: 'DELETE' })
+    itemDialog.value.open = false
+    await refreshPcsRaw()
+    show('所持品を削除しました')
+  } catch (e) {
+    show(e?.data?.statusMessage ?? '削除に失敗しました', 'error')
+  }
+}
+
+// 荷物チェッカー: ココフォリアに貼る文章をコピーする
+const copyLoadCheck = async (pc) => {
+  try {
+    await navigator.clipboard.writeText(loadCheckText(pc.name, pc.pcItems))
+    show('荷物の一覧をコピーしました')
+  } catch {
+    show('コピーできませんでした', 'error')
+  }
+}
+
+// ステータスの表示: 所持品(消耗品以外)の補正があれば「補正後(元の値+補正)」。HP/MPが未入力なら能力値からの目安
+const statDisplay = (pc, key) => {
+  let base = pc.stats?.[key]
+  if (base === undefined || base === '') {
+    const d = derivedStats(pc.stats)
+    base = key === 'HP' ? d.hp : key === 'MP' ? d.mp : null
+  }
+  if (base === null || base === undefined) return { value: '-', sub: '' }
+  const mod = totalModifiers(pc.pcItems)[key] ?? 0
+  return mod ? { value: base + mod, sub: `${base}${formatModifier(mod)}` } : { value: base, sub: '' }
+}
 
 // --- PCの新規作成はポップアップ ---
 const pcDialogOpen = ref(false)
@@ -461,6 +543,17 @@ const confirmPcDelete = async () => {
           <p class="meta-line">
             所属: {{ item.affiliation || '-' }} / 事務所: {{ item.office || '-' }} / {{ item.grade }}級<template v-if="pcRoles(item)"> / {{ pcRoles(item) }}</template>
           </p>
+          <p class="view-label">ステータス</p>
+          <div class="stat-grid">
+            <div v-for="k in STAT_KEYS" :key="k" class="stat-cell">
+              <span class="stat-key">{{ k }}</span>
+              <span class="stat-val">{{ statDisplay(item, k).value }}</span>
+              <span v-if="statDisplay(item, k).sub" class="stat-sub">{{ statDisplay(item, k).sub }}</span>
+            </div>
+          </div>
+          <p class="meta-line derived">
+            アイデア {{ derivedStats(item.stats).idea ?? '-' }} / 幸運 {{ derivedStats(item.stats).luck ?? '-' }} / 知識 {{ derivedStats(item.stats).know ?? '-' }} / DB {{ derivedStats(item.stats).db }}
+          </p>
           <template v-if="item.memo">
             <p class="view-label">メモ</p>
             <MarkdownText :text="item.memo" />
@@ -516,6 +609,19 @@ const confirmPcDelete = async () => {
           </div>
           <p class="markdown-hint">表示例: {{ pcTitle(formPreview(drafts[item.id])) }}</p>
 
+          <label class="edit-label">ステータス(CoC6版。HP/MPは空欄なら能力値からの目安を表示)</label>
+          <div class="stat-grid">
+            <label v-for="k in STAT_KEYS" :key="k" class="stat-input">
+              <span class="stat-key">{{ k }}</span>
+              <input
+                v-model.number="drafts[item.id].stats[k]"
+                type="number"
+                inputmode="numeric"
+                :placeholder="k === 'HP' ? String(derivedStats(drafts[item.id].stats).hp ?? '') : k === 'MP' ? String(derivedStats(drafts[item.id].stats).mp ?? '') : ''"
+              />
+            </label>
+          </div>
+
           <label class="edit-label">メモ</label>
           <textarea v-model="drafts[item.id].memo" class="edit-textarea auto-wrap" rows="3" @input="resize" />
 
@@ -533,6 +639,43 @@ const confirmPcDelete = async () => {
             <span class="money-label">{{ moneyLabel(item) }}</span>
             <span class="money-value" :class="{ negative: item.money < 0 }">{{ formatBalance(item) }}</span>
             <button class="money-edit-btn" @click="openMoneyDialog(item.id)">増減・履歴</button>
+          </div>
+
+          <!-- 所持品と荷物チェッカー -->
+          <div class="pc-items">
+            <h3 class="pc-magics-title">所持品<span class="section-count">{{ item.pcItems.length }}件</span></h3>
+            <p v-if="!item.pcItems.length" class="empty">所持品はありません(魔法店/武器屋で買うと自動で入ります)</p>
+            <button
+              v-for="it in item.pcItems"
+              :key="it.id"
+              class="pc-item-row"
+              @click="openItemEdit(item.id, it)"
+            >
+              <span class="pc-item-top">
+                <span class="pc-item-name">{{ it.name }}<span class="pc-item-qty">×{{ it.quantity }}</span></span>
+                <span v-if="it.consumable" class="pc-item-tag">消耗品</span>
+                <span v-if="it.shop_item_id" class="pc-item-tag">店</span>
+                <span class="pc-item-cost">{{ it.size === 'none' ? 'なし' : sizeLabel(it.size) }}{{ it.per_slot > 1 ? `(${it.per_slot}個で1つ)` : '' }} / {{ itemCost(it) }}</span>
+              </span>
+              <span v-if="Object.keys(it.modifiers ?? {}).length" class="pc-item-mods">{{ modifiersText(it.modifiers) }}</span>
+              <span v-if="it.effect" class="pc-item-effect">{{ it.effect }}</span>
+            </button>
+            <p v-if="Object.keys(totalModifiers(item.pcItems)).length" class="mods-total">
+              補正の合計(消耗品以外): {{ modifiersText(totalModifiers(item.pcItems)) }}
+            </p>
+            <button class="add-btn" @click="openItemCreate(item.id)">＋ 所持品を追加</button>
+
+            <div class="load-check" :class="{ over: totalCost(item.pcItems) > LOAD_LIMIT }">
+              <div class="load-head">
+                <span>荷物のコスト(大5・中3・小1)</span>
+                <strong>{{ totalCost(item.pcItems) }} / {{ LOAD_LIMIT }}</strong>
+              </div>
+              <div class="load-bar">
+                <div class="load-fill" :style="{ width: `${Math.min(100, (totalCost(item.pcItems) / LOAD_LIMIT) * 100)}%` }" />
+              </div>
+              <p v-if="totalCost(item.pcItems) > LOAD_LIMIT" class="load-over">上限を{{ totalCost(item.pcItems) - LOAD_LIMIT }}超えています</p>
+              <button class="copy-btn" @click="copyLoadCheck(item)">ココフォリア用にコピー</button>
+            </div>
           </div>
 
           <!-- このPCが所持者の魔法 -->
@@ -589,6 +732,60 @@ const confirmPcDelete = async () => {
         <button class="save-bar-btn primary" :disabled="savingDrafts" @click="saveDrafts">保存</button>
       </div>
     </Transition>
+
+    <!-- 所持品の追加・編集 -->
+    <FormDialog
+      v-model="itemDialog.open"
+      :title="itemDialog.itemId ? '所持品の編集' : '所持品の追加'"
+      :save-disabled="itemSaving || !itemForm.name.trim()"
+      @save="saveItem"
+    >
+      <label class="edit-label">名前</label>
+      <input v-model="itemForm.name" class="edit-input" />
+
+      <div class="pc-grid">
+        <div>
+          <label class="edit-label">個数</label>
+          <input v-model.number="itemForm.quantity" type="number" min="0" inputmode="numeric" class="edit-input" />
+        </div>
+        <div>
+          <label class="edit-label">大きさ</label>
+          <select v-model="itemForm.size" class="edit-input">
+            <option v-for="sz in ITEM_SIZES" :key="sz.value" :value="sz.value">{{ sz.label }}({{ sz.points }})</option>
+          </select>
+        </div>
+      </div>
+      <label class="edit-label">何個で1つ分の大きさか(例: 御札は10、手榴弾は2)</label>
+      <input v-model.number="itemForm.perSlot" type="number" min="1" inputmode="numeric" class="edit-input" />
+      <p class="markdown-hint">コスト: {{ itemCost({ quantity: itemForm.quantity, per_slot: itemForm.perSlot, size: itemForm.size }) }}</p>
+
+      <label class="check-label">
+        <input v-model="itemForm.consumable" type="checkbox" />
+        消耗品(補正の合計に含めない)
+      </label>
+
+      <label class="edit-label">効果</label>
+      <textarea v-model="itemForm.effect" class="edit-textarea auto-wrap" rows="2" @input="resize" />
+
+      <label class="edit-label">ステータスへの補正(例: STR に 1)</label>
+      <div class="stat-grid">
+        <label v-for="k in STAT_KEYS" :key="k" class="stat-input">
+          <span class="stat-key">{{ k }}</span>
+          <input v-model.number="itemForm.modifiers[k]" type="number" inputmode="numeric" />
+        </label>
+      </div>
+
+      <template v-if="itemDialog.itemId" #extra>
+        <button class="delete-btn" @click="showItemConfirm = true">削除</button>
+      </template>
+    </FormDialog>
+
+    <ConfirmDialog
+      v-model="showItemConfirm"
+      title="所持品の削除"
+      message="この所持品を削除します。よろしいですか?"
+      @confirm="deleteItem"
+    />
 
     <!-- 魔法の記入・編集 -->
     <FormDialog
@@ -1278,5 +1475,176 @@ const confirmPcDelete = async () => {
   display: flex;
   flex-direction: column;
   padding: 0 14px 14px;
+}
+
+/* ---------- ステータス ---------- */
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.stat-cell,
+.stat-input {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  border: 1px solid var(--color-text, #000);
+  padding: 3px 2px;
+  background: var(--color-bg, #fff);
+}
+
+.stat-key {
+  font-size: 0.65rem;
+  font-weight: bold;
+  opacity: 0.7;
+}
+
+.stat-val {
+  font-size: 0.85rem;
+  font-weight: bold;
+  white-space: nowrap;
+}
+
+.stat-sub {
+  font-size: 0.62rem;
+  color: var(--color-plus, #1b7f2a);
+  font-weight: bold;
+}
+
+.stat-input input {
+  width: 100%;
+  border: none;
+  padding: 2px;
+  text-align: center;
+  font-weight: bold;
+  box-sizing: border-box;
+}
+
+.meta-line.derived {
+  margin-top: 6px;
+}
+
+/* ---------- 所持品・荷物チェッカー ---------- */
+.pc-items {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 2px solid var(--color-text, #000);
+}
+
+.pc-item-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  text-align: left;
+  border: none;
+  border-bottom: 1px solid var(--color-line, rgba(0, 0, 0, 0.14));
+  background: none;
+  color: var(--color-text, #000);
+  padding: 8px 2px;
+  cursor: pointer;
+}
+
+.pc-item-top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pc-item-name {
+  flex: 1;
+  font-weight: bold;
+  font-size: 0.9rem;
+  word-break: break-word;
+}
+
+.pc-item-qty {
+  margin-left: 4px;
+  font-weight: normal;
+  font-size: 0.8rem;
+}
+
+.pc-item-tag {
+  font-size: 0.65rem;
+  border: 1px solid currentColor;
+  padding: 0 4px;
+  opacity: 0.7;
+}
+
+.pc-item-cost {
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+.pc-item-mods {
+  font-size: 0.75rem;
+  font-weight: bold;
+  color: var(--color-plus, #1b7f2a);
+}
+
+.pc-item-effect {
+  font-size: 0.78rem;
+  opacity: 0.75;
+  white-space: pre-line;
+}
+
+.mods-total {
+  margin: 8px 0 0;
+  font-size: 0.8rem;
+  font-weight: bold;
+}
+
+.load-check {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--color-text, #000);
+  background: var(--color-bg, #fff);
+}
+
+.load-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  font-size: 0.8rem;
+}
+
+.load-head strong {
+  font-size: 1.05rem;
+}
+
+.load-bar {
+  height: 8px;
+  margin: 6px 0;
+  border: 1px solid var(--color-text, #000);
+  background: var(--color-page, #f6f5ef);
+}
+
+.load-fill {
+  height: 100%;
+  background: var(--color-accent, #ffd400);
+  transition: width 0.2s ease;
+}
+
+.load-check.over .load-fill {
+  background: var(--color-error, #c62828);
+}
+
+.load-over {
+  margin: 0 0 6px;
+  font-size: 0.78rem;
+  font-weight: bold;
+  color: var(--color-error, #c62828);
+}
+
+.copy-btn {
+  width: 100%;
+  border: 1px solid #000;
+  background: #000;
+  color: var(--color-accent, #ffd400);
+  padding: 8px;
+  font-size: 0.85rem;
+  font-weight: bold;
+  cursor: pointer;
 }
 </style>

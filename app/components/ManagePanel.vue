@@ -190,6 +190,9 @@ const emptyItemForm = () => ({
   shop: '魔法店', name: '', price: 0, stock: '', description: '', sellers: [],
   // 割引販売(通常販売とは別の価格・在庫・販売者)
   discountEnabled: false, discountPrice: 0, discountStock: 0, discountSellers: [],
+  // 買ったときに所持品へ入れる設定
+  itemSize: 'small', itemPerSlot: 1, itemConsumable: true,
+  itemModifiers: Object.fromEntries(STAT_KEYS.map((k) => [k, ''])),
 })
 
 const addSeller = (form) => {
@@ -232,6 +235,10 @@ const openItemEdit = (item) => {
     discountPrice: item.discount_price ?? 0,
     discountStock: item.discount_stock ?? 0,
     discountSellers: (item.discountSellers ?? []).map((s) => ({ pcId: s.pcId, amount: s.amount })),
+    itemSize: item.item_size ?? 'none',
+    itemPerSlot: item.item_per_slot ?? 1,
+    itemConsumable: !!item.item_consumable,
+    itemModifiers: Object.fromEntries(STAT_KEYS.map((k) => [k, item.item_modifiers?.[k] ?? ''])),
   }
   itemDialogOpen.value = true
   fitAll()
@@ -474,6 +481,9 @@ const savePayouts = async () => {
                   <br />割引の販売者: {{ item.discountSellers.map((s) => `${s.pcName}(${formatMoney(s.amount)})`).join('、') }}
                 </template>
               </p>
+              <p class="item-meta">
+                所持品: {{ item.item_size === 'none' ? '大きさなし' : sizeLabel(item.item_size) }}{{ item.item_per_slot > 1 ? `(${item.item_per_slot}個で1つ)` : '' }}{{ item.item_consumable ? ' / 消耗品' : '' }}{{ Object.keys(item.item_modifiers ?? {}).length ? ` / ${modifiersText(item.item_modifiers)}` : '' }}
+              </p>
               <p v-if="item.description" class="item-meta description">{{ item.description }}</p>
               <button class="edit-btn" @click="openItemEdit(item)">編集</button>
             </div>
@@ -676,6 +686,28 @@ const savePayouts = async () => {
         <button class="delete-btn" @click="removeSeller(itemForm, i)">×</button>
       </div>
       <button class="edit-btn add-seller" @click="addSeller(itemForm)">＋ 販売者を追加</button>
+
+      <!-- 買ったときに所持品へ入れる設定(荷物チェッカーのコストと補正) -->
+      <p class="field-label">所持品としての設定(買うとPCの所持品に入る)</p>
+      <div class="discount-box">
+        <label class="field-label">大きさ</label>
+        <select v-model="itemForm.itemSize" class="field-input">
+          <option v-for="sz in ITEM_SIZES" :key="sz.value" :value="sz.value">{{ sz.label }}({{ sz.points }})</option>
+        </select>
+        <label class="field-label">何個で1つ分の大きさか(例: 御札は10、手榴弾は2)</label>
+        <input v-model.number="itemForm.itemPerSlot" type="number" min="1" class="field-input" />
+        <label class="check-label">
+          <input v-model="itemForm.itemConsumable" type="checkbox" />
+          消耗品(補正の合計に含めない)
+        </label>
+        <label class="field-label">ステータスへの補正</label>
+        <div class="mod-grid">
+          <label v-for="k in STAT_KEYS" :key="k" class="mod-input">
+            <span>{{ k }}</span>
+            <input v-model.number="itemForm.itemModifiers[k]" type="number" />
+          </label>
+        </div>
+      </div>
 
       <!-- 割引販売: 割引の在庫が残っている間は通常販売より優先し、なくなったら通常販売に戻る -->
       <label class="check-label discount-toggle">
@@ -1117,5 +1149,28 @@ const savePayouts = async () => {
 
 .category-select {
   margin: 8px 0 4px;
+}
+
+.mod-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 4px;
+}
+
+.mod-input {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  border: 1px solid var(--color-text, #000);
+  background: var(--color-bg, #fff);
+  font-size: 0.65rem;
+  font-weight: bold;
+}
+
+.mod-input input {
+  width: 100%;
+  border: none;
+  text-align: center;
+  box-sizing: border-box;
 }
 </style>

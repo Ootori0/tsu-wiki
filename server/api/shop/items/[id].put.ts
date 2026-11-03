@@ -22,10 +22,14 @@ export default defineEventHandler(async (event) => {
       .prepare(
         `UPDATE shop_items
          SET shop = ?, name = ?, price = ?, stock = ?, description = ?,
-             discount_price = ?, discount_stock = ?, updated_at = datetime('now')
+             discount_price = ?, discount_stock = ?,
+             item_size = ?, item_per_slot = ?, item_consumable = ?, item_modifiers = ?, updated_at = datetime('now')
          WHERE id = ?`
       )
-      .bind(item.shop, item.name, item.price, item.stock, item.description, item.discount.price, item.discount.stock, id),
+      .bind(
+        item.shop, item.name, item.price, item.stock, item.description, item.discount.price, item.discount.stock,
+        item.asItem.size, item.asItem.perSlot, item.asItem.consumable, item.asItem.modifiers, id,
+      ),
     db.prepare('DELETE FROM shop_item_sellers WHERE item_id = ?').bind(id),
     db.prepare('DELETE FROM shop_item_discount_sellers WHERE item_id = ?').bind(id),
     ...sellerInsertStatements(db, '?', [id], item.sellers),

@@ -1,7 +1,12 @@
+import { parseSize, parsePerSlot, parseModifiers } from './pcItems'
+
 export const SHOPS = ['魔法店', '武器屋']
 
 export function parseShopItemBody(body) {
-  const { shop, name, price, stock, description, sellers, discountEnabled, discountPrice, discountStock, discountSellers } = body ?? {}
+  const {
+    shop, name, price, stock, description, sellers, discountEnabled, discountPrice, discountStock, discountSellers,
+    itemSize, itemPerSlot, itemConsumable, itemModifiers,
+  } = body ?? {}
 
   if (!SHOPS.includes(shop)) {
     throw createError({ statusCode: 400, statusMessage: '店の種類が不正です' })
@@ -46,6 +51,13 @@ export function parseShopItemBody(body) {
     description: description ?? '',
     sellers: parseSellers(sellers),
     discount,
+    // 買ったときに所持品へ入れる設定
+    asItem: {
+      size: parseSize(itemSize),
+      perSlot: parsePerSlot(itemPerSlot),
+      consumable: itemConsumable ? 1 : 0,
+      modifiers: JSON.stringify(parseModifiers(itemModifiers)),
+    },
   }
 }
 

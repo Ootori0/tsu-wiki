@@ -74,6 +74,17 @@ export const HISTORY_TARGETS = {
         `UPDATE shop_items SET discount_stock = discount_stock + (SELECT quantity FROM purchases WHERE id = ?1)
          WHERE id = (SELECT item_id FROM purchases WHERE id = ?1 AND discount = 1)`
       ).bind(id),
+      // 所持品に入れた分を減らす(0個になったら所持品から外す)
+      db.prepare(
+        `UPDATE pc_items SET quantity = MAX(0, quantity - (SELECT quantity FROM purchases WHERE id = ?1))
+         WHERE pc_id = (SELECT pc_id FROM purchases WHERE id = ?1)
+           AND shop_item_id = (SELECT item_id FROM purchases WHERE id = ?1)`
+      ).bind(id),
+      db.prepare(
+        `DELETE FROM pc_items WHERE quantity = 0
+           AND pc_id = (SELECT pc_id FROM purchases WHERE id = ?1)
+           AND shop_item_id = (SELECT item_id FROM purchases WHERE id = ?1)`
+      ).bind(id),
       db.prepare('DELETE FROM purchase_payouts WHERE purchase_id = ?').bind(id),
       db.prepare('DELETE FROM purchases WHERE id = ?').bind(id),
     ],
@@ -135,6 +146,14 @@ export function deleteAllHistoryOfPc(db, pcId) {
        )
        WHERE id IN (SELECT item_id FROM purchases WHERE pc_id = ?1 AND discount = 1)`
     ).bind(pcId),
+    // 所持品に入れた分を減らす(0個になったら所持品から外す)
+    db.prepare(
+      `UPDATE pc_items SET quantity = MAX(0, quantity - (
+         SELECT COALESCE(SUM(quantity), 0) FROM purchases WHERE pc_id = ?1 AND item_id = pc_items.shop_item_id
+       ))
+       WHERE pc_id = ?1 AND shop_item_id IS NOT NULL`
+    ).bind(pcId),
+    db.prepare('DELETE FROM pc_items WHERE pc_id = ? AND shop_item_id IS NOT NULL AND quantity = 0').bind(pcId),
     db.prepare('DELETE FROM purchase_payouts WHERE purchase_id IN (SELECT id FROM purchases WHERE pc_id = ?)').bind(pcId),
     db.prepare('DELETE FROM purchases WHERE pc_id = ?').bind(pcId),
 

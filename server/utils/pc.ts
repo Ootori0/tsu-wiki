@@ -1,6 +1,8 @@
+import { parseStats } from './pcItems'
+
 export function parsePcBody(body) {
   const {
-    name, affiliation, office, grade, memo, items, money,
+    name, affiliation, office, grade, memo, items, money, stats,
     isRepresentative, isOfficeRepresentative, showTitle, showOffice,
   } = body ?? {}
 
@@ -26,6 +28,7 @@ export function parsePcBody(body) {
     grade: gradeNum,
     memo: memo ?? '',
     items: items ?? '',
+    stats: JSON.stringify(parseStats(stats)),
     isRepresentative: isRepresentative ? 1 : 0,
     isOfficeRepresentative: isOfficeRepresentative ? 1 : 0,
     showTitle: showTitle === false ? 0 : 1,
@@ -41,5 +44,6 @@ export function formatPc(r) {
     is_office_representative: !!r.is_office_representative,
     show_title: !!r.show_title,
     show_office: !!r.show_office,
+    stats: JSON.parse(r.stats || '{}'),
   }
 }

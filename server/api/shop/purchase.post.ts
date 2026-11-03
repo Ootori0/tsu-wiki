@@ -83,6 +83,20 @@ export default defineEventHandler(async (event) => {
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
         )
         .bind(pc.id, item.id, item.shop, item.name, unitPrice, qty, total, currentUser.id, useDiscount ? 1 : 0),
+      // 買ったものを所持品に入れる(同じ商品を持っていれば個数を足す)
+      db
+        .prepare('UPDATE pc_items SET quantity = quantity + ? WHERE pc_id = ? AND shop_item_id = ?')
+        .bind(qty, pc.id, item.id),
+      db
+        .prepare(
+          `INSERT INTO pc_items (pc_id, name, quantity, size, per_slot, consumable, effect, modifiers, shop_item_id)
+           SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?
+           WHERE NOT EXISTS (SELECT 1 FROM pc_items WHERE pc_id = ? AND shop_item_id = ?)`
+        )
+        .bind(
+          pc.id, item.name, qty, item.item_size ?? 'none', item.item_per_slot ?? 1, item.item_consumable ?? 0,
+          item.description ?? '', item.item_modifiers ?? '{}', item.id, pc.id, item.id,
+        ),
       // 販売者へ「1個あたりの金額×個数」を支払う
       ...sellers.flatMap((s) => [
         db
