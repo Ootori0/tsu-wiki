@@ -5,6 +5,12 @@ export default defineNuxtConfig({
   compatibilityDate: '2025-07-15',
   devtools: { enabled: true },
 
+  // デプロイで古いファイル(_nuxt/*.js)がなくなったあと、前から開いていた画面がそれを読みに行くと
+  // 「Failed to fetch dynamically imported module」で500になる。そのときはすぐ読み込み直して新しい版を開く
+  experimental: {
+    emitRouteChunkError: 'automatic-immediate',
+  },
+
   css: ['~/assets/css/variables.css'],
 
   build: {
