@@ -89,12 +89,12 @@ export default defineEventHandler(async (event) => {
         .bind(qty, pc.id, item.id),
       db
         .prepare(
-          `INSERT INTO pc_items (pc_id, name, quantity, size, per_slot, consumable, effect, modifiers, shop_item_id)
+          `INSERT INTO pc_items (pc_id, name, quantity, size, per_slot, category, effect, modifiers, shop_item_id)
            SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?
            WHERE NOT EXISTS (SELECT 1 FROM pc_items WHERE pc_id = ? AND shop_item_id = ?)`
         )
         .bind(
-          pc.id, item.name, qty, item.item_size ?? 'none', item.item_per_slot ?? 1, item.item_consumable ?? 0,
+          pc.id, item.name, qty, item.item_size ?? 'none', item.item_per_slot ?? 1, item.item_category ?? 'cargo',
           item.description ?? '', item.item_modifiers ?? '{}', item.id, pc.id, item.id,
         ),
       // 販売者へ「1個あたりの金額×個数」を支払う

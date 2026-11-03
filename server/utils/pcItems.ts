@@ -1,6 +1,12 @@
 // CoC6版のステータス(SANはココフォリアで管理するので持たない。HP/MPは最大値のみ)
 export const STAT_KEYS = ['STR', 'CON', 'POW', 'DEX', 'APP', 'SIZ', 'INT', 'EDU', 'HP', 'MP']
 export const ITEM_SIZES = ['large', 'medium', 'small', 'none']
+// 所持品の区分: 荷物(コストに数える)・装備品(コスト免除、ステータス補正あり)・倉庫(どちらにも数えない)
+export const ITEM_CATEGORIES = ['cargo', 'equipment', 'storage']
+
+export function parseCategory(category) {
+  return ITEM_CATEGORIES.includes(category) ? category : 'cargo'
+}
 
 // { STR: 12, ... } の形に整える(数値でない・範囲外のものは捨てる)
 export function parseStats(input) {
@@ -45,12 +51,12 @@ export function parsePcItemBody(body) {
     quantity,
     size: parseSize(body?.size),
     perSlot: parsePerSlot(body?.perSlot),
-    consumable: body?.consumable ? 1 : 0,
+    category: parseCategory(body?.category),
     effect: String(body?.effect ?? ''),
     modifiers: JSON.stringify(parseModifiers(body?.modifiers)),
   }
 }
 
 export function formatPcItem(r) {
-  return { ...r, consumable: !!r.consumable, modifiers: JSON.parse(r.modifiers || '{}') }
+  return { ...r, modifiers: JSON.parse(r.modifiers || '{}') }
 }

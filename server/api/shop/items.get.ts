@@ -33,7 +33,6 @@ export default defineEventHandler(async (event) => {
   return items.map((item) => ({
     ...item,
     item_modifiers: JSON.parse(item.item_modifiers || '{}'),
-    item_consumable: !!item.item_consumable,
     sellers: sellersOf(sellers, item.id),
     discountSellers: sellersOf(discountSellers, item.id),
   }))

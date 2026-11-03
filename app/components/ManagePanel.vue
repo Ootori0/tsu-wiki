@@ -191,7 +191,7 @@ const emptyItemForm = () => ({
   // 割引販売(通常販売とは別の価格・在庫・販売者)
   discountEnabled: false, discountPrice: 0, discountStock: 0, discountSellers: [],
   // 買ったときに所持品へ入れる設定
-  itemSize: 'small', itemPerSlot: 1, itemConsumable: true,
+  itemSize: 'small', itemPerSlot: 1, itemCategory: 'cargo',
   itemModifiers: Object.fromEntries(STAT_KEYS.map((k) => [k, ''])),
 })
 
@@ -237,7 +237,7 @@ const openItemEdit = (item) => {
     discountSellers: (item.discountSellers ?? []).map((s) => ({ pcId: s.pcId, amount: s.amount })),
     itemSize: item.item_size ?? 'none',
     itemPerSlot: item.item_per_slot ?? 1,
-    itemConsumable: !!item.item_consumable,
+    itemCategory: item.item_category ?? 'cargo',
     itemModifiers: Object.fromEntries(STAT_KEYS.map((k) => [k, item.item_modifiers?.[k] ?? ''])),
   }
   itemDialogOpen.value = true
@@ -482,7 +482,7 @@ const savePayouts = async () => {
                 </template>
               </p>
               <p class="item-meta">
-                所持品: {{ item.item_size === 'none' ? '大きさなし' : sizeLabel(item.item_size) }}{{ item.item_per_slot > 1 ? `(${item.item_per_slot}個で1つ)` : '' }}{{ item.item_consumable ? ' / 消耗品' : '' }}{{ Object.keys(item.item_modifiers ?? {}).length ? ` / ${modifiersText(item.item_modifiers)}` : '' }}
+                所持品: {{ item.item_size === 'none' ? '大きさなし' : sizeLabel(item.item_size) }}{{ item.item_per_slot > 1 ? `(${item.item_per_slot}個で1つ)` : '' }}{{ ` / ${categoryLabel(item.item_category)}` }}{{ Object.keys(item.item_modifiers ?? {}).length ? ` / ${modifiersText(item.item_modifiers)}` : '' }}
               </p>
               <p v-if="item.description" class="item-meta description">{{ item.description }}</p>
               <button class="edit-btn" @click="openItemEdit(item)">編集</button>
@@ -696,11 +696,11 @@ const savePayouts = async () => {
         </select>
         <label class="field-label">何個で1つ分の大きさか(例: 御札は10、手榴弾は2)</label>
         <input v-model.number="itemForm.itemPerSlot" type="number" min="1" class="field-input" />
-        <label class="check-label">
-          <input v-model="itemForm.itemConsumable" type="checkbox" />
-          消耗品(補正の合計に含めない)
-        </label>
-        <label class="field-label">ステータスへの補正</label>
+        <label class="field-label">入れる区分</label>
+        <select v-model="itemForm.itemCategory" class="field-input">
+          <option v-for="cat in ITEM_CATEGORIES" :key="cat.value" :value="cat.value">{{ cat.label }}({{ cat.note }})</option>
+        </select>
+        <label class="field-label">ステータスへの補正(装備品のときだけ反映)</label>
         <div class="mod-grid">
           <label v-for="k in STAT_KEYS" :key="k" class="mod-input">
             <span>{{ k }}</span>

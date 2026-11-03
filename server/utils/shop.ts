@@ -1,11 +1,11 @@
-import { parseSize, parsePerSlot, parseModifiers } from './pcItems'
+import { parseSize, parsePerSlot, parseModifiers, parseCategory } from './pcItems'
 
 export const SHOPS = ['魔法店', '武器屋']
 
 export function parseShopItemBody(body) {
   const {
     shop, name, price, stock, description, sellers, discountEnabled, discountPrice, discountStock, discountSellers,
-    itemSize, itemPerSlot, itemConsumable, itemModifiers,
+    itemSize, itemPerSlot, itemCategory, itemModifiers,
   } = body ?? {}
 
   if (!SHOPS.includes(shop)) {
@@ -55,7 +55,7 @@ export function parseShopItemBody(body) {
     asItem: {
       size: parseSize(itemSize),
       perSlot: parsePerSlot(itemPerSlot),
-      consumable: itemConsumable ? 1 : 0,
+      category: parseCategory(itemCategory),
       modifiers: JSON.stringify(parseModifiers(itemModifiers)),
     },
   }

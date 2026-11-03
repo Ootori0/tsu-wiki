@@ -14,10 +14,10 @@ export default defineEventHandler(async (event) => {
 
   await db
     .prepare(
-      `UPDATE pc_items SET name = ?, quantity = ?, size = ?, per_slot = ?, consumable = ?, effect = ?, modifiers = ?
+      `UPDATE pc_items SET name = ?, quantity = ?, size = ?, per_slot = ?, category = ?, effect = ?, modifiers = ?
        WHERE id = ?`
     )
-    .bind(item.name, item.quantity, item.size, item.perSlot, item.consumable, item.effect, item.modifiers, id)
+    .bind(item.name, item.quantity, item.size, item.perSlot, item.category, item.effect, item.modifiers, id)
     .run()
 
   return { success: true, id }

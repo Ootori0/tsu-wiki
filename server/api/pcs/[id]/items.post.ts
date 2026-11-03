@@ -10,10 +10,10 @@ export default defineEventHandler(async (event) => {
 
   const result = await db
     .prepare(
-      `INSERT INTO pc_items (pc_id, name, quantity, size, per_slot, consumable, effect, modifiers)
+      `INSERT INTO pc_items (pc_id, name, quantity, size, per_slot, category, effect, modifiers)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
     )
-    .bind(pc.id, item.name, item.quantity, item.size, item.perSlot, item.consumable, item.effect, item.modifiers)
+    .bind(pc.id, item.name, item.quantity, item.size, item.perSlot, item.category, item.effect, item.modifiers)
     .run()
 
   return { success: true, id: result.meta.last_row_id }

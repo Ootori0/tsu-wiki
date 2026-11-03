@@ -324,7 +324,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', warnBeforeUnloa
 
 // --- 所持品(追加・編集はポップアップ。保存するとすぐ反映) ---
 const emptyItemForm = () => ({
-  name: '', quantity: 1, size: 'small', perSlot: 1, consumable: false, effect: '',
+  name: '', quantity: 1, size: 'small', perSlot: 1, category: 'cargo', effect: '',
   modifiers: Object.fromEntries(STAT_KEYS.map((k) => [k, ''])),
 })
 const itemDialog = ref({ open: false, pcId: null, itemId: null })
@@ -332,9 +332,9 @@ const itemForm = ref(emptyItemForm())
 const itemSaving = ref(false)
 const showItemConfirm = ref(false)
 
-const openItemCreate = (pcId) => {
+const openItemCreate = (pcId, category = 'cargo') => {
   itemDialog.value = { open: true, pcId, itemId: null }
-  itemForm.value = emptyItemForm()
+  itemForm.value = { ...emptyItemForm(), category }
 }
 
 const openItemEdit = (pcId, item) => {
@@ -344,7 +344,7 @@ const openItemEdit = (pcId, item) => {
     quantity: item.quantity,
     size: item.size,
     perSlot: item.per_slot,
-    consumable: item.consumable,
+    category: item.category ?? 'cargo',
     effect: item.effect ?? '',
     modifiers: Object.fromEntries(STAT_KEYS.map((k) => [k, item.modifiers?.[k] ?? ''])),
   }
@@ -641,31 +641,35 @@ const confirmPcDelete = async () => {
             <button class="money-edit-btn" @click="openMoneyDialog(item.id)">増減・履歴</button>
           </div>
 
-          <!-- 所持品と荷物チェッカー -->
-          <div class="pc-items">
-            <h3 class="pc-magics-title">所持品<span class="section-count">{{ item.pcItems.length }}件</span></h3>
-            <p v-if="!item.pcItems.length" class="empty">所持品はありません(魔法店/武器屋で買うと自動で入ります)</p>
+          <!-- 所持品: 装備品・荷物(荷物チェッカー)・倉庫 -->
+          <div v-for="cat in ITEM_CATEGORIES" :key="cat.value" class="pc-items">
+            <h3 class="pc-magics-title">
+              {{ cat.label }}<span class="section-count">{{ itemsOf(item.pcItems, cat.value).length }}件</span>
+              <span class="cat-note">{{ cat.note }}</span>
+            </h3>
             <button
-              v-for="it in item.pcItems"
+              v-for="it in itemsOf(item.pcItems, cat.value)"
               :key="it.id"
               class="pc-item-row"
               @click="openItemEdit(item.id, it)"
             >
               <span class="pc-item-top">
                 <span class="pc-item-name">{{ it.name }}<span class="pc-item-qty">×{{ it.quantity }}</span></span>
-                <span v-if="it.consumable" class="pc-item-tag">消耗品</span>
                 <span v-if="it.shop_item_id" class="pc-item-tag">店</span>
-                <span class="pc-item-cost">{{ it.size === 'none' ? 'なし' : sizeLabel(it.size) }}{{ it.per_slot > 1 ? `(${it.per_slot}個で1つ)` : '' }} / {{ itemCost(it) }}</span>
+                <span v-if="cat.value === 'cargo'" class="pc-item-cost">{{ it.size === 'none' ? 'なし' : sizeLabel(it.size) }}{{ it.per_slot > 1 ? `(${it.per_slot}個で1つ)` : '' }} / {{ itemCost(it) }}</span>
               </span>
-              <span v-if="Object.keys(it.modifiers ?? {}).length" class="pc-item-mods">{{ modifiersText(it.modifiers) }}</span>
+              <span v-if="Object.keys(it.modifiers ?? {}).length" class="pc-item-mods" :class="{ inactive: cat.value !== 'equipment' }">
+                {{ modifiersText(it.modifiers) }}<template v-if="cat.value !== 'equipment'">(装備品にすると反映)</template>
+              </span>
               <span v-if="it.effect" class="pc-item-effect">{{ it.effect }}</span>
             </button>
-            <p v-if="Object.keys(totalModifiers(item.pcItems)).length" class="mods-total">
-              補正の合計(消耗品以外): {{ modifiersText(totalModifiers(item.pcItems)) }}
+            <p v-if="cat.value === 'equipment' && Object.keys(totalModifiers(item.pcItems)).length" class="mods-total">
+              補正の合計: {{ modifiersText(totalModifiers(item.pcItems)) }}
             </p>
-            <button class="add-btn" @click="openItemCreate(item.id)">＋ 所持品を追加</button>
+            <button class="add-btn small" @click="openItemCreate(item.id, cat.value)">＋ {{ cat.label }}を追加</button>
 
-            <div class="load-check" :class="{ over: totalCost(item.pcItems) > LOAD_LIMIT }">
+            <!-- 荷物チェッカー -->
+            <div v-if="cat.value === 'cargo'" class="load-check" :class="{ over: totalCost(item.pcItems) > LOAD_LIMIT }">
               <div class="load-head">
                 <span>荷物のコスト(大5・中3・小1)</span>
                 <strong>{{ totalCost(item.pcItems) }} / {{ LOAD_LIMIT }}</strong>
@@ -757,17 +761,21 @@ const confirmPcDelete = async () => {
       </div>
       <label class="edit-label">何個で1つ分の大きさか(例: 御札は10、手榴弾は2)</label>
       <input v-model.number="itemForm.perSlot" type="number" min="1" inputmode="numeric" class="edit-input" />
-      <p class="markdown-hint">コスト: {{ itemCost({ quantity: itemForm.quantity, per_slot: itemForm.perSlot, size: itemForm.size }) }}</p>
+      <p class="markdown-hint">荷物にしたときのコスト: {{ itemCost({ quantity: itemForm.quantity, per_slot: itemForm.perSlot, size: itemForm.size }) }}</p>
 
-      <label class="check-label">
-        <input v-model="itemForm.consumable" type="checkbox" />
-        消耗品(補正の合計に含めない)
-      </label>
+      <label class="edit-label">区分</label>
+      <div class="cat-choices">
+        <label v-for="cat in ITEM_CATEGORIES" :key="cat.value" class="cat-choice" :class="{ active: itemForm.category === cat.value }">
+          <input v-model="itemForm.category" type="radio" :value="cat.value" />
+          <span class="cat-choice-label">{{ cat.label }}</span>
+          <span class="cat-choice-note">{{ cat.note }}</span>
+        </label>
+      </div>
 
       <label class="edit-label">効果</label>
       <textarea v-model="itemForm.effect" class="edit-textarea auto-wrap" rows="2" @input="resize" />
 
-      <label class="edit-label">ステータスへの補正(例: STR に 1)</label>
+      <label class="edit-label">ステータスへの補正(装備品のときだけ反映。例: STR に 1)</label>
       <div class="stat-grid">
         <label v-for="k in STAT_KEYS" :key="k" class="stat-input">
           <span class="stat-key">{{ k }}</span>
@@ -1646,5 +1654,53 @@ const confirmPcDelete = async () => {
   font-size: 0.85rem;
   font-weight: bold;
   cursor: pointer;
+}
+
+.cat-note {
+  margin-left: 8px;
+  font-size: 0.68rem;
+  font-weight: normal;
+  opacity: 0.6;
+}
+
+.pc-item-mods.inactive {
+  color: inherit;
+  opacity: 0.5;
+  font-weight: normal;
+}
+
+.add-btn.small {
+  padding: 8px;
+  font-size: 0.82rem;
+}
+
+.cat-choices {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.cat-choice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--color-text, #000);
+  padding: 6px 10px;
+  cursor: pointer;
+}
+
+.cat-choice.active {
+  background: var(--color-accent-soft, #fff7cc);
+  border-width: 2px;
+}
+
+.cat-choice-label {
+  font-weight: bold;
+  font-size: 0.9rem;
+}
+
+.cat-choice-note {
+  font-size: 0.72rem;
+  opacity: 0.7;
 }
 </style>
