@@ -381,6 +381,20 @@ const deleteItem = async () => {
   }
 }
 
+// 倉庫⇔荷物の出し入れ(チェックを入れると荷物、外すと倉庫)
+const togglingItemId = ref(null)
+const toggleCargo = async (it, checked) => {
+  togglingItemId.value = it.id
+  try {
+    await $fetch(`/api/pc-items/${it.id}/category`, { method: 'POST', body: { category: checked ? 'cargo' : 'storage' } })
+    await refreshPcsRaw()
+  } catch (e) {
+    show(e?.data?.statusMessage ?? '変更できませんでした', 'error')
+  } finally {
+    togglingItemId.value = null
+  }
+}
+
 // 荷物チェッカー: ココフォリアに貼る文章をコピーする
 const copyLoadCheck = async (pc) => {
   try {
@@ -647,22 +661,29 @@ const confirmPcDelete = async () => {
               {{ cat.label }}<span class="section-count">{{ itemsOf(item.pcItems, cat.value).length }}件</span>
               <span class="cat-note">{{ cat.note }}</span>
             </h3>
-            <button
-              v-for="it in itemsOf(item.pcItems, cat.value)"
-              :key="it.id"
-              class="pc-item-row"
-              @click="openItemEdit(item.id, it)"
-            >
+            <div v-for="it in itemsOf(item.pcItems, cat.value)" :key="it.id" class="pc-item-line">
+            <!-- 荷物と倉庫はチェックで出し入れする(チェックあり=荷物) -->
+            <label v-if="cat.value !== 'equipment'" class="cargo-check" :title="cat.value === 'cargo' ? '倉庫に戻す' : '荷物に入れる'">
+              <input
+                type="checkbox"
+                :checked="cat.value === 'cargo'"
+                :disabled="togglingItemId === it.id"
+                :aria-label="cat.value === 'cargo' ? `${it.name}を倉庫に戻す` : `${it.name}を荷物に入れる`"
+                @change="toggleCargo(it, $event.target.checked)"
+              />
+            </label>
+            <button class="pc-item-row" @click="openItemEdit(item.id, it)">
               <span class="pc-item-top">
                 <span class="pc-item-name">{{ it.name }}<span class="pc-item-qty">×{{ it.quantity }}</span></span>
                 <span v-if="it.shop_item_id" class="pc-item-tag">店</span>
-                <span v-if="cat.value === 'cargo'" class="pc-item-cost">{{ it.size === 'none' ? 'なし' : sizeLabel(it.size) }}{{ it.per_slot > 1 ? `(${it.per_slot}個で1つ)` : '' }} / {{ itemCost(it) }}</span>
+                <span v-if="cat.value !== 'equipment'" class="pc-item-cost">{{ it.size === 'none' ? 'なし' : sizeLabel(it.size) }}{{ it.per_slot > 1 ? `(${it.per_slot}個で1つ)` : '' }} / {{ itemCost(it) }}</span>
               </span>
               <span v-if="Object.keys(it.modifiers ?? {}).length" class="pc-item-mods" :class="{ inactive: cat.value !== 'equipment' }">
                 {{ modifiersText(it.modifiers) }}<template v-if="cat.value !== 'equipment'">(装備品にすると反映)</template>
               </span>
               <span v-if="it.effect" class="pc-item-effect">{{ it.effect }}</span>
             </button>
+            </div>
             <p v-if="cat.value === 'equipment' && Object.keys(totalModifiers(item.pcItems)).length" class="mods-total">
               補正の合計: {{ modifiersText(totalModifiers(item.pcItems)) }}
             </p>
@@ -1702,5 +1723,22 @@ const confirmPcDelete = async () => {
 .cat-choice-note {
   font-size: 0.72rem;
   opacity: 0.7;
+}
+
+.pc-item-line {
+  display: flex;
+  align-items: stretch;
+  border-bottom: 1px solid var(--color-line, rgba(0, 0, 0, 0.14));
+}
+
+.pc-item-line .pc-item-row {
+  border-bottom: none;
+}
+
+.cargo-check {
+  display: flex;
+  align-items: center;
+  padding: 0 8px 0 2px;
+  cursor: pointer;
 }
 </style>

@@ -22,5 +22,5 @@ CREATE INDEX idx_pc_items_pc ON pc_items(pc_id);
 -- 商品を買ったときに所持品へ入れる設定
 ALTER TABLE shop_items ADD COLUMN item_size TEXT NOT NULL DEFAULT 'none' CHECK (item_size IN ('large', 'medium', 'small', 'none'));
 ALTER TABLE shop_items ADD COLUMN item_per_slot INTEGER NOT NULL DEFAULT 1 CHECK (item_per_slot >= 1);
-ALTER TABLE shop_items ADD COLUMN item_category TEXT NOT NULL DEFAULT 'cargo' CHECK (item_category IN ('cargo', 'equipment', 'storage'));
+ALTER TABLE shop_items ADD COLUMN item_category TEXT NOT NULL DEFAULT 'storage' CHECK (item_category IN ('cargo', 'equipment', 'storage'));
 ALTER TABLE shop_items ADD COLUMN item_modifiers TEXT NOT NULL DEFAULT '{}';

@@ -55,7 +55,8 @@ export function parseShopItemBody(body) {
     asItem: {
       size: parseSize(itemSize),
       perSlot: parsePerSlot(itemPerSlot),
-      category: parseCategory(itemCategory),
+      // 未設定なら倉庫に入れる
+      category: parseCategory(itemCategory, 'storage'),
       modifiers: JSON.stringify(parseModifiers(itemModifiers)),
     },
   }

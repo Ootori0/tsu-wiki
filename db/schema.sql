@@ -116,7 +116,7 @@ CREATE TABLE shop_items (
   discount_stock INTEGER NOT NULL DEFAULT 0 CHECK (discount_stock >= 0), -- 割引の在庫(残っている間は通常販売より優先)
   item_size TEXT NOT NULL DEFAULT 'none' CHECK (item_size IN ('large', 'medium', 'small', 'none')), -- 買ったとき所持品に入れる大きさ
   item_per_slot INTEGER NOT NULL DEFAULT 1 CHECK (item_per_slot >= 1), -- 何個で1つ分の大きさか
-  item_category TEXT NOT NULL DEFAULT 'cargo' CHECK (item_category IN ('cargo', 'equipment', 'storage')), -- 買ったとき所持品のどこに入れるか
+  item_category TEXT NOT NULL DEFAULT 'storage' CHECK (item_category IN ('cargo', 'equipment', 'storage')), -- 買ったとき所持品のどこに入れるか
   item_modifiers TEXT NOT NULL DEFAULT '{}', -- ステータスへの補正 JSON
   sort_order INTEGER DEFAULT 0,
   created_at TEXT DEFAULT (datetime('now')),

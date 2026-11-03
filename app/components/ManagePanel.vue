@@ -191,7 +191,7 @@ const emptyItemForm = () => ({
   // 割引販売(通常販売とは別の価格・在庫・販売者)
   discountEnabled: false, discountPrice: 0, discountStock: 0, discountSellers: [],
   // 買ったときに所持品へ入れる設定
-  itemSize: 'small', itemPerSlot: 1, itemCategory: 'cargo',
+  itemSize: 'small', itemPerSlot: 1, itemCategory: 'storage',
   itemModifiers: Object.fromEntries(STAT_KEYS.map((k) => [k, ''])),
 })
 
@@ -237,7 +237,7 @@ const openItemEdit = (item) => {
     discountSellers: (item.discountSellers ?? []).map((s) => ({ pcId: s.pcId, amount: s.amount })),
     itemSize: item.item_size ?? 'none',
     itemPerSlot: item.item_per_slot ?? 1,
-    itemCategory: item.item_category ?? 'cargo',
+    itemCategory: item.item_category ?? 'storage',
     itemModifiers: Object.fromEntries(STAT_KEYS.map((k) => [k, item.item_modifiers?.[k] ?? ''])),
   }
   itemDialogOpen.value = true

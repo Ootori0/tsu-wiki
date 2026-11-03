@@ -4,8 +4,8 @@ export const ITEM_SIZES = ['large', 'medium', 'small', 'none']
 // 所持品の区分: 荷物(コストに数える)・装備品(コスト免除、ステータス補正あり)・倉庫(どちらにも数えない)
 export const ITEM_CATEGORIES = ['cargo', 'equipment', 'storage']
 
-export function parseCategory(category) {
-  return ITEM_CATEGORIES.includes(category) ? category : 'cargo'
+export function parseCategory(category, fallback = 'cargo') {
+  return ITEM_CATEGORIES.includes(category) ? category : fallback
 }
 
 // { STR: 12, ... } の形に整える(数値でない・範囲外のものは捨てる)
