@@ -592,12 +592,19 @@ const confirmPcDelete = async () => {
 
         <template v-if="tabOf(item.id) === 'basic'">
         <!-- このPCの閲覧/編集の切り替え -->
-        <div class="pc-mode-row">
+        <!-- 閲覧中は「編集する」ボタン、編集中は「編集中」の帯と「完了」ボタン -->
+        <div v-if="!isEditing(item.id)" class="pc-mode-row">
           <span v-if="dirtyIds.includes(item.id)" class="dirty-note inline">未保存の変更あり</span>
-          <div class="mode-switch" role="group" aria-label="表示の切り替え">
-            <button class="mode-btn" :class="{ active: !isEditing(item.id) }" @click="setEditing(item.id, false)">閲覧</button>
-            <button class="mode-btn" :class="{ active: isEditing(item.id) }" @click="setEditing(item.id, true)">編集</button>
-          </div>
+          <button class="edit-start-btn" @click="setEditing(item.id, true)">
+            <v-icon icon="mdi-pencil" size="16" />編集する
+          </button>
+        </div>
+        <div v-else class="editing-banner">
+          <v-icon icon="mdi-pencil" size="16" />
+          <span class="editing-banner-text">
+            編集中<small>{{ dirtyIds.includes(item.id) ? '変更は左下の「保存」で保存します' : '書き換えると左下に保存ボタンが出ます' }}</small>
+          </span>
+          <button class="edit-done-btn" @click="setEditing(item.id, false)">完了</button>
         </div>
 
         <!-- 閲覧モード -->
@@ -1958,5 +1965,62 @@ const confirmPcDelete = async () => {
   opacity: 1;
   background: var(--color-accent, #ffd400);
   border-color: var(--color-text, #000);
+}
+
+/* ---------- 編集の開始・終了 ---------- */
+.edit-start-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  border: 1px solid var(--color-text, #000);
+  background: var(--color-bg, #fff);
+  color: var(--color-text, #000);
+  padding: 6px 14px;
+  font-size: 0.85rem;
+  font-weight: bold;
+  cursor: pointer;
+  box-shadow: 2px 2px 0 var(--color-text, #000);
+}
+
+.edit-start-btn:active {
+  transform: translate(2px, 2px);
+  box-shadow: none;
+}
+
+.editing-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 10px 14px 0;
+  padding: 8px 10px;
+  background: var(--color-accent, #ffd400);
+  border: 1px solid var(--color-text, #000);
+  color: #000;
+}
+
+.editing-banner-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  font-size: 0.85rem;
+  font-weight: bold;
+  line-height: 1.3;
+}
+
+.editing-banner-text small {
+  font-size: 0.68rem;
+  font-weight: normal;
+}
+
+.edit-done-btn {
+  flex-shrink: 0;
+  border: 1px solid #000;
+  background: #000;
+  color: var(--color-accent, #ffd400);
+  padding: 6px 16px;
+  font-size: 0.85rem;
+  font-weight: bold;
+  cursor: pointer;
 }
 </style>
