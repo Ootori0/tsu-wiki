@@ -27,6 +27,8 @@ const saveName = async () => {
 const { resize, fitAll: fitTextareas } = useAutoResize()
 // --- パスワード変更 ---
 const passwordAccordionOpen = ref(false)
+// アカウント設定(ID・パスワードの変更)はふだん閉じておく
+const accountOpen = ref(false)
 const currentPassword = ref('')
 const newPassword = ref('')
 const newPasswordConfirm = ref('')
@@ -224,6 +226,19 @@ const pcToForm = (pc) => ({
   showOffice: !!pc.show_office,
   stats: Object.fromEntries(STAT_KEYS.map((k) => [k, pc.stats?.[k] ?? ''])),
 })
+
+// PCの中のタブ(PCごとに覚える)
+const PC_TABS = [
+  { value: 'basic', label: '基本' },
+  { value: 'items', label: '所持品', count: (pc) => pc.pcItems?.length ?? 0 },
+  { value: 'magic', label: '魔法', count: (pc) => magicsOf(pc.id).length },
+]
+const pcTabs = ref({})
+const tabOf = (id) => pcTabs.value[id] ?? 'basic'
+const setTab = (id, tab) => {
+  pcTabs.value = { ...pcTabs.value, [id]: tab }
+  if (tab === 'basic' && isEditing(id)) fitTextareas()
+}
 
 // 閲覧モード / 編集モード(PCごとに切り替える)
 const editingPcIds = ref([])
@@ -476,22 +491,27 @@ const confirmPcDelete = async () => {
     <h1 class="page-title">ユーザーページ</h1>
 
     <!-- アカウント情報 -->
-    <div class="box">
-      <h2 class="box-title">アカウント情報</h2>
+    <div class="box account-box">
+      <button class="account-head" :aria-expanded="accountOpen" @click="accountOpen = !accountOpen">
+        <v-icon icon="mdi-account-circle" size="22" />
+        <span class="account-name">{{ user?.name }}</span>
+        <span v-for="perm in user?.permissions ?? []" :key="perm" class="chip active small">{{ perm }}</span>
+        <span class="account-toggle">アカウント設定</span>
+        <span class="password-accordion-icon" :class="{ open: accountOpen }">
+          <svg viewBox="0 0 24 24" width="14" height="14">
+            <path d="M8 5l8 7-8 7z" fill="currentColor" />
+          </svg>
+        </span>
+      </button>
 
+      <div class="password-outer" :class="{ open: accountOpen }">
+      <div class="password-inner">
       <label class="field-label">ID</label>
       <div class="inline-form">
         <input v-model="newName" class="field-input" />
         <button class="save-btn" :disabled="savingName" @click="saveName">変更</button>
       </div>
       <p v-if="nameError" class="error-text">{{ nameError }}</p>
-
-      <label class="field-label">権限</label>
-      <div class="chip-list">
-        <span v-for="perm in user?.permissions ?? []" :key="perm" class="chip active">
-          {{ perm }}
-        </span>
-      </div>
 
       <!-- パスワード変更(アコーディオン) -->
       <div class="password-accordion">
@@ -524,6 +544,8 @@ const confirmPcDelete = async () => {
           </div>
         </div>
       </div>
+      </div>
+      </div>
     </div>
 
     <!-- 所持金(ダイアログで編集) -->
@@ -544,8 +566,32 @@ const confirmPcDelete = async () => {
         <span v-if="dirtyIds.includes(item.id)" class="dirty-mark">未保存</span>
       </template>
       <template #detail="{ item }">
+        <!-- 所持金(どのタブでも見える) -->
+        <div class="pc-money">
+          <span class="money-label">{{ moneyLabel(item) }}</span>
+          <span class="money-value" :class="{ negative: item.money < 0 }">{{ formatBalance(item) }}</span>
+          <button class="money-edit-btn" @click="openMoneyDialog(item.id)">増減・履歴</button>
+        </div>
+
+        <!-- PCの中のタブ: 基本(プロフィール・ステータス) / 所持品 / 魔法 -->
+        <div class="pc-tabs" role="tablist">
+          <button
+            v-for="t in PC_TABS"
+            :key="t.value"
+            class="pc-tab"
+            :class="{ active: tabOf(item.id) === t.value }"
+            role="tab"
+            :aria-selected="tabOf(item.id) === t.value"
+            @click="setTab(item.id, t.value)"
+          >
+            {{ t.label }}<span v-if="t.count" class="pc-tab-count">{{ t.count(item) }}</span>
+          </button>
+        </div>
+
+        <template v-if="tabOf(item.id) === 'basic'">
         <!-- このPCの閲覧/編集の切り替え -->
         <div class="pc-mode-row">
+          <span v-if="dirtyIds.includes(item.id)" class="dirty-note inline">未保存の変更あり</span>
           <div class="mode-switch" role="group" aria-label="表示の切り替え">
             <button class="mode-btn" :class="{ active: !isEditing(item.id) }" @click="setEditing(item.id, false)">閲覧</button>
             <button class="mode-btn" :class="{ active: isEditing(item.id) }" @click="setEditing(item.id, true)">編集</button>
@@ -576,7 +622,6 @@ const confirmPcDelete = async () => {
             <p class="view-label">持ち物</p>
             <MarkdownText :text="item.items" />
           </template>
-          <p v-if="dirtyIds.includes(item.id)" class="dirty-note">保存していない変更があります(編集モードで確認できます)</p>
         </div>
 
         <!-- 編集モード -->
@@ -647,20 +692,25 @@ const confirmPcDelete = async () => {
 
         </div>
 
-        <!-- 所持金とこのPCの魔法(閲覧・編集のどちらでも出す) -->
-        <div class="pc-common">
-          <div class="money-row">
-            <span class="money-label">{{ moneyLabel(item) }}</span>
-            <span class="money-value" :class="{ negative: item.money < 0 }">{{ formatBalance(item) }}</span>
-            <button class="money-edit-btn" @click="openMoneyDialog(item.id)">増減・履歴</button>
-          </div>
+        <div v-if="isEditing(item.id)" class="pc-delete-row">
+          <button class="delete-btn pc-delete" :disabled="pcDeleting" @click="requestPcDelete(item.id)">このPCを削除</button>
+        </div>
+        </template>
+
+        <!-- 所持品・魔法のタブ -->
+        <div v-else class="pc-common">
+
 
           <!-- 所持品: 装備品・荷物(荷物チェッカー)・倉庫 -->
+          <template v-if="tabOf(item.id) === 'items'">
           <div v-for="cat in ITEM_CATEGORIES" :key="cat.value" class="pc-items">
-            <h3 class="pc-magics-title">
-              {{ cat.label }}<span class="section-count">{{ itemsOf(item.pcItems, cat.value).length }}件</span>
-              <span class="cat-note">{{ cat.note }}</span>
-            </h3>
+            <div class="sub-head">
+              <h3 class="pc-magics-title">
+                {{ cat.label }}<span class="section-count">{{ itemsOf(item.pcItems, cat.value).length }}件</span>
+              </h3>
+              <button class="mini-add" @click="openItemCreate(item.id, cat.value)">＋ 追加</button>
+            </div>
+            <p class="cat-note">{{ cat.note }}</p>
             <div v-for="it in itemsOf(item.pcItems, cat.value)" :key="it.id" class="pc-item-line">
             <!-- 荷物と倉庫はチェックで出し入れする(チェックあり=荷物) -->
             <label v-if="cat.value !== 'equipment'" class="cargo-check" :title="cat.value === 'cargo' ? '倉庫に戻す' : '荷物に入れる'">
@@ -679,7 +729,7 @@ const confirmPcDelete = async () => {
                 <span v-if="cat.value !== 'equipment'" class="pc-item-cost">{{ it.size === 'none' ? 'なし' : sizeLabel(it.size) }}{{ it.per_slot > 1 ? `(${it.per_slot}個で1つ)` : '' }} / {{ itemCost(it) }}</span>
               </span>
               <span v-if="Object.keys(it.modifiers ?? {}).length" class="pc-item-mods" :class="{ inactive: cat.value !== 'equipment' }">
-                {{ modifiersText(it.modifiers) }}<template v-if="cat.value !== 'equipment'">(装備品にすると反映)</template>
+                {{ modifiersText(it.modifiers) }}<template v-if="cat.value !== 'equipment'">(装備・装飾品にすると反映)</template>
               </span>
               <span v-if="it.effect" class="pc-item-effect">{{ it.effect }}</span>
             </button>
@@ -687,7 +737,6 @@ const confirmPcDelete = async () => {
             <p v-if="cat.value === 'equipment' && Object.keys(totalModifiers(item.pcItems)).length" class="mods-total">
               補正の合計: {{ modifiersText(totalModifiers(item.pcItems)) }}
             </p>
-            <button class="add-btn small" @click="openItemCreate(item.id, cat.value)">＋ {{ cat.label }}を追加</button>
 
             <!-- 荷物チェッカー -->
             <div v-if="cat.value === 'cargo'" class="load-check" :class="{ over: totalCost(item.pcItems) > LOAD_LIMIT }">
@@ -703,9 +752,15 @@ const confirmPcDelete = async () => {
             </div>
           </div>
 
+          </template>
+
           <!-- このPCが所持者の魔法 -->
-          <div class="pc-magics">
-            <h3 class="pc-magics-title">このPCの魔法<span class="section-count">{{ magicsOf(item.id).length }}件</span></h3>
+          <div v-else class="pc-magics">
+            <div class="sub-head">
+              <h3 class="pc-magics-title">このPCの魔法<span class="section-count">{{ magicsOf(item.id).length }}件</span></h3>
+              <button class="mini-add" @click="openMagicCreate(item.id)">＋ 作成</button>
+            </div>
+            <p v-if="!magicsOf(item.id).length" class="cat-note">まだ魔法がありません</p>
             <AccordionList :items="magicsOf(item.id)" title-key="name" class="ruled-list">
               <template #detail="{ item: magic }">
                 <div class="view-mode">
@@ -716,10 +771,8 @@ const confirmPcDelete = async () => {
                 </div>
               </template>
             </AccordionList>
-            <button class="add-btn" @click="openMagicCreate(item.id)">＋ このPCの魔法を作成</button>
           </div>
 
-          <button v-if="isEditing(item.id)" class="delete-btn pc-delete" :disabled="pcDeleting" @click="requestPcDelete(item.id)">このPCを削除</button>
         </div>
       </template>
     </AccordionList>
@@ -1677,13 +1730,6 @@ const confirmPcDelete = async () => {
   cursor: pointer;
 }
 
-.cat-note {
-  margin-left: 8px;
-  font-size: 0.68rem;
-  font-weight: normal;
-  opacity: 0.6;
-}
-
 .pc-item-mods.inactive {
   color: inherit;
   opacity: 0.5;
@@ -1740,5 +1786,157 @@ const confirmPcDelete = async () => {
   align-items: center;
   padding: 0 8px 0 2px;
   cursor: pointer;
+}
+
+/* ---------- アカウント(ふだんは1行) ---------- */
+.account-box {
+  padding: 0;
+}
+
+.account-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 12px 14px;
+  border: none;
+  background: none;
+  color: var(--color-text, #000);
+  cursor: pointer;
+  text-align: left;
+}
+
+.account-name {
+  font-weight: bold;
+  font-size: 1rem;
+}
+
+.chip.small {
+  padding: 1px 8px;
+  font-size: 0.7rem;
+}
+
+.account-toggle {
+  margin-left: auto;
+  font-size: 0.75rem;
+  opacity: 0.7;
+}
+
+.account-box .password-inner {
+  padding: 0 14px;
+}
+
+.account-box .password-outer.open .password-inner {
+  padding-bottom: 14px;
+}
+
+/* ---------- PCの中: 所持金・タブ ---------- */
+.pc-money {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 12px 14px 0;
+  padding: 8px 10px;
+  background: #000;
+  color: var(--color-accent, #ffd400);
+}
+
+.pc-money .money-label {
+  font-size: 0.75rem;
+  font-weight: bold;
+}
+
+.pc-money .money-value {
+  flex: 1;
+  font-size: 1.1rem;
+  font-weight: bold;
+}
+
+.pc-money .money-value.negative {
+  color: #ff6b6b;
+}
+
+.pc-tabs {
+  display: flex;
+  margin: 12px 14px 0;
+  border-bottom: 2px solid var(--color-text, #000);
+}
+
+.pc-tab {
+  flex: 1;
+  border: none;
+  background: none;
+  color: var(--color-text, #000);
+  padding: 8px 4px;
+  font-size: 0.88rem;
+  font-weight: bold;
+  opacity: 0.55;
+  cursor: pointer;
+  border-bottom: 4px solid transparent;
+  margin-bottom: -2px;
+}
+
+.pc-tab.active {
+  opacity: 1;
+  border-bottom-color: var(--color-accent, #ffd400);
+}
+
+.pc-tab-count {
+  margin-left: 4px;
+  font-size: 0.7rem;
+  font-weight: normal;
+}
+
+.pc-mode-row {
+  align-items: center;
+  gap: 8px;
+}
+
+.dirty-note.inline {
+  margin: 0 auto 0 0;
+}
+
+.sub-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.sub-head .pc-magics-title {
+  margin: 0;
+}
+
+.mini-add {
+  flex-shrink: 0;
+  border: 1px solid var(--color-text, #000);
+  background: var(--color-accent, #ffd400);
+  color: #000;
+  padding: 4px 10px;
+  font-size: 0.78rem;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.cat-note {
+  display: block;
+  margin: 2px 0 4px;
+  font-size: 0.7rem;
+  opacity: 0.6;
+}
+
+.pc-delete-row {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0 14px 14px;
+}
+
+.pc-common .pc-items:first-of-type,
+.pc-common .pc-magics {
+  border-top: none;
+}
+
+.pc-common {
+  padding-top: 4px;
 }
 </style>
