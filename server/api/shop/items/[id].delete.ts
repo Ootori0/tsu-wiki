@@ -16,6 +16,8 @@ export default defineEventHandler(async (event) => {
     db.prepare('DELETE FROM shop_item_sellers WHERE item_id = ?').bind(id),
     db.prepare('DELETE FROM shop_item_discount_sellers WHERE item_id = ?').bind(id),
     db.prepare('DELETE FROM shop_items WHERE id = ?').bind(id),
+    // 持っている人の所持品は消さず、商品との結びつきを外して自分で編集できる品物として残す
+    db.prepare('UPDATE pc_items SET shop_item_id = NULL WHERE shop_item_id = ?').bind(id),
   ])
 
   invalidateCache('shop:items')

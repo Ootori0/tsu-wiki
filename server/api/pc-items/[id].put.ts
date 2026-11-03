@@ -5,7 +5,7 @@ import { parsePcItemBody, formatPcItem } from '../../utils/pcItems'
 export default defineEventHandler(async (event) => {
   const db = event.context.cloudflare.env.tsu_wiki_db
   const id = Number(getRouterParam(event, 'id'))
-  const existing = await db.prepare('SELECT pc_id, shop_item_id FROM pc_items WHERE id = ?').bind(id).first()
+  const existing = await db.prepare('SELECT pc_id, shop_item_id, magic_id FROM pc_items WHERE id = ?').bind(id).first()
   if (!existing) {
     throw createError({ statusCode: 404, statusMessage: '所持品が見つかりません' })
   }
@@ -15,6 +15,13 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, statusMessage: '店で買った品物は編集できません(荷物と倉庫の出し入れだけできます)' })
   }
   const item = parsePcItemBody(await readBody(event))
+
+  // 魔道具・AFは名前・効果が魔法に結びついているので、変えられるのは大きさ(元になった物の大きさ)だけ
+  if (existing.magic_id) {
+    await db.prepare('UPDATE pc_items SET size = ?, per_slot = ? WHERE id = ?').bind(item.size, item.perSlot, id).run()
+    const row = await db.prepare('SELECT * FROM pc_items WHERE id = ?').bind(id).first()
+    return { success: true, item: formatPcItem(row) }
+  }
 
   await db
     .prepare(

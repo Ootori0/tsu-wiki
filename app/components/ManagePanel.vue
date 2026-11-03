@@ -213,6 +213,8 @@ const itemError = ref('')
 const afterItemChange = async () => {
   // 店ページの商品キャッシュも破棄する
   clearNuxtData('shop-items')
+  // 所持品は商品に結びついているので、マイページのPCも読み込み直させる
+  clearNuxtData('my-pcs-list')
   await refreshShopItems()
 }
 

@@ -34,6 +34,10 @@ export default defineEventHandler(async (event) => {
     db.prepare('DELETE FROM shop_item_discount_sellers WHERE item_id = ?').bind(id),
     ...sellerInsertStatements(db, '?', [id], item.sellers),
     ...sellerInsertStatements(db, '?', [id], item.discount.sellers, 'shop_item_discount_sellers'),
+    // 所持品はこの商品に結びついているので、名前・効果・大きさ・補正を合わせる(荷物/倉庫などの置き場所と個数はそのまま)
+    db
+      .prepare('UPDATE pc_items SET name = ?, effect = ?, size = ?, per_slot = ?, modifiers = ? WHERE shop_item_id = ?')
+      .bind(item.name, item.description, item.asItem.size, item.asItem.perSlot, item.asItem.modifiers, id),
   ])
 
   invalidateCache('shop:items')
