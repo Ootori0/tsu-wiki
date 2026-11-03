@@ -73,10 +73,6 @@ const statOf = (k) => {
           <MarkdownText :text="pc.memo" />
         </div>
 
-        <div v-if="pc.items" class="detail-memo">
-          <p class="detail-items-label">持ち物</p>
-          <MarkdownText :text="pc.items" />
-        </div>
       </div>
     </div>
   </Transition>

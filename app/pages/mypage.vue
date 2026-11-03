@@ -90,10 +90,10 @@ const saving = ref(false)
 const deleting = ref(false)
 const showConfirm = ref(false)
 
-// ownerPcId を渡すと、所持者がそのPCの状態で開く(PCの中の「このPCの魔法を作成」)
-const openMagicCreate = (ownerPcId = null) => {
+// ownerPcId を渡すと、所持者がそのPCの状態で開く(PCの中の「このPCの魔法を作成」)。type で区分も決めて開ける
+const openMagicCreate = (ownerPcId = null, type = '魔法') => {
   magicEditingId.value = null
-  magicForm.value = { ...emptyMagicForm(), ownerPcId: typeof ownerPcId === 'number' ? ownerPcId : null }
+  magicForm.value = { ...emptyMagicForm(), type, ownerPcId: typeof ownerPcId === 'number' ? ownerPcId : null }
   magicDialogOpen.value = true
 }
 
@@ -122,7 +122,8 @@ const saveMagic = async () => {
     if (id) await $fetch(`/api/magics/${id}`, { method: 'PUT', body: magicForm.value })
     else await $fetch('/api/magics', { method: 'POST', body: magicForm.value })
     magicDialogOpen.value = false
-    await refreshMagics()
+    // 魔道具・AFは所持者のPCの倉庫にも入るので、PCの所持品も読み込み直す
+    await Promise.all([refreshMagics(), refreshPcsRaw()])
     // 魔法タブの一覧も次に開いたときに読み込み直す
     clearNuxtData('magics-list')
     show(id ? '魔法を保存しました' : '魔法を作成しました')
@@ -139,7 +140,8 @@ const confirmDelete = async () => {
   try {
     await $fetch(`/api/magics/${magicEditingId.value}`, { method: 'DELETE' })
     magicDialogOpen.value = false
-    await refreshMagics()
+    // 魔道具・AFは所持者のPCの倉庫にも入るので、PCの所持品も読み込み直す
+    await Promise.all([refreshMagics(), refreshPcsRaw()])
     // 魔法タブの一覧も次に開いたときに読み込み直す
     clearNuxtData('magics-list')
     show('魔法を削除しました')
@@ -182,8 +184,16 @@ const formPreview = (form) => ({
 })
 
 // 魔法: 「あなたの魔法一覧」にはすべて出し、自分のPCが所持者のものはそのPCの中にも出す
-const magicsOf = (pcId) => (fetchedMagics.value ?? []).filter((m) => m.owner_pc_id === pcId)
-const magicSection = computed(() => [{ id: 'magics', title: 'あなたの魔法一覧', count: (fetchedMagics.value ?? []).length }])
+// 魔法と魔道具・AFは分けて並べる(魔道具・AFは所持者のPCの倉庫にも入る)
+const isItemMagic = (m) => ITEM_MAGIC_TYPES.includes(m.type)
+const spellsAll = computed(() => (fetchedMagics.value ?? []).filter((m) => !isItemMagic(m)))
+const itemMagicsAll = computed(() => (fetchedMagics.value ?? []).filter(isItemMagic))
+const magicsOf = (pcId, items = false) =>
+  (fetchedMagics.value ?? []).filter((m) => m.owner_pc_id === pcId && isItemMagic(m) === items)
+const magicSections = computed(() => [
+  { id: 'spells', title: 'あなたの魔法一覧', list: spellsAll.value, type: '魔法', count: spellsAll.value.length },
+  { id: 'items', title: 'あなたの魔道具・AF一覧', list: itemMagicsAll.value, type: '魔道具', count: itemMagicsAll.value.length },
+])
 
 const myPcItems = computed(() =>
   (fetchedPcs.value ?? []).map((pc) => ({ ...pc, title: pcTitle(pc) }))
@@ -220,6 +230,7 @@ const pcToForm = (pc) => ({
   office: pc.office ?? '',
   grade: pc.grade,
   memo: pc.memo ?? '',
+  // 自由記述の持ち物欄は廃止(画面には出さないが、入っていた内容は消さずに残す)
   items: pc.items ?? '',
   isRepresentative: !!pc.is_representative,
   isOfficeRepresentative: !!pc.is_office_representative,
@@ -233,7 +244,7 @@ const pcToForm = (pc) => ({
 const PC_TABS = [
   { value: 'basic', label: '基本' },
   { value: 'items', label: '所持品', count: (pc) => pc.pcItems?.length ?? 0 },
-  { value: 'magic', label: '魔法', count: (pc) => magicsOf(pc.id).length },
+  { value: 'magic', label: '魔法・魔道具', count: (pc) => magicsOf(pc.id).length + magicsOf(pc.id, true).length },
 ]
 const pcTabs = ref({})
 const tabOf = (id) => pcTabs.value[id] ?? 'basic'
@@ -627,10 +638,6 @@ const confirmPcDelete = async () => {
             <p class="view-label">メモ</p>
             <MarkdownText :text="item.memo" />
           </template>
-          <template v-if="item.items">
-            <p class="view-label">持ち物</p>
-            <MarkdownText :text="item.items" />
-          </template>
         </div>
 
         <!-- 編集モード -->
@@ -697,8 +704,6 @@ const confirmPcDelete = async () => {
           <label class="edit-label">メモ</label>
           <textarea v-model="drafts[item.id].memo" class="edit-textarea auto-wrap" rows="3" @input="resize" />
 
-          <label class="edit-label">持ち物</label>
-          <textarea v-model="drafts[item.id].items" class="edit-textarea auto-wrap" rows="2" placeholder="例: 杖、回復薬×2" @input="resize" />
           <p class="markdown-hint">
             # 見出し **太字** ~~取消線~~ `コード` &gt; 引用 ||スポイラー||
           </p>
@@ -739,6 +744,7 @@ const confirmPcDelete = async () => {
               <span class="pc-item-top">
                 <span class="pc-item-name">{{ it.name }}<span class="pc-item-qty">×{{ it.quantity }}</span></span>
                 <span v-if="it.shop_item_id" class="pc-item-tag">店</span>
+                <span v-if="it.magic_id" class="pc-item-tag">魔道具・AF</span>
                 <span v-if="cat.value !== 'equipment'" class="pc-item-cost">{{ it.size === 'none' ? 'なし' : sizeLabel(it.size) }}{{ it.per_slot > 1 ? `(${it.per_slot}個で1つ)` : '' }} / {{ itemCost(it) }}</span>
               </span>
               <span v-if="Object.keys(it.modifiers ?? {}).length" class="pc-item-mods" :class="{ inactive: cat.value !== 'equipment' }">
@@ -767,23 +773,25 @@ const confirmPcDelete = async () => {
 
           </template>
 
-          <!-- このPCが所持者の魔法 -->
-          <div v-else class="pc-magics">
-            <div class="sub-head">
-              <h3 class="pc-magics-title">このPCの魔法<span class="section-count">{{ magicsOf(item.id).length }}件</span></h3>
-              <button class="mini-add" @click="openMagicCreate(item.id)">＋ 作成</button>
+          <!-- このPCが所持者の魔法と魔道具・AF -->
+          <div v-else>
+            <div v-for="sec in [{ items: false, label: '魔法', type: '魔法' }, { items: true, label: '魔道具・AF', type: '魔道具' }]" :key="sec.label" class="pc-magics">
+              <div class="sub-head">
+                <h3 class="pc-magics-title">{{ sec.label }}<span class="section-count">{{ magicsOf(item.id, sec.items).length }}件</span></h3>
+                <button class="mini-add" @click="openMagicCreate(item.id, sec.type)">＋ 作成</button>
+              </div>
+              <p class="cat-note">{{ sec.items ? '作成するとこのPCの倉庫にも入ります' : '' }}</p>
+              <AccordionList :items="magicsOf(item.id, sec.items)" title-key="name" class="ruled-list">
+                <template #detail="{ item: magic }">
+                  <div class="view-mode">
+                    <p class="meta-line">区分: {{ magic.type }}</p>
+                    <p class="meta-line">コスト: {{ magic.cost || '-' }} / 発動条件: {{ magic.condition || '-' }}</p>
+                    <MarkdownText :text="magic.effect" />
+                    <button class="edit-btn" @click="openMagicEdit(magic)">編集</button>
+                  </div>
+                </template>
+              </AccordionList>
             </div>
-            <p v-if="!magicsOf(item.id).length" class="cat-note">まだ魔法がありません</p>
-            <AccordionList :items="magicsOf(item.id)" title-key="name" class="ruled-list">
-              <template #detail="{ item: magic }">
-                <div class="view-mode">
-                  <p class="meta-line">区分: {{ magic.type }}</p>
-                  <p class="meta-line">コスト: {{ magic.cost || '-' }} / 発動条件: {{ magic.condition || '-' }}</p>
-                  <MarkdownText :text="magic.effect" />
-                  <button class="edit-btn" @click="openMagicEdit(magic)">編集</button>
-                </div>
-              </template>
-            </AccordionList>
           </div>
 
         </div>
@@ -791,16 +799,16 @@ const confirmPcDelete = async () => {
     </AccordionList>
     <button class="add-btn" @click="openPcCreate">＋ PCを作成</button>
 
-    <!-- 自分の魔法一覧(表示はアコーディオン、記入・編集はポップアップ) -->
-    <AccordionList :items="magicSection" class="section-accordion">
+    <!-- 自分の魔法一覧・魔道具・AF一覧(表示はアコーディオン、記入・編集はポップアップ) -->
+    <AccordionList :items="magicSections" multiple class="section-accordion">
       <template #title="{ item }">
         <span class="section-title">{{ item.title }}</span>
         <span class="section-count">{{ item.count }}件</span>
       </template>
-      <template #detail>
+      <template #detail="{ item: sec }">
         <div class="section-body">
-          <p v-if="!(fetchedMagics ?? []).length" class="empty">まだ魔法がありません</p>
-          <AccordionList :items="fetchedMagics ?? []" title-key="name" class="ruled-list">
+          <p v-if="!sec.list.length" class="empty">まだありません</p>
+          <AccordionList :items="sec.list" title-key="name" class="ruled-list">
             <template #detail="{ item }">
               <div class="view-mode">
                 <p class="meta-line">区分: {{ item.type }} / 所持者: {{ item.owner_pc_name || item.owner || '-' }}</p>
@@ -810,7 +818,7 @@ const confirmPcDelete = async () => {
               </div>
             </template>
           </AccordionList>
-          <button class="add-btn" @click="openMagicCreate">＋ 魔法を作成</button>
+          <button class="add-btn" @click="openMagicCreate(null, sec.type)">＋ {{ sec.type === '魔法' ? '魔法' : '魔道具・AF' }}を作成</button>
         </div>
       </template>
     </AccordionList>
@@ -910,6 +918,9 @@ const confirmPcDelete = async () => {
         placeholder="所持者を自由に記入"
         @input="resize"
       />
+      <p v-if="ITEM_MAGIC_TYPES.includes(magicForm.type)" class="markdown-hint">
+        {{ magicForm.ownerPcId ? '所持者のPCの倉庫にも入ります(大きさは所持品の側で設定してください)' : '所持者を自分のPCにすると、そのPCの倉庫にも入ります' }}
+      </p>
 
       <label class="edit-label">コスト</label>
       <textarea v-model="magicForm.cost" class="edit-input auto-wrap" rows="1" @input="resize" />
@@ -1009,8 +1020,6 @@ const confirmPcDelete = async () => {
       <label class="edit-label">メモ</label>
       <textarea v-model="pcForm.memo" class="edit-textarea auto-wrap" rows="3" @input="resize" />
 
-      <label class="edit-label">持ち物</label>
-      <textarea v-model="pcForm.items" class="edit-textarea auto-wrap" rows="2" @input="resize" />
       <p class="markdown-hint">
         # 見出し **太字** ~~取消線~~ `コード` &gt; 引用 ||スポイラー||
       </p>

@@ -260,6 +260,7 @@ CREATE TABLE pc_items (
   effect TEXT NOT NULL DEFAULT '',
   modifiers TEXT NOT NULL DEFAULT '{}', -- ステータスへの補正 JSON {"STR":1}
   shop_item_id INTEGER, -- 魔法店/武器屋で買ったものは元の商品
+  magic_id INTEGER, -- 魔道具・AFとして作った魔法(所持者のPCの倉庫に入れる)
   created_at TEXT DEFAULT (datetime('now')),
   FOREIGN KEY (pc_id) REFERENCES pcs(id) ON DELETE CASCADE
 );

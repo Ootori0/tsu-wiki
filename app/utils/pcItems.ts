@@ -95,3 +95,6 @@ export function loadCheckText(pcName, items) {
       : []),
   ].join('\n')
 }
+
+// 所持品として倉庫に入る魔法の区分
+export const ITEM_MAGIC_TYPES = ['魔道具', 'AF']
