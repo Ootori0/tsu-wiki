@@ -41,7 +41,7 @@ const statOf = (k) => {
           </div>
           <div class="meta-item">
             <dt>級</dt>
-            <dd>{{ pc.grade }}級</dd>
+            <dd>{{ pc.grade ? `${pc.grade}級` : '-' }}</dd>
           </div>
           <div class="meta-item">
             <dt>役職</dt>

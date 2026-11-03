@@ -90,6 +90,7 @@ CREATE TABLE pcs (
   affiliation TEXT, -- affiliations.name
   office TEXT NOT NULL DEFAULT '', -- 事務所(自由記述)
   grade INTEGER NOT NULL DEFAULT 10 CHECK (grade BETWEEN 1 AND 10),
+  no_grade INTEGER NOT NULL DEFAULT 0, -- 1: 級を空欄にした(このとき grade は使わない)
   memo TEXT,
   items TEXT NOT NULL DEFAULT '', -- 持ち物(自由記述)
   stats TEXT NOT NULL DEFAULT '{}', -- ステータス(CoC6版。JSON)

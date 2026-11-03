@@ -736,7 +736,7 @@ const confirmPcDelete = async () => {
         <!-- 閲覧モード -->
         <div v-if="!isEditing(item.id)" class="pc-view">
           <p class="meta-line">
-            所属: {{ item.affiliation || '-' }} / 事務所: {{ item.office || '-' }} / {{ item.grade }}級<template v-if="pcRoles(item)"> / {{ pcRoles(item) }}</template>
+            所属: {{ item.affiliation || '-' }} / 事務所: {{ item.office || '-' }} / {{ item.grade ? `${item.grade}級` : '級なし' }}<template v-if="pcRoles(item)"> / {{ pcRoles(item) }}</template>
           </p>
           <p class="view-label">ステータス<span class="stats-visibility" :class="{ public: item.show_stats }">{{ item.show_stats ? '公開' : '非公開' }}</span></p>
           <div class="stat-grid">
@@ -771,6 +771,7 @@ const confirmPcDelete = async () => {
             <div>
               <label class="edit-label">級</label>
               <select v-model.number="drafts[item.id].grade" class="edit-input">
+                <option :value="null">空欄</option>
                 <option v-for="g in grades" :key="g" :value="g">{{ g }}級</option>
               </select>
             </div>
@@ -1181,6 +1182,7 @@ const confirmPcDelete = async () => {
 
       <label class="edit-label">級</label>
       <select v-model.number="pcForm.grade" class="edit-input">
+        <option :value="null">空欄</option>
         <option v-for="g in grades" :key="g" :value="g">{{ g }}級</option>
       </select>
 
