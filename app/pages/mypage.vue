@@ -445,19 +445,28 @@ const deleteItem = async () => {
   }
 }
 
-// 倉庫⇔荷物の出し入れ: チェックで移す先を選び(チェックあり=荷物)、「移動を確定」でまとめて保存する
-const pendingMoves = ref({}) // 所持品のid → 移す先の区分
-const isCargoChecked = (it) => (pendingMoves.value[it.id] ?? it.category) === 'cargo'
-const toggleCargo = (it, checked) => {
+// 倉庫⇔荷物の出し入れ: 「荷物へ」「倉庫へ」で移す個数を選び、「移動を確定」でまとめて保存する
+const pendingMoves = ref({}) // 所持品のid → { to: 移す先の区分, qty: 移す個数 }
+const otherSide = (category) => (category === 'cargo' ? 'storage' : 'cargo')
+const startMove = (it) => {
+  pendingMoves.value = { ...pendingMoves.value, [it.id]: { to: otherSide(it.category), qty: it.quantity } }
+}
+const setMoveQty = (it, qty) => {
+  const n = Math.min(Math.max(1, Number(qty) || 1), it.quantity)
+  pendingMoves.value = { ...pendingMoves.value, [it.id]: { ...pendingMoves.value[it.id], qty: n } }
+}
+const cancelMove = (it) => {
   const next = { ...pendingMoves.value }
-  const target = checked ? 'cargo' : 'storage'
-  if (target === it.category) delete next[it.id]
-  else next[it.id] = target
+  delete next[it.id]
   pendingMoves.value = next
 }
 const pendingMovesOf = (pc) => pc.pcItems.filter((i) => pendingMoves.value[i.id])
-// 確定したときの荷物のコスト(移動を反映した見込み)
-const projectedCost = (pc) => totalCost(pc.pcItems.map((i) => ({ ...i, category: pendingMoves.value[i.id] ?? i.category })))
+// 確定したときの荷物のコスト(移動を反映した見込み。一部だけ移すものは2つに分けて数える)
+const projectedCost = (pc) => totalCost(pc.pcItems.flatMap((i) => {
+  const m = pendingMoves.value[i.id]
+  if (!m) return [i]
+  return [{ ...i, quantity: i.quantity - m.qty }, { ...i, category: m.to, quantity: m.qty }]
+}))
 
 const cancelMoves = (pc) => {
   const next = { ...pendingMoves.value }
@@ -467,13 +476,13 @@ const cancelMoves = (pc) => {
 
 const movingPcId = ref(null)
 const confirmMoves = async (pc) => {
-  const moves = pendingMovesOf(pc).map((i) => ({ id: i.id, category: pendingMoves.value[i.id] }))
+  const moves = pendingMovesOf(pc).map((i) => ({ id: i.id, category: pendingMoves.value[i.id].to, quantity: pendingMoves.value[i.id].qty }))
   if (!moves.length) return
   movingPcId.value = pc.id
   try {
-    await $fetch(`/api/pcs/${pc.id}/items/move`, { method: 'POST', body: { moves } })
-    const to = Object.fromEntries(moves.map((m) => [m.id, m.category]))
-    updatePc(pc.id, (p) => ({ ...p, pcItems: p.pcItems.map((i) => (to[i.id] ? { ...i, category: to[i.id] } : i)) }))
+    const res = await $fetch(`/api/pcs/${pc.id}/items/move`, { method: 'POST', body: { moves } })
+    // 分けたり合わせたりした結果の所持品が返ってくるので、それで置き換える
+    updatePc(pc.id, (p) => ({ ...p, pcItems: res.items }))
     cancelMoves(pc)
     show(`${moves.length}件を移動しました`)
   } catch (e) {
@@ -799,20 +808,9 @@ const confirmPcDelete = async () => {
             </div>
             <p class="cat-note">{{ cat.note }}</p>
             <div v-for="it in itemsOf(item.pcItems, cat.value)" :key="it.id" class="pc-item-line">
-            <!-- 荷物と倉庫はチェックで出し入れする(チェックあり=荷物) -->
-            <label v-if="cat.value !== 'equipment'" class="cargo-check" :title="cat.value === 'cargo' ? '倉庫に戻す' : '荷物に入れる'">
-              <input
-                type="checkbox"
-                :checked="isCargoChecked(it)"
-                :disabled="movingPcId === item.id"
-                :aria-label="cat.value === 'cargo' ? `${it.name}を倉庫に戻す` : `${it.name}を荷物に入れる`"
-                @change="toggleCargo(it, $event.target.checked)"
-              />
-            </label>
             <button class="pc-item-row" @click="openItemEdit(item.id, it)">
               <span class="pc-item-top">
                 <span class="pc-item-name">{{ it.name }}<span class="pc-item-qty">×{{ it.quantity }}</span></span>
-                <span v-if="pendingMoves[it.id]" class="move-mark">→{{ pendingMoves[it.id] === 'cargo' ? '荷物' : '倉庫' }}</span>
                 <span v-if="it.shop_item_id" class="pc-item-tag">店</span>
                 <span v-if="it.magic_id" class="pc-item-tag">魔道具・AF</span>
                 <span v-if="cat.value !== 'equipment'" class="pc-item-cost">{{ it.size === 'none' ? 'なし' : sizeLabel(it.size) }}{{ it.per_slot > 1 ? `(${it.per_slot}個で1つ)` : '' }} / {{ itemCost(it) }}</span>
@@ -822,6 +820,35 @@ const confirmPcDelete = async () => {
               </span>
               <span v-if="it.effect" class="pc-item-effect">{{ it.effect }}</span>
             </button>
+            <!-- 荷物と倉庫の間の出し入れ(個数を選んで「移動を確定」) -->
+            <div v-if="cat.value !== 'equipment'" class="move-ctl">
+              <button
+                v-if="!pendingMoves[it.id]"
+                class="move-start"
+                :disabled="movingPcId === item.id"
+                @click="startMove(it)"
+              >
+                {{ cat.value === 'cargo' ? '倉庫へ' : '荷物へ' }}
+              </button>
+              <div v-else class="move-qty">
+                <span class="move-qty-label">→{{ pendingMoves[it.id].to === 'cargo' ? '荷物' : '倉庫' }}</span>
+                <div class="move-stepper">
+                  <button :disabled="pendingMoves[it.id].qty <= 1" aria-label="1個減らす" @click="setMoveQty(it, pendingMoves[it.id].qty - 1)">−</button>
+                  <input
+                    :value="pendingMoves[it.id].qty"
+                    type="number"
+                    inputmode="numeric"
+                    min="1"
+                    :max="it.quantity"
+                    aria-label="移す個数"
+                    @change="setMoveQty(it, $event.target.value)"
+                  />
+                  <button :disabled="pendingMoves[it.id].qty >= it.quantity" aria-label="1個増やす" @click="setMoveQty(it, pendingMoves[it.id].qty + 1)">＋</button>
+                </div>
+                <span class="move-of">/{{ it.quantity }}</span>
+                <button class="move-cancel" aria-label="この移動をやめる" @click="cancelMove(it)">×</button>
+              </div>
+            </div>
             </div>
             <p v-if="cat.value === 'equipment' && Object.keys(totalModifiers(item.pcItems)).length" class="mods-total">
               補正の合計: {{ modifiersText(totalModifiers(item.pcItems)) }}
@@ -1873,13 +1900,6 @@ const confirmPcDelete = async () => {
   border-bottom: none;
 }
 
-.cargo-check {
-  display: flex;
-  align-items: center;
-  padding: 0 8px 0 2px;
-  cursor: pointer;
-}
-
 /* ---------- アカウント(ふだんは1行) ---------- */
 .account-box {
   padding: 0;
@@ -2154,5 +2174,87 @@ const confirmPcDelete = async () => {
 .move-btn.primary {
   background: var(--color-accent, #ffd400);
   color: #000;
+}
+
+/* ---------- 荷物⇔倉庫の個数を選んで移す ---------- */
+.pc-item-line {
+  flex-wrap: wrap;
+}
+
+.pc-item-line .pc-item-row {
+  flex: 1;
+  min-width: 0;
+}
+
+.move-ctl {
+  display: flex;
+  align-items: center;
+  padding: 6px 0 6px 6px;
+}
+
+.move-start {
+  border: 1px solid var(--color-text, #000);
+  background: var(--color-bg, #fff);
+  color: var(--color-text, #000);
+  padding: 4px 8px;
+  font-size: 0.75rem;
+  font-weight: bold;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.move-qty {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 4px;
+  background: var(--color-accent-soft, #fff7cc);
+  border: 1px solid var(--color-text, #000);
+}
+
+.move-qty-label {
+  font-size: 0.72rem;
+  font-weight: bold;
+  white-space: nowrap;
+}
+
+.move-stepper {
+  display: flex;
+  border: 1px solid var(--color-text, #000);
+  background: var(--color-bg, #fff);
+}
+
+.move-stepper button {
+  width: 26px;
+  border: none;
+  background: none;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.move-stepper button:disabled {
+  opacity: 0.3;
+}
+
+.move-stepper input {
+  width: 38px;
+  border: none;
+  border-left: 1px solid var(--color-text, #000);
+  border-right: 1px solid var(--color-text, #000);
+  text-align: center;
+  padding: 2px 0;
+  font-size: 16px;
+}
+
+.move-of {
+  font-size: 0.72rem;
+}
+
+.move-cancel {
+  border: none;
+  background: none;
+  font-weight: bold;
+  cursor: pointer;
+  padding: 0 4px;
 }
 </style>

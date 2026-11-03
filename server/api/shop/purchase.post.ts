@@ -86,9 +86,16 @@ export default defineEventHandler(async (event) => {
         )
         .bind(pc.id, item.id, item.shop, item.name, unitPrice, qty, total, currentUser.id, useDiscount ? 1 : 0, setSize),
       // 買ったものを所持品に入れる(同じ商品を持っていれば個数を足す)
+      // 荷物と倉庫に分けて持っていることもあるので、足すのは1行だけ(商品で決めた区分の行を優先)
       db
-        .prepare('UPDATE pc_items SET quantity = quantity + ? WHERE pc_id = ? AND shop_item_id = ?')
-        .bind(qty * setSize, pc.id, item.id),
+        .prepare(
+          `UPDATE pc_items SET quantity = quantity + ?
+           WHERE id = (
+             SELECT id FROM pc_items WHERE pc_id = ? AND shop_item_id = ?
+             ORDER BY (category = ?) DESC, id ASC LIMIT 1
+           )`
+        )
+        .bind(qty * setSize, pc.id, item.id, item.item_category ?? 'storage'),
       db
         .prepare(
           `INSERT INTO pc_items (pc_id, name, quantity, size, per_slot, category, effect, modifiers, shop_item_id)
