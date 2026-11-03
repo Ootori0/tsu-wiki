@@ -1,6 +1,6 @@
 import { getSessionUser } from '../../utils/session'
 import { isAdmin } from '../../utils/permission'
-import { parsePcBody } from '../../utils/pc'
+import { parsePcBody, formatPc } from '../../utils/pc'
 import { invalidateCache } from '../../utils/cache'
 
 export default defineEventHandler(async (event) => {
@@ -40,5 +40,7 @@ export default defineEventHandler(async (event) => {
   // 魔法の所持者にPC名を出しているので魔法のキャッシュも破棄する
   invalidateCache('pcs', 'casino:dealer', 'shop:items', 'magics')
 
-  return { id: Number(id), success: true }
+  // 画面で読み込み直さずに済むよう、保存したPCを返す
+  const row = await db.prepare('SELECT * FROM pcs WHERE id = ?').bind(id).first()
+  return { id: Number(id), success: true, pc: formatPc(row) }
 })

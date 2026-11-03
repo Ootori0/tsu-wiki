@@ -114,16 +114,21 @@ const openMagicEdit = (item) => {
   fitTextareas()
 }
 
+// 魔道具・AF(所持者が自分のPC)が関わるときだけ、PCの所持品も変わる
+const touchesPcItems = (m) => !!m && ITEM_MAGIC_TYPES.includes(m.type) && !!(m.owner_pc_id ?? m.ownerPcId)
+
 const saveMagic = async () => {
   if (!magicForm.value.name) return
   const id = magicEditingId.value
+  const before = id ? (fetchedMagics.value ?? []).find((m) => m.id === id) : null
+  const needPcs = touchesPcItems(before) || touchesPcItems(magicForm.value)
   saving.value = true
   try {
     if (id) await $fetch(`/api/magics/${id}`, { method: 'PUT', body: magicForm.value })
     else await $fetch('/api/magics', { method: 'POST', body: magicForm.value })
     magicDialogOpen.value = false
-    // 魔道具・AFは所持者のPCの倉庫にも入るので、PCの所持品も読み込み直す
-    await Promise.all([refreshMagics(), refreshPcsRaw()])
+    // 魔道具・AFが関わるときだけPCの所持品も読み込み直す(それ以外は魔法の一覧だけ)
+    await Promise.all([refreshMagics(), needPcs ? refreshPcsRaw() : null])
     // 魔法タブの一覧も次に開いたときに読み込み直す
     clearNuxtData('magics-list')
     show(id ? '魔法を保存しました' : '魔法を作成しました')
@@ -138,10 +143,11 @@ const confirmDelete = async () => {
   if (!magicEditingId.value) return
   deleting.value = true
   try {
+    const before = (fetchedMagics.value ?? []).find((m) => m.id === magicEditingId.value)
     await $fetch(`/api/magics/${magicEditingId.value}`, { method: 'DELETE' })
     magicDialogOpen.value = false
-    // 魔道具・AFは所持者のPCの倉庫にも入るので、PCの所持品も読み込み直す
-    await Promise.all([refreshMagics(), refreshPcsRaw()])
+    // 魔道具・AFとして所持品に入っていたときだけPCの所持品も読み込み直す
+    await Promise.all([refreshMagics(), touchesPcItems(before) ? refreshPcsRaw() : null])
     // 魔法タブの一覧も次に開いたときに読み込み直す
     clearNuxtData('magics-list')
     show('魔法を削除しました')
@@ -214,6 +220,13 @@ const emptyPcForm = () => ({
   showOffice: true,
   showStats: false,
 })
+
+// 保存後に読み込み直さず、手元の一覧を書き換える(通信を減らす)
+// 取得したデータは中身を書き換えても画面に反映されないので、書き換えたPCを新しい配列にして置き換える
+const findPc = (id) => (fetchedPcs.value ?? []).find((pc) => pc.id === id)
+const updatePc = (id, fn) => {
+  fetchedPcs.value = (fetchedPcs.value ?? []).map((pc) => (pc.id === id ? fn({ ...pc, pcItems: [...(pc.pcItems ?? [])] }) : pc))
+}
 
 const refreshPcs = async () => {
   // PCタブの一覧キャッシュも破棄して次回表示時に再取得させる
@@ -320,11 +333,24 @@ const saveDrafts = async () => {
   }
   savingDrafts.value = true
   try {
+    let renamedWithMagics = false
     for (const id of ids) {
-      await $fetch(`/api/pcs/${id}`, { method: 'PUT', body: drafts.value[id] })
-      baselines.value[id] = JSON.parse(JSON.stringify(drafts.value[id]))
+      const res = await $fetch(`/api/pcs/${id}`, { method: 'PUT', body: drafts.value[id] })
+      const pc = findPc(id)
+      if (pc && res.pc) {
+        if (pc.name !== res.pc.name && magicsOf(id).length + magicsOf(id, true).length) renamedWithMagics = true
+        baselines.value[id] = JSON.parse(JSON.stringify(drafts.value[id]))
+        // 所持品はこの保存では変わらないので手元のものを残す
+        updatePc(id, (p) => ({ ...p, ...res.pc, pcItems: p.pcItems }))
+      }
     }
-    await Promise.all([refreshPcs(), refreshMagics()])
+    // 他のページの一覧は次に開いたときに読み込み直す
+    clearNuxtData('pcs-list')
+    // 魔法の所持者にPC名を出しているので、名前を変えたときだけ魔法の一覧を読み込み直す
+    if (renamedWithMagics) {
+      clearNuxtData('magics-list')
+      await refreshMagics()
+    }
     show('PCを保存しました')
   } catch (e) {
     show(e?.data?.statusMessage ?? '保存に失敗しました', 'error')
@@ -342,10 +368,11 @@ const revertDrafts = async () => {
 
 // 保存していない変更があるときは、ページを離れる前に確かめる
 onBeforeRouteLeave(() => {
-  if (dirtyIds.value.length && !confirm('保存していないPCの変更があります。保存せずに移動しますか?')) return false
+  const unsaved = dirtyIds.value.length || Object.keys(pendingMoves.value).length
+  if (unsaved && !confirm('保存していない変更(PCの内容・所持品の移動)があります。保存せずに移動しますか?')) return false
 })
 const warnBeforeUnload = (e) => {
-  if (dirtyIds.value.length) e.preventDefault()
+  if (dirtyIds.value.length || Object.keys(pendingMoves.value).length) e.preventDefault()
 }
 onMounted(() => window.addEventListener('beforeunload', warnBeforeUnload))
 onBeforeUnmount(() => window.removeEventListener('beforeunload', warnBeforeUnload))
@@ -384,10 +411,19 @@ const saveItem = async () => {
   if (!itemForm.value.name.trim()) return
   itemSaving.value = true
   try {
-    if (itemId) await $fetch(`/api/pc-items/${itemId}`, { method: 'PUT', body: itemForm.value })
-    else await $fetch(`/api/pcs/${pcId}/items`, { method: 'POST', body: itemForm.value })
+    const res = itemId
+      ? await $fetch(`/api/pc-items/${itemId}`, { method: 'PUT', body: itemForm.value })
+      : await $fetch(`/api/pcs/${pcId}/items`, { method: 'POST', body: itemForm.value })
     itemDialog.value.open = false
-    await refreshPcsRaw()
+    // 返ってきた所持品で手元の一覧を書き換える(読み込み直さない)
+    if (res.item) {
+      updatePc(pcId, (p) => {
+        const idx = p.pcItems.findIndex((i) => i.id === res.item.id)
+        if (idx === -1) p.pcItems.push(res.item)
+        else p.pcItems.splice(idx, 1, res.item)
+        return p
+      })
+    }
     show(itemId ? '所持品を保存しました' : '所持品を追加しました')
   } catch (e) {
     show(e?.data?.statusMessage ?? '保存に失敗しました', 'error')
@@ -402,24 +438,48 @@ const deleteItem = async () => {
   try {
     await $fetch(`/api/pc-items/${itemId}`, { method: 'DELETE' })
     itemDialog.value.open = false
-    await refreshPcsRaw()
+    updatePc(itemDialog.value.pcId, (p) => ({ ...p, pcItems: p.pcItems.filter((i) => i.id !== itemId) }))
     show('所持品を削除しました')
   } catch (e) {
     show(e?.data?.statusMessage ?? '削除に失敗しました', 'error')
   }
 }
 
-// 倉庫⇔荷物の出し入れ(チェックを入れると荷物、外すと倉庫)
-const togglingItemId = ref(null)
-const toggleCargo = async (it, checked) => {
-  togglingItemId.value = it.id
+// 倉庫⇔荷物の出し入れ: チェックで移す先を選び(チェックあり=荷物)、「移動を確定」でまとめて保存する
+const pendingMoves = ref({}) // 所持品のid → 移す先の区分
+const isCargoChecked = (it) => (pendingMoves.value[it.id] ?? it.category) === 'cargo'
+const toggleCargo = (it, checked) => {
+  const next = { ...pendingMoves.value }
+  const target = checked ? 'cargo' : 'storage'
+  if (target === it.category) delete next[it.id]
+  else next[it.id] = target
+  pendingMoves.value = next
+}
+const pendingMovesOf = (pc) => pc.pcItems.filter((i) => pendingMoves.value[i.id])
+// 確定したときの荷物のコスト(移動を反映した見込み)
+const projectedCost = (pc) => totalCost(pc.pcItems.map((i) => ({ ...i, category: pendingMoves.value[i.id] ?? i.category })))
+
+const cancelMoves = (pc) => {
+  const next = { ...pendingMoves.value }
+  for (const i of pc.pcItems) delete next[i.id]
+  pendingMoves.value = next
+}
+
+const movingPcId = ref(null)
+const confirmMoves = async (pc) => {
+  const moves = pendingMovesOf(pc).map((i) => ({ id: i.id, category: pendingMoves.value[i.id] }))
+  if (!moves.length) return
+  movingPcId.value = pc.id
   try {
-    await $fetch(`/api/pc-items/${it.id}/category`, { method: 'POST', body: { category: checked ? 'cargo' : 'storage' } })
-    await refreshPcsRaw()
+    await $fetch(`/api/pcs/${pc.id}/items/move`, { method: 'POST', body: { moves } })
+    const to = Object.fromEntries(moves.map((m) => [m.id, m.category]))
+    updatePc(pc.id, (p) => ({ ...p, pcItems: p.pcItems.map((i) => (to[i.id] ? { ...i, category: to[i.id] } : i)) }))
+    cancelMoves(pc)
+    show(`${moves.length}件を移動しました`)
   } catch (e) {
-    show(e?.data?.statusMessage ?? '変更できませんでした', 'error')
+    show(e?.data?.statusMessage ?? '移動できませんでした', 'error')
   } finally {
-    togglingItemId.value = null
+    movingPcId.value = null
   }
 }
 
@@ -721,6 +781,15 @@ const confirmPcDelete = async () => {
 
           <!-- 所持品: 装備品・荷物(荷物チェッカー)・倉庫 -->
           <template v-if="tabOf(item.id) === 'items'">
+          <!-- 倉庫⇔荷物の移動の確定 -->
+          <div v-if="pendingMovesOf(item).length" class="move-bar">
+            <span class="move-bar-text">
+              {{ pendingMovesOf(item).length }}件を移動
+              <small>確定後のコスト {{ projectedCost(item) }} / {{ LOAD_LIMIT }}</small>
+            </span>
+            <button class="move-btn" :disabled="movingPcId === item.id" @click="cancelMoves(item)">取り消す</button>
+            <button class="move-btn primary" :disabled="movingPcId === item.id" @click="confirmMoves(item)">移動を確定</button>
+          </div>
           <div v-for="cat in ITEM_CATEGORIES" :key="cat.value" class="pc-items">
             <div class="sub-head">
               <h3 class="pc-magics-title">
@@ -734,8 +803,8 @@ const confirmPcDelete = async () => {
             <label v-if="cat.value !== 'equipment'" class="cargo-check" :title="cat.value === 'cargo' ? '倉庫に戻す' : '荷物に入れる'">
               <input
                 type="checkbox"
-                :checked="cat.value === 'cargo'"
-                :disabled="togglingItemId === it.id"
+                :checked="isCargoChecked(it)"
+                :disabled="movingPcId === item.id"
                 :aria-label="cat.value === 'cargo' ? `${it.name}を倉庫に戻す` : `${it.name}を荷物に入れる`"
                 @change="toggleCargo(it, $event.target.checked)"
               />
@@ -743,6 +812,7 @@ const confirmPcDelete = async () => {
             <button class="pc-item-row" @click="openItemEdit(item.id, it)">
               <span class="pc-item-top">
                 <span class="pc-item-name">{{ it.name }}<span class="pc-item-qty">×{{ it.quantity }}</span></span>
+                <span v-if="pendingMoves[it.id]" class="move-mark">→{{ pendingMoves[it.id] === 'cargo' ? '荷物' : '倉庫' }}</span>
                 <span v-if="it.shop_item_id" class="pc-item-tag">店</span>
                 <span v-if="it.magic_id" class="pc-item-tag">魔道具・AF</span>
                 <span v-if="cat.value !== 'equipment'" class="pc-item-cost">{{ it.size === 'none' ? 'なし' : sizeLabel(it.size) }}{{ it.per_slot > 1 ? `(${it.per_slot}個で1つ)` : '' }} / {{ itemCost(it) }}</span>
@@ -2031,5 +2101,58 @@ const confirmPcDelete = async () => {
   font-size: 0.85rem;
   font-weight: bold;
   cursor: pointer;
+}
+
+/* ---------- 倉庫⇔荷物の移動 ---------- */
+.move-mark {
+  font-size: 0.7rem;
+  font-weight: bold;
+  padding: 0 5px;
+  background: var(--color-accent, #ffd400);
+  border: 1px solid #000;
+  color: #000;
+}
+
+.move-bar {
+  position: sticky;
+  top: 64px;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 10px 0 0;
+  padding: 8px 10px;
+  background: #000;
+  color: var(--color-accent, #ffd400);
+}
+
+.move-bar-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  font-size: 0.85rem;
+  font-weight: bold;
+  line-height: 1.3;
+}
+
+.move-bar-text small {
+  font-size: 0.7rem;
+  font-weight: normal;
+}
+
+.move-btn {
+  flex-shrink: 0;
+  border: 1px solid var(--color-accent, #ffd400);
+  background: transparent;
+  color: var(--color-accent, #ffd400);
+  padding: 6px 10px;
+  font-size: 0.8rem;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.move-btn.primary {
+  background: var(--color-accent, #ffd400);
+  color: #000;
 }
 </style>

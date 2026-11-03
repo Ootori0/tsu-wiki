@@ -92,13 +92,35 @@ const play = async () => {
       await sleep(250)
     }
     result.value = res
+    // 読み込み直さず、返ってきた結果で所持金と履歴を書き換える(ディーラーが自分の別PCならそちらも)
+    // (取得したデータは中身の書き換えを検知しないので、新しい配列・オブジェクトにして置き換える)
+    const pc = (myPcs.value ?? []).find((p) => p.id === selectedPc.value?.id)
+    myPcs.value = (myPcs.value ?? []).map((p) => {
+      if (p.id === pc?.id) return { ...p, money: res.money }
+      if (p.id === res.dealerPcId) return { ...p, money: p.money + res.dealerDelta }
+      return p
+    })
+    if (gamesData.value) {
+      gamesData.value = {
+        ...gamesData.value,
+        playsToday: res.playsToday,
+        games: [
+        {
+          id: res.gameId, pc_id: pc?.id, bet: res.bet, rolls: res.rolls, hand: res.hand, multiplier: res.multiplier,
+          net: res.net, dealer_pc_id: res.dealerPcId, dealer_delta: res.dealerDelta,
+          created_at: new Date().toISOString().slice(0, 19).replace('T', ' '), player_name: pc?.name, role: 'player',
+        },
+        ...gamesData.value.games,
+        ].slice(0, 20),
+      }
+    }
   } catch (e) {
     errorMessage.value = e?.data?.statusMessage ?? 'エラーが発生しました'
+    // 失敗したときは最新の状態を読み込み直す
+    await Promise.all([refreshMyPcs(), refreshGames()])
   } finally {
     rollingDice.value = null
     playing.value = false
-    // ディーラーが自分の別PCの場合もあるので自分のPC一覧ごと再取得
-    await Promise.all([refreshMyPcs(), refreshGames()])
   }
 }
 </script>

@@ -1,5 +1,5 @@
 import { requirePcOwner } from '../../../utils/pcAccess'
-import { parsePcItemBody } from '../../../utils/pcItems'
+import { parsePcItemBody, formatPcItem } from '../../../utils/pcItems'
 
 // 所持品の追加(PCの作成者/admin)
 export default defineEventHandler(async (event) => {
@@ -16,5 +16,7 @@ export default defineEventHandler(async (event) => {
     .bind(pc.id, item.name, item.quantity, item.size, item.perSlot, item.category, item.effect, item.modifiers)
     .run()
 
-  return { success: true, id: result.meta.last_row_id }
+  // 画面で読み込み直さずに済むよう、追加した所持品を返す
+  const row = await db.prepare('SELECT * FROM pc_items WHERE id = ?').bind(result.meta.last_row_id).first()
+  return { success: true, item: formatPcItem(row) }
 })
