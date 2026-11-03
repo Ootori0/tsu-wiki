@@ -137,6 +137,7 @@ CREATE TABLE purchases (
   purchased_by INTEGER NOT NULL, -- 操作したユーザー
   discount INTEGER NOT NULL DEFAULT 0, -- 割引販売で買ったか(0/1)
   set_size INTEGER NOT NULL DEFAULT 1, -- 買ったときの1セットの個数(quantity はセット数)
+  carry_in INTEGER NOT NULL DEFAULT 0, -- 持ち込み(過去や別のルートで手に入れた分を追加した記録。代金0・在庫は減らさない)
   created_at TEXT DEFAULT (datetime('now'))
 );
 
