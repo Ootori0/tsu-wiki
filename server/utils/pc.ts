@@ -3,7 +3,7 @@ import { parseStats } from './pcItems'
 export function parsePcBody(body) {
   const {
     name, affiliation, office, grade, memo, items, money, stats,
-    isRepresentative, isOfficeRepresentative, showTitle, showOffice,
+    isRepresentative, isOfficeRepresentative, showTitle, showOffice, showStats,
   } = body ?? {}
 
   if (!name) {
@@ -33,6 +33,7 @@ export function parsePcBody(body) {
     isOfficeRepresentative: isOfficeRepresentative ? 1 : 0,
     showTitle: showTitle === false ? 0 : 1,
     showOffice: showOffice === false ? 0 : 1,
+    showStats: showStats ? 1 : 0,
     money: moneyNum,
   }
 }
@@ -44,6 +45,7 @@ export function formatPc(r) {
     is_office_representative: !!r.is_office_representative,
     show_title: !!r.show_title,
     show_office: !!r.show_office,
+    show_stats: !!r.show_stats,
     stats: JSON.parse(r.stats || '{}'),
   }
 }

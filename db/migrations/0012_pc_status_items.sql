@@ -1,5 +1,7 @@
 -- PCのステータス(CoC6版。JSON: {"STR":10,...,"HP":12,"MP":10})
 ALTER TABLE pcs ADD COLUMN stats TEXT NOT NULL DEFAULT '{}';
+-- ステータスをPCタブ(公開一覧)に出すか(0/1。初期は非公開)
+ALTER TABLE pcs ADD COLUMN show_stats INTEGER NOT NULL DEFAULT 0;
 
 -- PCの所持品
 CREATE TABLE pc_items (

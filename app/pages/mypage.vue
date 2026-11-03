@@ -202,6 +202,7 @@ const emptyPcForm = () => ({
   isOfficeRepresentative: false,
   showTitle: true,
   showOffice: true,
+  showStats: false,
 })
 
 const refreshPcs = async () => {
@@ -224,6 +225,7 @@ const pcToForm = (pc) => ({
   isOfficeRepresentative: !!pc.is_office_representative,
   showTitle: !!pc.show_title,
   showOffice: !!pc.show_office,
+  showStats: !!pc.show_stats,
   stats: Object.fromEntries(STAT_KEYS.map((k) => [k, pc.stats?.[k] ?? ''])),
 })
 
@@ -603,7 +605,7 @@ const confirmPcDelete = async () => {
           <p class="meta-line">
             所属: {{ item.affiliation || '-' }} / 事務所: {{ item.office || '-' }} / {{ item.grade }}級<template v-if="pcRoles(item)"> / {{ pcRoles(item) }}</template>
           </p>
-          <p class="view-label">ステータス</p>
+          <p class="view-label">ステータス<span class="stats-visibility" :class="{ public: item.show_stats }">{{ item.show_stats ? '公開' : '非公開' }}</span></p>
           <div class="stat-grid">
             <div v-for="k in STAT_KEYS" :key="k" class="stat-cell">
               <span class="stat-key">{{ k }}</span>
@@ -680,6 +682,10 @@ const confirmPcDelete = async () => {
               />
             </label>
           </div>
+          <label class="check-label">
+            <input v-model="drafts[item.id].showStats" type="checkbox" />
+            ステータスをPCタブで公開する
+          </label>
 
           <label class="edit-label">メモ</label>
           <textarea v-model="drafts[item.id].memo" class="edit-textarea auto-wrap" rows="3" @input="resize" />
@@ -1938,5 +1944,19 @@ const confirmPcDelete = async () => {
 
 .pc-common {
   padding-top: 4px;
+}
+
+.stats-visibility {
+  margin-left: 6px;
+  padding: 0 6px;
+  font-size: 0.65rem;
+  border: 1px solid currentColor;
+  opacity: 0.6;
+}
+
+.stats-visibility.public {
+  opacity: 1;
+  background: var(--color-accent, #ffd400);
+  border-color: var(--color-text, #000);
 }
 </style>

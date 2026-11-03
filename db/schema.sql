@@ -93,6 +93,7 @@ CREATE TABLE pcs (
   memo TEXT,
   items TEXT NOT NULL DEFAULT '', -- 持ち物(自由記述)
   stats TEXT NOT NULL DEFAULT '{}', -- ステータス(CoC6版。JSON)
+  show_stats INTEGER NOT NULL DEFAULT 0, -- 0/1 ステータスをPCタブに公開するか
   is_representative INTEGER NOT NULL DEFAULT 0, -- 0/1 協会の代表
   is_office_representative INTEGER NOT NULL DEFAULT 0, -- 0/1 事務所の代表
   show_title INTEGER NOT NULL DEFAULT 1, -- 0/1 名前と一緒に肩書きを表示するか

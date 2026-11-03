@@ -17,10 +17,10 @@ export default defineEventHandler(async (event) => {
     db
       .prepare(
         `INSERT INTO pcs (created_by, name, affiliation, office, grade, memo, items, stats,
-          is_representative, is_office_representative, show_title, show_office, money)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          is_representative, is_office_representative, show_title, show_office, show_stats, money)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
-      .bind(currentUser.id, pc.name, pc.affiliation, pc.office, pc.grade, pc.memo, pc.items, pc.stats, pc.isRepresentative, pc.isOfficeRepresentative, pc.showTitle, pc.showOffice, pc.money),
+      .bind(currentUser.id, pc.name, pc.affiliation, pc.office, pc.grade, pc.memo, pc.items, pc.stats, pc.isRepresentative, pc.isOfficeRepresentative, pc.showTitle, pc.showOffice, pc.showStats, pc.money),
     // 初期所持金も履歴に残す
     ...(pc.money !== 0
       ? [
