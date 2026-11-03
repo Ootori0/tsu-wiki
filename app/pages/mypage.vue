@@ -390,6 +390,52 @@ const showItemConfirm = ref(false)
 const openItemCreate = (pcId, category = 'cargo') => {
   itemDialog.value = { open: true, pcId, itemId: null }
   itemForm.value = { ...emptyItemForm(), category }
+  itemMode.value = 'manual'
+}
+
+// 持ち込み: 過去や別のルートで手に入れた店の商品を追加する(代金0・在庫は減らない。購入履歴に「持ち込み」で残る)
+const itemMode = ref('manual') // manual: 自分で入力 / shop: 店の商品から
+const shopItems = ref(null) // 店の商品(持ち込みを選んだときに一度だけ読み込む)
+const carryForm = ref({ itemId: null, quantity: 1, search: '' })
+const { showWithUndo } = useUndo()
+
+const setItemMode = async (mode) => {
+  itemMode.value = mode
+  if (mode !== 'shop' || shopItems.value) return
+  try {
+    shopItems.value = await $fetch('/api/shop/items')
+  } catch {
+    shopItems.value = null
+    show('店の商品を読み込めませんでした', 'error')
+  }
+}
+const filteredShopItems = computed(() => {
+  const q = carryForm.value.search.trim().toLowerCase()
+  const list = shopItems.value ?? []
+  return q ? list.filter((i) => i.name.toLowerCase().includes(q)) : list
+})
+const carryItem = computed(() => (shopItems.value ?? []).find((i) => i.id === carryForm.value.itemId) ?? null)
+const carryCategoryLabel = computed(() => ITEM_CATEGORIES.find((c) => c.value === (carryItem.value?.item_category ?? 'storage'))?.label)
+
+const saveCarryIn = async () => {
+  const { pcId } = itemDialog.value
+  const item = carryItem.value
+  if (!item) return
+  itemSaving.value = true
+  try {
+    const res = await $fetch(`/api/pcs/${pcId}/items/carry-in`, {
+      method: 'POST',
+      body: { itemId: item.id, quantity: carryForm.value.quantity },
+    })
+    itemDialog.value.open = false
+    updatePc(pcId, (p) => ({ ...p, pcItems: res.items }))
+    carryForm.value = { itemId: null, quantity: 1, search: '' }
+    showWithUndo(`「${item.name}」を持ち込みました`, 'purchase', res.purchaseId, refreshPcs)
+  } catch (e) {
+    show(e?.data?.statusMessage ?? '追加に失敗しました', 'error')
+  } finally {
+    itemSaving.value = false
+  }
 }
 
 const openItemEdit = (pcId, item) => {
@@ -939,9 +985,39 @@ const confirmPcDelete = async () => {
     <FormDialog
       v-model="itemDialog.open"
       :title="itemDialog.itemId ? '所持品の編集' : '所持品の追加'"
-      :save-disabled="itemSaving || !itemForm.name.trim()"
-      @save="saveItem"
+      :save-label="!itemDialog.itemId && itemMode === 'shop' ? '持ち込む' : '保存'"
+      :save-disabled="itemSaving || (!itemDialog.itemId && itemMode === 'shop' ? !carryItem || !(carryForm.quantity >= 1) : !itemForm.name.trim())"
+      @save="!itemDialog.itemId && itemMode === 'shop' ? saveCarryIn() : saveItem()"
     >
+      <div v-if="!itemDialog.itemId" class="mode-switch" role="tablist">
+        <button :class="{ active: itemMode === 'manual' }" role="tab" @click="setItemMode('manual')">自分で入力</button>
+        <button :class="{ active: itemMode === 'shop' }" role="tab" @click="setItemMode('shop')">店の商品から</button>
+      </div>
+
+      <template v-if="!itemDialog.itemId && itemMode === 'shop'">
+        <p class="markdown-hint">過去や別のルートで手に入れた店の商品を追加します。代金はかからず、店の在庫も減りません。所持金の履歴に「持ち込み」として残ります。</p>
+        <label class="edit-label">商品</label>
+        <input v-model="carryForm.search" class="edit-input" placeholder="名前で絞り込み" />
+        <div v-if="shopItems === null" class="markdown-hint">読み込み中…</div>
+        <div v-else class="carry-list">
+          <label
+            v-for="si in filteredShopItems"
+            :key="si.id"
+            class="cat-choice"
+            :class="{ active: carryForm.itemId === si.id }"
+          >
+            <input v-model="carryForm.itemId" type="radio" :value="si.id" />
+            <span class="cat-choice-label">{{ si.name }}</span>
+            <span class="cat-choice-note">{{ si.shop }}</span>
+          </label>
+          <p v-if="filteredShopItems.length === 0" class="markdown-hint">該当する商品がありません</p>
+        </div>
+        <label class="edit-label">個数(1個単位。セット販売の商品もばらの個数で)</label>
+        <input v-model.number="carryForm.quantity" type="number" min="1" inputmode="numeric" class="edit-input" />
+        <p v-if="carryItem" class="markdown-hint">「{{ carryCategoryLabel }}」に入ります。同じ商品を持っていればその個数に足します。</p>
+      </template>
+
+      <template v-else>
       <label class="edit-label">名前</label>
       <input v-model="itemForm.name" class="edit-input" />
 
@@ -980,6 +1056,7 @@ const confirmPcDelete = async () => {
           <input v-model.number="itemForm.modifiers[k]" type="number" inputmode="numeric" />
         </label>
       </div>
+      </template>
 
       <template v-if="itemDialog.itemId" #extra>
         <button class="delete-btn" @click="showItemConfirm = true">削除</button>
@@ -1898,6 +1975,41 @@ const confirmPcDelete = async () => {
 .cat-choice-note {
   font-size: 0.72rem;
   opacity: 0.7;
+}
+
+/* 所持品の追加: 「自分で入力」「店の商品から」の切り替え */
+.mode-switch {
+  display: flex;
+  border: 1px solid var(--color-text, #000);
+  margin-bottom: 6px;
+}
+
+.mode-switch button {
+  flex: 1;
+  border: none;
+  background: none;
+  color: var(--color-text, #000);
+  padding: 8px;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.mode-switch button + button {
+  border-left: 1px solid var(--color-text, #000);
+}
+
+.mode-switch button.active {
+  background: var(--color-accent, #ffd400);
+  color: #000;
+  font-weight: bold;
+}
+
+.carry-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 240px;
+  overflow-y: auto;
 }
 
 .pc-item-line {

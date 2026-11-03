@@ -1,6 +1,6 @@
 // 履歴の削除・取り消しで使う、所持金の増減を戻してから記録を消すSQL
 // kind: manual/settle/mode … 所持金の手動増減など(money_logs)
-//       purchase …… 購入(販売者への支払いも取り消し、在庫を戻す。割引で買ったものは割引の在庫へ)
+//       purchase …… 購入(販売者への支払いも取り消し、在庫を戻す。割引で買ったものは割引の在庫へ。持ち込みは在庫を戻さない)
 //       sale ……… 販売者への支払い1件
 //       casino/dealer … チンチロの勝負(プレイヤーとディーラーの両方の増減を取り消す)
 //       casino_month/dealer_month … 圧縮したチンチロの月計(同上)
@@ -68,11 +68,11 @@ export const HISTORY_TARGETS = {
       // 在庫を戻す(割引で買ったものは割引の在庫へ。無制限の商品・削除済みの商品はそのまま)
       db.prepare(
         `UPDATE shop_items SET stock = stock + (SELECT quantity FROM purchases WHERE id = ?1)
-         WHERE stock IS NOT NULL AND id = (SELECT item_id FROM purchases WHERE id = ?1 AND discount = 0)`
+         WHERE stock IS NOT NULL AND id = (SELECT item_id FROM purchases WHERE id = ?1 AND discount = 0 AND carry_in = 0)`
       ).bind(id),
       db.prepare(
         `UPDATE shop_items SET discount_stock = discount_stock + (SELECT quantity FROM purchases WHERE id = ?1)
-         WHERE id = (SELECT item_id FROM purchases WHERE id = ?1 AND discount = 1)`
+         WHERE id = (SELECT item_id FROM purchases WHERE id = ?1 AND discount = 1 AND carry_in = 0)`
       ).bind(id),
       // 所持品に入れた分を減らす(0個になったら所持品から外す)
       db.prepare(
@@ -141,15 +141,15 @@ export function deleteAllHistoryOfPc(db, pcId) {
     ).bind(pcId),
     db.prepare(
       `UPDATE shop_items SET stock = stock + (
-         SELECT COALESCE(SUM(quantity), 0) FROM purchases WHERE pc_id = ?1 AND discount = 0 AND item_id = shop_items.id
+         SELECT COALESCE(SUM(quantity), 0) FROM purchases WHERE pc_id = ?1 AND discount = 0 AND carry_in = 0 AND item_id = shop_items.id
        )
-       WHERE stock IS NOT NULL AND id IN (SELECT item_id FROM purchases WHERE pc_id = ?1 AND discount = 0)`
+       WHERE stock IS NOT NULL AND id IN (SELECT item_id FROM purchases WHERE pc_id = ?1 AND discount = 0 AND carry_in = 0)`
     ).bind(pcId),
     db.prepare(
       `UPDATE shop_items SET discount_stock = discount_stock + (
-         SELECT COALESCE(SUM(quantity), 0) FROM purchases WHERE pc_id = ?1 AND discount = 1 AND item_id = shop_items.id
+         SELECT COALESCE(SUM(quantity), 0) FROM purchases WHERE pc_id = ?1 AND discount = 1 AND carry_in = 0 AND item_id = shop_items.id
        )
-       WHERE id IN (SELECT item_id FROM purchases WHERE pc_id = ?1 AND discount = 1)`
+       WHERE id IN (SELECT item_id FROM purchases WHERE pc_id = ?1 AND discount = 1 AND carry_in = 0)`
     ).bind(pcId),
     // 所持品に入れた分を減らす(0個になったら所持品から外す)
     db.prepare(

@@ -49,10 +49,10 @@ export default defineEventHandler(async (event) => {
   const { results } = await db
     .prepare(
       `SELECT * FROM (
-         SELECT 'purchase' AS kind, id, shop, item_name || CASE WHEN set_size > 1 THEN '(' || set_size || '個セット)' ELSE '' END || CASE WHEN discount = 1 THEN '(割引)' ELSE '' END AS item_name, quantity, -total AS amount, created_at
+         SELECT 'purchase' AS kind, id, shop, item_name || CASE WHEN set_size > 1 THEN '(' || set_size || '個セット)' ELSE '' END || CASE WHEN discount = 1 THEN '(割引)' ELSE '' END || CASE WHEN carry_in = 1 THEN '(持ち込み)' ELSE '' END AS item_name, quantity, -total AS amount, created_at
          FROM purchases WHERE pc_id = ?
          UNION ALL
-         SELECT 'sale' AS kind, po.id, pu.shop, pu.item_name || CASE WHEN pu.set_size > 1 THEN '(' || pu.set_size || '個セット)' ELSE '' END || CASE WHEN pu.discount = 1 THEN '(割引)' ELSE '' END, pu.quantity, po.amount AS amount, po.created_at
+         SELECT 'sale' AS kind, po.id, pu.shop, pu.item_name || CASE WHEN pu.set_size > 1 THEN '(' || pu.set_size || '個セット)' ELSE '' END || CASE WHEN pu.discount = 1 THEN '(割引)' ELSE '' END || CASE WHEN pu.carry_in = 1 THEN '(持ち込み)' ELSE '' END, pu.quantity, po.amount AS amount, po.created_at
          FROM purchase_payouts po JOIN purchases pu ON pu.id = po.purchase_id
          WHERE po.pc_id = ?
        ) ORDER BY created_at DESC, id DESC LIMIT 50`

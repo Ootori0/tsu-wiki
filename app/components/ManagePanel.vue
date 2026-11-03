@@ -501,7 +501,7 @@ const savePayouts = async () => {
         <div v-for="p in allPurchases ?? []" :key="p.id" class="list-row">
           <span class="item-meta">
             {{ formatDateTime(p.created_at) }}<br />
-            {{ p.pc_name ?? '(削除済みPC)' }}: [{{ p.shop }}] {{ p.item_name }}{{ p.discount ? '(割引)' : '' }} ×{{ p.quantity }}{{ p.set_size > 1 ? `セット(${p.set_size}個入)` : '' }}
+            {{ p.pc_name ?? '(削除済みPC)' }}: [{{ p.shop }}] {{ p.item_name }}{{ p.discount ? '(割引)' : '' }}{{ p.carry_in ? '(持ち込み)' : '' }} ×{{ p.quantity }}{{ p.set_size > 1 ? `セット(${p.set_size}個入)` : '' }}
             <template v-for="po in p.payouts" :key="po.purchase_id + po.pc_name">
               <br />→ {{ po.pc_name ?? '(削除済みPC)' }} +{{ formatMoney(po.amount) }}
             </template>
