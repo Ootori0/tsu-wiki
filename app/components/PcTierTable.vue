@@ -5,12 +5,13 @@ const props = defineProps({
 })
 const emit = defineEmits(['select'])
 
-const grades = Array.from({ length: 10 }, (_, i) => i + 1)
+// 級が空欄のPCは最後の「級なし」の段に並べる
+const grades = [...Array.from({ length: 10 }, (_, i) => i + 1), null]
 
 const tiers = computed(() =>
   grades.map((grade) => ({
     grade,
-    pcs: props.pcs.filter((pc) => pc.grade === grade),
+    pcs: props.pcs.filter((pc) => (pc.grade ?? null) === grade),
   }))
 )
 </script>
@@ -19,13 +20,16 @@ const tiers = computed(() =>
   <div class="tier-table">
     <div
       v-for="tier in tiers"
-      :key="tier.grade"
+      :key="tier.grade ?? 'none'"
       class="tier-row"
       :class="{ empty: tier.pcs.length === 0 }"
     >
       <div class="tier-label">
-        <span class="tier-num">{{ tier.grade }}</span>
-        <span class="tier-unit">級</span>
+        <template v-if="tier.grade">
+          <span class="tier-num">{{ tier.grade }}</span>
+          <span class="tier-unit">級</span>
+        </template>
+        <span v-else class="tier-unit">級なし</span>
       </div>
       <div class="tier-items">
         <button

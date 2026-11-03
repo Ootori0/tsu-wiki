@@ -10,9 +10,11 @@ export function parsePcBody(body) {
     throw createError({ statusCode: 400, statusMessage: 'name is required' })
   }
 
-  const gradeNum = Number(grade)
+  // 級は空欄も可(no_grade = 1。grade 列は 1〜10 の制約があるので 10 のまま置いておく)
+  const noGrade = grade === null || grade === undefined || grade === ''
+  const gradeNum = noGrade ? 10 : Number(grade)
   if (!Number.isInteger(gradeNum) || gradeNum < 1 || gradeNum > 10) {
-    throw createError({ statusCode: 400, statusMessage: '級は1~10で指定してください' })
+    throw createError({ statusCode: 400, statusMessage: '級は1~10で指定するか、空欄にしてください' })
   }
 
   // カジノの負けでマイナスになり得るので負の値も許可
@@ -26,6 +28,7 @@ export function parsePcBody(body) {
     affiliation: affiliation ?? '',
     office: office ?? '',
     grade: gradeNum,
+    noGrade: noGrade ? 1 : 0,
     memo: memo ?? '',
     items: items ?? '',
     stats: JSON.stringify(parseStats(stats)),
@@ -41,6 +44,7 @@ export function parsePcBody(body) {
 export function formatPc(r) {
   return {
     ...r,
+    grade: r.no_grade ? null : r.grade, // 空欄の級は null で返す
     is_representative: !!r.is_representative,
     is_office_representative: !!r.is_office_representative,
     show_title: !!r.show_title,

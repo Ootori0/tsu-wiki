@@ -382,13 +382,13 @@ const emptyItemForm = () => ({
   name: '', quantity: 1, size: 'small', perSlot: 1, category: 'cargo', effect: '',
   modifiers: Object.fromEntries(STAT_KEYS.map((k) => [k, ''])),
 })
-const itemDialog = ref({ open: false, pcId: null, itemId: null })
+const itemDialog = ref({ open: false, pcId: null, itemId: null, magic: false }) // magic: 魔道具・AF(大きさだけ編集できる)
 const itemForm = ref(emptyItemForm())
 const itemSaving = ref(false)
 const showItemConfirm = ref(false)
 
 const openItemCreate = (pcId, category = 'cargo') => {
-  itemDialog.value = { open: true, pcId, itemId: null }
+  itemDialog.value = { open: true, pcId, itemId: null, magic: false }
   itemForm.value = { ...emptyItemForm(), category }
   itemMode.value = 'manual'
 }
@@ -439,7 +439,7 @@ const saveCarryIn = async () => {
 }
 
 const openItemEdit = (pcId, item) => {
-  itemDialog.value = { open: true, pcId, itemId: item.id }
+  itemDialog.value = { open: true, pcId, itemId: item.id, magic: !!item.magic_id }
   itemForm.value = {
     name: item.name,
     quantity: item.quantity,
@@ -736,7 +736,7 @@ const confirmPcDelete = async () => {
         <!-- 閲覧モード -->
         <div v-if="!isEditing(item.id)" class="pc-view">
           <p class="meta-line">
-            所属: {{ item.affiliation || '-' }} / 事務所: {{ item.office || '-' }} / {{ item.grade }}級<template v-if="pcRoles(item)"> / {{ pcRoles(item) }}</template>
+            所属: {{ item.affiliation || '-' }} / 事務所: {{ item.office || '-' }} / {{ item.grade ? `${item.grade}級` : '級なし' }}<template v-if="pcRoles(item)"> / {{ pcRoles(item) }}</template>
           </p>
           <p class="view-label">ステータス<span class="stats-visibility" :class="{ public: item.show_stats }">{{ item.show_stats ? '公開' : '非公開' }}</span></p>
           <div class="stat-grid">
@@ -771,6 +771,7 @@ const confirmPcDelete = async () => {
             <div>
               <label class="edit-label">級</label>
               <select v-model.number="drafts[item.id].grade" class="edit-input">
+                <option :value="null">空欄</option>
                 <option v-for="g in grades" :key="g" :value="g">{{ g }}級</option>
               </select>
             </div>
@@ -984,7 +985,7 @@ const confirmPcDelete = async () => {
     <!-- 所持品の追加・編集 -->
     <FormDialog
       v-model="itemDialog.open"
-      :title="itemDialog.itemId ? '所持品の編集' : '所持品の追加'"
+      :title="itemDialog.magic ? '魔道具・AFの大きさ' : itemDialog.itemId ? '所持品の編集' : '所持品の追加'"
       :save-label="!itemDialog.itemId && itemMode === 'shop' ? '持ち込む' : '保存'"
       :save-disabled="itemSaving || (!itemDialog.itemId && itemMode === 'shop' ? !carryItem || !(carryForm.quantity >= 1) : !itemForm.name.trim())"
       @save="!itemDialog.itemId && itemMode === 'shop' ? saveCarryIn() : saveItem()"
@@ -1015,6 +1016,18 @@ const confirmPcDelete = async () => {
         <label class="edit-label">個数(1個単位。セット販売の商品もばらの個数で)</label>
         <input v-model.number="carryForm.quantity" type="number" min="1" inputmode="numeric" class="edit-input" />
         <p v-if="carryItem" class="markdown-hint">「{{ carryCategoryLabel }}」に入ります。同じ商品を持っていればその個数に足します。</p>
+      </template>
+
+      <template v-else-if="itemDialog.magic">
+        <!-- 魔道具・AF: 名前と効果は魔道具・AFの欄で変える。ここでは元になった物の大きさだけ -->
+        <p class="markdown-hint">「{{ itemForm.name }}」の名前と効果は、魔道具・AFの欄で編集します。ここでは荷物にしたときの大きさ(元になった物の大きさ)だけ変えられます。</p>
+        <label class="edit-label">大きさ</label>
+        <select v-model="itemForm.size" class="edit-input">
+          <option v-for="sz in ITEM_SIZES" :key="sz.value" :value="sz.value">{{ sz.label }}({{ sz.points }})</option>
+        </select>
+        <label class="edit-label">何個で1つ分の大きさか</label>
+        <input v-model.number="itemForm.perSlot" type="number" min="1" inputmode="numeric" class="edit-input" />
+        <p class="markdown-hint">荷物にしたときのコスト: {{ itemCost({ quantity: itemForm.quantity, per_slot: itemForm.perSlot, size: itemForm.size }) }}</p>
       </template>
 
       <template v-else>
@@ -1058,7 +1071,7 @@ const confirmPcDelete = async () => {
       </div>
       </template>
 
-      <template v-if="itemDialog.itemId" #extra>
+      <template v-if="itemDialog.itemId && !itemDialog.magic" #extra>
         <button class="delete-btn" @click="showItemConfirm = true">削除</button>
       </template>
     </FormDialog>
@@ -1169,6 +1182,7 @@ const confirmPcDelete = async () => {
 
       <label class="edit-label">級</label>
       <select v-model.number="pcForm.grade" class="edit-input">
+        <option :value="null">空欄</option>
         <option v-for="g in grades" :key="g" :value="g">{{ g }}級</option>
       </select>
 

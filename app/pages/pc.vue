@@ -94,7 +94,7 @@ const selectedPc = ref(null)
           >
             <div class="card-image">
               <PcImage :src="pc.image_url" :alt="pc.name" />
-              <span class="grade-tag">{{ pc.grade }}級</span>
+              <span v-if="pc.grade" class="grade-tag">{{ pc.grade }}級</span>
               <span v-if="pc.is_representative || pc.is_office_representative" class="rep-badge">代表</span>
             </div>
             <div class="card-body">
