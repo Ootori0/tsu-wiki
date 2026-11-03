@@ -3,8 +3,7 @@ const { user, ensureUser } = useAuth()
 onMounted(() => ensureUser())
 
 const pages = computed(() => [
-  { to: '/pc', label: 'PC', desc: 'キャラクターシートまとめ' },
-  { to: '/pc-tier', label: 'PC級一覧', desc: '級ごとのティア表' },
+  { to: '/pc', label: 'PC', desc: 'キャラクターシートまとめ・級ごとの一覧' },
   { to: '/magic', label: '魔法', desc: '魔法,魔道具,AF,魔術などの総覧' },
   { to: '/shop', label: '魔法店/武器屋', desc: 'PCの所持金で商品を購入' },
   { to: '/casino', label: 'カジノ[アーリア]', desc: 'チンチロで所持金を賭ける' },

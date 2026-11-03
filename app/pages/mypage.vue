@@ -27,6 +27,8 @@ const saveName = async () => {
 const { resize, fitAll: fitTextareas } = useAutoResize()
 // --- パスワード変更 ---
 const passwordAccordionOpen = ref(false)
+// アカウント設定(ID・パスワードの変更)はふだん閉じておく
+const accountOpen = ref(false)
 const currentPassword = ref('')
 const newPassword = ref('')
 const newPasswordConfirm = ref('')
@@ -88,10 +90,10 @@ const saving = ref(false)
 const deleting = ref(false)
 const showConfirm = ref(false)
 
-// ownerPcId を渡すと、所持者がそのPCの状態で開く(PCの中の「このPCの魔法を作成」)
-const openMagicCreate = (ownerPcId = null) => {
+// ownerPcId を渡すと、所持者がそのPCの状態で開く(PCの中の「このPCの魔法を作成」)。type で区分も決めて開ける
+const openMagicCreate = (ownerPcId = null, type = '魔法') => {
   magicEditingId.value = null
-  magicForm.value = { ...emptyMagicForm(), ownerPcId: typeof ownerPcId === 'number' ? ownerPcId : null }
+  magicForm.value = { ...emptyMagicForm(), type, ownerPcId: typeof ownerPcId === 'number' ? ownerPcId : null }
   magicDialogOpen.value = true
 }
 
@@ -112,15 +114,21 @@ const openMagicEdit = (item) => {
   fitTextareas()
 }
 
+// 魔道具・AF(所持者が自分のPC)が関わるときだけ、PCの所持品も変わる
+const touchesPcItems = (m) => !!m && ITEM_MAGIC_TYPES.includes(m.type) && !!(m.owner_pc_id ?? m.ownerPcId)
+
 const saveMagic = async () => {
   if (!magicForm.value.name) return
   const id = magicEditingId.value
+  const before = id ? (fetchedMagics.value ?? []).find((m) => m.id === id) : null
+  const needPcs = touchesPcItems(before) || touchesPcItems(magicForm.value)
   saving.value = true
   try {
     if (id) await $fetch(`/api/magics/${id}`, { method: 'PUT', body: magicForm.value })
     else await $fetch('/api/magics', { method: 'POST', body: magicForm.value })
     magicDialogOpen.value = false
-    await refreshMagics()
+    // 魔道具・AFが関わるときだけPCの所持品も読み込み直す(それ以外は魔法の一覧だけ)
+    await Promise.all([refreshMagics(), needPcs ? refreshPcsRaw() : null])
     // 魔法タブの一覧も次に開いたときに読み込み直す
     clearNuxtData('magics-list')
     show(id ? '魔法を保存しました' : '魔法を作成しました')
@@ -135,9 +143,11 @@ const confirmDelete = async () => {
   if (!magicEditingId.value) return
   deleting.value = true
   try {
+    const before = (fetchedMagics.value ?? []).find((m) => m.id === magicEditingId.value)
     await $fetch(`/api/magics/${magicEditingId.value}`, { method: 'DELETE' })
     magicDialogOpen.value = false
-    await refreshMagics()
+    // 魔道具・AFとして所持品に入っていたときだけPCの所持品も読み込み直す
+    await Promise.all([refreshMagics(), touchesPcItems(before) ? refreshPcsRaw() : null])
     // 魔法タブの一覧も次に開いたときに読み込み直す
     clearNuxtData('magics-list')
     show('魔法を削除しました')
@@ -180,8 +190,16 @@ const formPreview = (form) => ({
 })
 
 // 魔法: 「あなたの魔法一覧」にはすべて出し、自分のPCが所持者のものはそのPCの中にも出す
-const magicsOf = (pcId) => (fetchedMagics.value ?? []).filter((m) => m.owner_pc_id === pcId)
-const magicSection = computed(() => [{ id: 'magics', title: 'あなたの魔法一覧', count: (fetchedMagics.value ?? []).length }])
+// 魔法と魔道具・AFは分けて並べる(魔道具・AFは所持者のPCの倉庫にも入る)
+const isItemMagic = (m) => ITEM_MAGIC_TYPES.includes(m.type)
+const spellsAll = computed(() => (fetchedMagics.value ?? []).filter((m) => !isItemMagic(m)))
+const itemMagicsAll = computed(() => (fetchedMagics.value ?? []).filter(isItemMagic))
+const magicsOf = (pcId, items = false) =>
+  (fetchedMagics.value ?? []).filter((m) => m.owner_pc_id === pcId && isItemMagic(m) === items)
+const magicSections = computed(() => [
+  { id: 'spells', title: 'あなたの魔法一覧', list: spellsAll.value, type: '魔法', count: spellsAll.value.length },
+  { id: 'items', title: 'あなたの魔道具・AF一覧', list: itemMagicsAll.value, type: '魔道具', count: itemMagicsAll.value.length },
+])
 
 const myPcItems = computed(() =>
   (fetchedPcs.value ?? []).map((pc) => ({ ...pc, title: pcTitle(pc) }))
@@ -200,7 +218,15 @@ const emptyPcForm = () => ({
   isOfficeRepresentative: false,
   showTitle: true,
   showOffice: true,
+  showStats: false,
 })
+
+// 保存後に読み込み直さず、手元の一覧を書き換える(通信を減らす)
+// 取得したデータは中身を書き換えても画面に反映されないので、書き換えたPCを新しい配列にして置き換える
+const findPc = (id) => (fetchedPcs.value ?? []).find((pc) => pc.id === id)
+const updatePc = (id, fn) => {
+  fetchedPcs.value = (fetchedPcs.value ?? []).map((pc) => (pc.id === id ? fn({ ...pc, pcItems: [...(pc.pcItems ?? [])] }) : pc))
+}
 
 const refreshPcs = async () => {
   // PCタブの一覧キャッシュも破棄して次回表示時に再取得させる
@@ -217,12 +243,28 @@ const pcToForm = (pc) => ({
   office: pc.office ?? '',
   grade: pc.grade,
   memo: pc.memo ?? '',
+  // 自由記述の持ち物欄は廃止(画面には出さないが、入っていた内容は消さずに残す)
   items: pc.items ?? '',
   isRepresentative: !!pc.is_representative,
   isOfficeRepresentative: !!pc.is_office_representative,
   showTitle: !!pc.show_title,
   showOffice: !!pc.show_office,
+  showStats: !!pc.show_stats,
+  stats: Object.fromEntries(STAT_KEYS.map((k) => [k, pc.stats?.[k] ?? ''])),
 })
+
+// PCの中のタブ(PCごとに覚える)
+const PC_TABS = [
+  { value: 'basic', label: '基本' },
+  { value: 'items', label: '所持品', count: (pc) => pc.pcItems?.length ?? 0 },
+  { value: 'magic', label: '魔法・魔道具', count: (pc) => magicsOf(pc.id).length + magicsOf(pc.id, true).length },
+]
+const pcTabs = ref({})
+const tabOf = (id) => pcTabs.value[id] ?? 'basic'
+const setTab = (id, tab) => {
+  pcTabs.value = { ...pcTabs.value, [id]: tab }
+  if (tab === 'basic' && isEditing(id)) fitTextareas()
+}
 
 // 閲覧モード / 編集モード(PCごとに切り替える)
 const editingPcIds = ref([])
@@ -291,11 +333,24 @@ const saveDrafts = async () => {
   }
   savingDrafts.value = true
   try {
+    let renamedWithMagics = false
     for (const id of ids) {
-      await $fetch(`/api/pcs/${id}`, { method: 'PUT', body: drafts.value[id] })
-      baselines.value[id] = JSON.parse(JSON.stringify(drafts.value[id]))
+      const res = await $fetch(`/api/pcs/${id}`, { method: 'PUT', body: drafts.value[id] })
+      const pc = findPc(id)
+      if (pc && res.pc) {
+        if (pc.name !== res.pc.name && magicsOf(id).length + magicsOf(id, true).length) renamedWithMagics = true
+        baselines.value[id] = JSON.parse(JSON.stringify(drafts.value[id]))
+        // 所持品はこの保存では変わらないので手元のものを残す
+        updatePc(id, (p) => ({ ...p, ...res.pc, pcItems: p.pcItems }))
+      }
     }
-    await Promise.all([refreshPcs(), refreshMagics()])
+    // 他のページの一覧は次に開いたときに読み込み直す
+    clearNuxtData('pcs-list')
+    // 魔法の所持者にPC名を出しているので、名前を変えたときだけ魔法の一覧を読み込み直す
+    if (renamedWithMagics) {
+      clearNuxtData('magics-list')
+      await refreshMagics()
+    }
     show('PCを保存しました')
   } catch (e) {
     show(e?.data?.statusMessage ?? '保存に失敗しました', 'error')
@@ -313,13 +368,142 @@ const revertDrafts = async () => {
 
 // 保存していない変更があるときは、ページを離れる前に確かめる
 onBeforeRouteLeave(() => {
-  if (dirtyIds.value.length && !confirm('保存していないPCの変更があります。保存せずに移動しますか?')) return false
+  const unsaved = dirtyIds.value.length || Object.keys(pendingMoves.value).length
+  if (unsaved && !confirm('保存していない変更(PCの内容・所持品の移動)があります。保存せずに移動しますか?')) return false
 })
 const warnBeforeUnload = (e) => {
-  if (dirtyIds.value.length) e.preventDefault()
+  if (dirtyIds.value.length || Object.keys(pendingMoves.value).length) e.preventDefault()
 }
 onMounted(() => window.addEventListener('beforeunload', warnBeforeUnload))
 onBeforeUnmount(() => window.removeEventListener('beforeunload', warnBeforeUnload))
+
+// --- 所持品(追加・編集はポップアップ。保存するとすぐ反映) ---
+const emptyItemForm = () => ({
+  name: '', quantity: 1, size: 'small', perSlot: 1, category: 'cargo', effect: '',
+  modifiers: Object.fromEntries(STAT_KEYS.map((k) => [k, ''])),
+})
+const itemDialog = ref({ open: false, pcId: null, itemId: null })
+const itemForm = ref(emptyItemForm())
+const itemSaving = ref(false)
+const showItemConfirm = ref(false)
+
+const openItemCreate = (pcId, category = 'cargo') => {
+  itemDialog.value = { open: true, pcId, itemId: null }
+  itemForm.value = { ...emptyItemForm(), category }
+}
+
+const openItemEdit = (pcId, item) => {
+  itemDialog.value = { open: true, pcId, itemId: item.id }
+  itemForm.value = {
+    name: item.name,
+    quantity: item.quantity,
+    size: item.size,
+    perSlot: item.per_slot,
+    category: item.category ?? 'cargo',
+    effect: item.effect ?? '',
+    modifiers: Object.fromEntries(STAT_KEYS.map((k) => [k, item.modifiers?.[k] ?? ''])),
+  }
+  fitTextareas()
+}
+
+const saveItem = async () => {
+  const { pcId, itemId } = itemDialog.value
+  if (!itemForm.value.name.trim()) return
+  itemSaving.value = true
+  try {
+    const res = itemId
+      ? await $fetch(`/api/pc-items/${itemId}`, { method: 'PUT', body: itemForm.value })
+      : await $fetch(`/api/pcs/${pcId}/items`, { method: 'POST', body: itemForm.value })
+    itemDialog.value.open = false
+    // 返ってきた所持品で手元の一覧を書き換える(読み込み直さない)
+    if (res.item) {
+      updatePc(pcId, (p) => {
+        const idx = p.pcItems.findIndex((i) => i.id === res.item.id)
+        if (idx === -1) p.pcItems.push(res.item)
+        else p.pcItems.splice(idx, 1, res.item)
+        return p
+      })
+    }
+    show(itemId ? '所持品を保存しました' : '所持品を追加しました')
+  } catch (e) {
+    show(e?.data?.statusMessage ?? '保存に失敗しました', 'error')
+  } finally {
+    itemSaving.value = false
+  }
+}
+
+const deleteItem = async () => {
+  const { itemId } = itemDialog.value
+  if (!itemId) return
+  try {
+    await $fetch(`/api/pc-items/${itemId}`, { method: 'DELETE' })
+    itemDialog.value.open = false
+    updatePc(itemDialog.value.pcId, (p) => ({ ...p, pcItems: p.pcItems.filter((i) => i.id !== itemId) }))
+    show('所持品を削除しました')
+  } catch (e) {
+    show(e?.data?.statusMessage ?? '削除に失敗しました', 'error')
+  }
+}
+
+// 倉庫⇔荷物の出し入れ: チェックで移す先を選び(チェックあり=荷物)、「移動を確定」でまとめて保存する
+const pendingMoves = ref({}) // 所持品のid → 移す先の区分
+const isCargoChecked = (it) => (pendingMoves.value[it.id] ?? it.category) === 'cargo'
+const toggleCargo = (it, checked) => {
+  const next = { ...pendingMoves.value }
+  const target = checked ? 'cargo' : 'storage'
+  if (target === it.category) delete next[it.id]
+  else next[it.id] = target
+  pendingMoves.value = next
+}
+const pendingMovesOf = (pc) => pc.pcItems.filter((i) => pendingMoves.value[i.id])
+// 確定したときの荷物のコスト(移動を反映した見込み)
+const projectedCost = (pc) => totalCost(pc.pcItems.map((i) => ({ ...i, category: pendingMoves.value[i.id] ?? i.category })))
+
+const cancelMoves = (pc) => {
+  const next = { ...pendingMoves.value }
+  for (const i of pc.pcItems) delete next[i.id]
+  pendingMoves.value = next
+}
+
+const movingPcId = ref(null)
+const confirmMoves = async (pc) => {
+  const moves = pendingMovesOf(pc).map((i) => ({ id: i.id, category: pendingMoves.value[i.id] }))
+  if (!moves.length) return
+  movingPcId.value = pc.id
+  try {
+    await $fetch(`/api/pcs/${pc.id}/items/move`, { method: 'POST', body: { moves } })
+    const to = Object.fromEntries(moves.map((m) => [m.id, m.category]))
+    updatePc(pc.id, (p) => ({ ...p, pcItems: p.pcItems.map((i) => (to[i.id] ? { ...i, category: to[i.id] } : i)) }))
+    cancelMoves(pc)
+    show(`${moves.length}件を移動しました`)
+  } catch (e) {
+    show(e?.data?.statusMessage ?? '移動できませんでした', 'error')
+  } finally {
+    movingPcId.value = null
+  }
+}
+
+// 荷物チェッカー: ココフォリアに貼る文章をコピーする
+const copyLoadCheck = async (pc) => {
+  try {
+    await navigator.clipboard.writeText(loadCheckText(pc.name, pc.pcItems))
+    show('荷物の一覧をコピーしました')
+  } catch {
+    show('コピーできませんでした', 'error')
+  }
+}
+
+// ステータスの表示: 所持品(消耗品以外)の補正があれば「補正後(元の値+補正)」。HP/MPが未入力なら能力値からの目安
+const statDisplay = (pc, key) => {
+  let base = pc.stats?.[key]
+  if (base === undefined || base === '') {
+    const d = derivedStats(pc.stats)
+    base = key === 'HP' ? d.hp : key === 'MP' ? d.mp : null
+  }
+  if (base === null || base === undefined) return { value: '-', sub: '' }
+  const mod = totalModifiers(pc.pcItems)[key] ?? 0
+  return mod ? { value: base + mod, sub: `${base}${formatModifier(mod)}` } : { value: base, sub: '' }
+}
 
 // --- PCの新規作成はポップアップ ---
 const pcDialogOpen = ref(false)
@@ -380,22 +564,27 @@ const confirmPcDelete = async () => {
     <h1 class="page-title">ユーザーページ</h1>
 
     <!-- アカウント情報 -->
-    <div class="box">
-      <h2 class="box-title">アカウント情報</h2>
+    <div class="box account-box">
+      <button class="account-head" :aria-expanded="accountOpen" @click="accountOpen = !accountOpen">
+        <v-icon icon="mdi-account-circle" size="22" />
+        <span class="account-name">{{ user?.name }}</span>
+        <span v-for="perm in user?.permissions ?? []" :key="perm" class="chip active small">{{ perm }}</span>
+        <span class="account-toggle">アカウント設定</span>
+        <span class="password-accordion-icon" :class="{ open: accountOpen }">
+          <svg viewBox="0 0 24 24" width="14" height="14">
+            <path d="M8 5l8 7-8 7z" fill="currentColor" />
+          </svg>
+        </span>
+      </button>
 
+      <div class="password-outer" :class="{ open: accountOpen }">
+      <div class="password-inner">
       <label class="field-label">ID</label>
       <div class="inline-form">
         <input v-model="newName" class="field-input" />
         <button class="save-btn" :disabled="savingName" @click="saveName">変更</button>
       </div>
       <p v-if="nameError" class="error-text">{{ nameError }}</p>
-
-      <label class="field-label">権限</label>
-      <div class="chip-list">
-        <span v-for="perm in user?.permissions ?? []" :key="perm" class="chip active">
-          {{ perm }}
-        </span>
-      </div>
 
       <!-- パスワード変更(アコーディオン) -->
       <div class="password-accordion">
@@ -428,6 +617,8 @@ const confirmPcDelete = async () => {
           </div>
         </div>
       </div>
+      </div>
+      </div>
     </div>
 
     <!-- 所持金(ダイアログで編集) -->
@@ -448,12 +639,43 @@ const confirmPcDelete = async () => {
         <span v-if="dirtyIds.includes(item.id)" class="dirty-mark">未保存</span>
       </template>
       <template #detail="{ item }">
+        <!-- 所持金(どのタブでも見える) -->
+        <div class="pc-money">
+          <span class="money-label">{{ moneyLabel(item) }}</span>
+          <span class="money-value" :class="{ negative: item.money < 0 }">{{ formatBalance(item) }}</span>
+          <button class="money-edit-btn" @click="openMoneyDialog(item.id)">増減・履歴</button>
+        </div>
+
+        <!-- PCの中のタブ: 基本(プロフィール・ステータス) / 所持品 / 魔法 -->
+        <div class="pc-tabs" role="tablist">
+          <button
+            v-for="t in PC_TABS"
+            :key="t.value"
+            class="pc-tab"
+            :class="{ active: tabOf(item.id) === t.value }"
+            role="tab"
+            :aria-selected="tabOf(item.id) === t.value"
+            @click="setTab(item.id, t.value)"
+          >
+            {{ t.label }}<span v-if="t.count" class="pc-tab-count">{{ t.count(item) }}</span>
+          </button>
+        </div>
+
+        <template v-if="tabOf(item.id) === 'basic'">
         <!-- このPCの閲覧/編集の切り替え -->
-        <div class="pc-mode-row">
-          <div class="mode-switch" role="group" aria-label="表示の切り替え">
-            <button class="mode-btn" :class="{ active: !isEditing(item.id) }" @click="setEditing(item.id, false)">閲覧</button>
-            <button class="mode-btn" :class="{ active: isEditing(item.id) }" @click="setEditing(item.id, true)">編集</button>
-          </div>
+        <!-- 閲覧中は「編集する」ボタン、編集中は「編集中」の帯と「完了」ボタン -->
+        <div v-if="!isEditing(item.id)" class="pc-mode-row">
+          <span v-if="dirtyIds.includes(item.id)" class="dirty-note inline">未保存の変更あり</span>
+          <button class="edit-start-btn" @click="setEditing(item.id, true)">
+            <v-icon icon="mdi-pencil" size="16" />編集する
+          </button>
+        </div>
+        <div v-else class="editing-banner">
+          <v-icon icon="mdi-pencil" size="16" />
+          <span class="editing-banner-text">
+            編集中<small>{{ dirtyIds.includes(item.id) ? '変更は左下の「保存」で保存します' : '書き換えると左下に保存ボタンが出ます' }}</small>
+          </span>
+          <button class="edit-done-btn" @click="setEditing(item.id, false)">完了</button>
         </div>
 
         <!-- 閲覧モード -->
@@ -461,15 +683,21 @@ const confirmPcDelete = async () => {
           <p class="meta-line">
             所属: {{ item.affiliation || '-' }} / 事務所: {{ item.office || '-' }} / {{ item.grade }}級<template v-if="pcRoles(item)"> / {{ pcRoles(item) }}</template>
           </p>
+          <p class="view-label">ステータス<span class="stats-visibility" :class="{ public: item.show_stats }">{{ item.show_stats ? '公開' : '非公開' }}</span></p>
+          <div class="stat-grid">
+            <div v-for="k in STAT_KEYS" :key="k" class="stat-cell">
+              <span class="stat-key">{{ k }}</span>
+              <span class="stat-val">{{ statDisplay(item, k).value }}</span>
+              <span v-if="statDisplay(item, k).sub" class="stat-sub">{{ statDisplay(item, k).sub }}</span>
+            </div>
+          </div>
+          <p class="meta-line derived">
+            アイデア {{ derivedStats(item.stats).idea ?? '-' }} / 幸運 {{ derivedStats(item.stats).luck ?? '-' }} / 知識 {{ derivedStats(item.stats).know ?? '-' }} / DB {{ derivedStats(item.stats).db }}
+          </p>
           <template v-if="item.memo">
             <p class="view-label">メモ</p>
             <MarkdownText :text="item.memo" />
           </template>
-          <template v-if="item.items">
-            <p class="view-label">持ち物</p>
-            <MarkdownText :text="item.items" />
-          </template>
-          <p v-if="dirtyIds.includes(item.id)" class="dirty-note">保存していない変更があります(編集モードで確認できます)</p>
         </div>
 
         <!-- 編集モード -->
@@ -516,57 +744,141 @@ const confirmPcDelete = async () => {
           </div>
           <p class="markdown-hint">表示例: {{ pcTitle(formPreview(drafts[item.id])) }}</p>
 
+          <label class="edit-label">ステータス(CoC6版。HP/MPは空欄なら能力値からの目安を表示)</label>
+          <div class="stat-grid">
+            <label v-for="k in STAT_KEYS" :key="k" class="stat-input">
+              <span class="stat-key">{{ k }}</span>
+              <input
+                v-model.number="drafts[item.id].stats[k]"
+                type="number"
+                inputmode="numeric"
+                :placeholder="k === 'HP' ? String(derivedStats(drafts[item.id].stats).hp ?? '') : k === 'MP' ? String(derivedStats(drafts[item.id].stats).mp ?? '') : ''"
+              />
+            </label>
+          </div>
+          <label class="check-label">
+            <input v-model="drafts[item.id].showStats" type="checkbox" />
+            ステータスをPCタブで公開する
+          </label>
+
           <label class="edit-label">メモ</label>
           <textarea v-model="drafts[item.id].memo" class="edit-textarea auto-wrap" rows="3" @input="resize" />
 
-          <label class="edit-label">持ち物</label>
-          <textarea v-model="drafts[item.id].items" class="edit-textarea auto-wrap" rows="2" placeholder="例: 杖、回復薬×2" @input="resize" />
           <p class="markdown-hint">
             # 見出し **太字** ~~取消線~~ `コード` &gt; 引用 ||スポイラー||
           </p>
 
         </div>
 
-        <!-- 所持金とこのPCの魔法(閲覧・編集のどちらでも出す) -->
-        <div class="pc-common">
-          <div class="money-row">
-            <span class="money-label">{{ moneyLabel(item) }}</span>
-            <span class="money-value" :class="{ negative: item.money < 0 }">{{ formatBalance(item) }}</span>
-            <button class="money-edit-btn" @click="openMoneyDialog(item.id)">増減・履歴</button>
+        <div v-if="isEditing(item.id)" class="pc-delete-row">
+          <button class="delete-btn pc-delete" :disabled="pcDeleting" @click="requestPcDelete(item.id)">このPCを削除</button>
+        </div>
+        </template>
+
+        <!-- 所持品・魔法のタブ -->
+        <div v-else class="pc-common">
+
+
+          <!-- 所持品: 装備品・荷物(荷物チェッカー)・倉庫 -->
+          <template v-if="tabOf(item.id) === 'items'">
+          <!-- 倉庫⇔荷物の移動の確定 -->
+          <div v-if="pendingMovesOf(item).length" class="move-bar">
+            <span class="move-bar-text">
+              {{ pendingMovesOf(item).length }}件を移動
+              <small>確定後のコスト {{ projectedCost(item) }} / {{ LOAD_LIMIT }}</small>
+            </span>
+            <button class="move-btn" :disabled="movingPcId === item.id" @click="cancelMoves(item)">取り消す</button>
+            <button class="move-btn primary" :disabled="movingPcId === item.id" @click="confirmMoves(item)">移動を確定</button>
+          </div>
+          <div v-for="cat in ITEM_CATEGORIES" :key="cat.value" class="pc-items">
+            <div class="sub-head">
+              <h3 class="pc-magics-title">
+                {{ cat.label }}<span class="section-count">{{ itemsOf(item.pcItems, cat.value).length }}件</span>
+              </h3>
+              <button class="mini-add" @click="openItemCreate(item.id, cat.value)">＋ 追加</button>
+            </div>
+            <p class="cat-note">{{ cat.note }}</p>
+            <div v-for="it in itemsOf(item.pcItems, cat.value)" :key="it.id" class="pc-item-line">
+            <!-- 荷物と倉庫はチェックで出し入れする(チェックあり=荷物) -->
+            <label v-if="cat.value !== 'equipment'" class="cargo-check" :title="cat.value === 'cargo' ? '倉庫に戻す' : '荷物に入れる'">
+              <input
+                type="checkbox"
+                :checked="isCargoChecked(it)"
+                :disabled="movingPcId === item.id"
+                :aria-label="cat.value === 'cargo' ? `${it.name}を倉庫に戻す` : `${it.name}を荷物に入れる`"
+                @change="toggleCargo(it, $event.target.checked)"
+              />
+            </label>
+            <button class="pc-item-row" @click="openItemEdit(item.id, it)">
+              <span class="pc-item-top">
+                <span class="pc-item-name">{{ it.name }}<span class="pc-item-qty">×{{ it.quantity }}</span></span>
+                <span v-if="pendingMoves[it.id]" class="move-mark">→{{ pendingMoves[it.id] === 'cargo' ? '荷物' : '倉庫' }}</span>
+                <span v-if="it.shop_item_id" class="pc-item-tag">店</span>
+                <span v-if="it.magic_id" class="pc-item-tag">魔道具・AF</span>
+                <span v-if="cat.value !== 'equipment'" class="pc-item-cost">{{ it.size === 'none' ? 'なし' : sizeLabel(it.size) }}{{ it.per_slot > 1 ? `(${it.per_slot}個で1つ)` : '' }} / {{ itemCost(it) }}</span>
+              </span>
+              <span v-if="Object.keys(it.modifiers ?? {}).length" class="pc-item-mods" :class="{ inactive: cat.value !== 'equipment' }">
+                {{ modifiersText(it.modifiers) }}<template v-if="cat.value !== 'equipment'">(装備・装飾品にすると反映)</template>
+              </span>
+              <span v-if="it.effect" class="pc-item-effect">{{ it.effect }}</span>
+            </button>
+            </div>
+            <p v-if="cat.value === 'equipment' && Object.keys(totalModifiers(item.pcItems)).length" class="mods-total">
+              補正の合計: {{ modifiersText(totalModifiers(item.pcItems)) }}
+            </p>
+
+            <!-- 荷物チェッカー -->
+            <div v-if="cat.value === 'cargo'" class="load-check" :class="{ over: totalCost(item.pcItems) > LOAD_LIMIT }">
+              <div class="load-head">
+                <span>荷物のコスト(大5・中3・小1)</span>
+                <strong>{{ totalCost(item.pcItems) }} / {{ LOAD_LIMIT }}</strong>
+              </div>
+              <div class="load-bar">
+                <div class="load-fill" :style="{ width: `${Math.min(100, (totalCost(item.pcItems) / LOAD_LIMIT) * 100)}%` }" />
+              </div>
+              <p v-if="totalCost(item.pcItems) > LOAD_LIMIT" class="load-over">上限を{{ totalCost(item.pcItems) - LOAD_LIMIT }}超えています</p>
+              <button class="copy-btn" @click="copyLoadCheck(item)">ココフォリア用にコピー</button>
+            </div>
           </div>
 
-          <!-- このPCが所持者の魔法 -->
-          <div class="pc-magics">
-            <h3 class="pc-magics-title">このPCの魔法<span class="section-count">{{ magicsOf(item.id).length }}件</span></h3>
-            <AccordionList :items="magicsOf(item.id)" title-key="name" class="ruled-list">
-              <template #detail="{ item: magic }">
-                <div class="view-mode">
-                  <p class="meta-line">区分: {{ magic.type }}</p>
-                  <p class="meta-line">コスト: {{ magic.cost || '-' }} / 発動条件: {{ magic.condition || '-' }}</p>
-                  <MarkdownText :text="magic.effect" />
-                  <button class="edit-btn" @click="openMagicEdit(magic)">編集</button>
-                </div>
-              </template>
-            </AccordionList>
-            <button class="add-btn" @click="openMagicCreate(item.id)">＋ このPCの魔法を作成</button>
+          </template>
+
+          <!-- このPCが所持者の魔法と魔道具・AF -->
+          <div v-else>
+            <div v-for="sec in [{ items: false, label: '魔法', type: '魔法' }, { items: true, label: '魔道具・AF', type: '魔道具' }]" :key="sec.label" class="pc-magics">
+              <div class="sub-head">
+                <h3 class="pc-magics-title">{{ sec.label }}<span class="section-count">{{ magicsOf(item.id, sec.items).length }}件</span></h3>
+                <button class="mini-add" @click="openMagicCreate(item.id, sec.type)">＋ 作成</button>
+              </div>
+              <p class="cat-note">{{ sec.items ? '作成するとこのPCの倉庫にも入ります' : '' }}</p>
+              <AccordionList :items="magicsOf(item.id, sec.items)" title-key="name" class="ruled-list">
+                <template #detail="{ item: magic }">
+                  <div class="view-mode">
+                    <p class="meta-line">区分: {{ magic.type }}</p>
+                    <p class="meta-line">コスト: {{ magic.cost || '-' }} / 発動条件: {{ magic.condition || '-' }}</p>
+                    <MarkdownText :text="magic.effect" />
+                    <button class="edit-btn" @click="openMagicEdit(magic)">編集</button>
+                  </div>
+                </template>
+              </AccordionList>
+            </div>
           </div>
 
-          <button v-if="isEditing(item.id)" class="delete-btn pc-delete" :disabled="pcDeleting" @click="requestPcDelete(item.id)">このPCを削除</button>
         </div>
       </template>
     </AccordionList>
     <button class="add-btn" @click="openPcCreate">＋ PCを作成</button>
 
-    <!-- 自分の魔法一覧(表示はアコーディオン、記入・編集はポップアップ) -->
-    <AccordionList :items="magicSection" class="section-accordion">
+    <!-- 自分の魔法一覧・魔道具・AF一覧(表示はアコーディオン、記入・編集はポップアップ) -->
+    <AccordionList :items="magicSections" multiple class="section-accordion">
       <template #title="{ item }">
         <span class="section-title">{{ item.title }}</span>
         <span class="section-count">{{ item.count }}件</span>
       </template>
-      <template #detail>
+      <template #detail="{ item: sec }">
         <div class="section-body">
-          <p v-if="!(fetchedMagics ?? []).length" class="empty">まだ魔法がありません</p>
-          <AccordionList :items="fetchedMagics ?? []" title-key="name" class="ruled-list">
+          <p v-if="!sec.list.length" class="empty">まだありません</p>
+          <AccordionList :items="sec.list" title-key="name" class="ruled-list">
             <template #detail="{ item }">
               <div class="view-mode">
                 <p class="meta-line">区分: {{ item.type }} / 所持者: {{ item.owner_pc_name || item.owner || '-' }}</p>
@@ -576,7 +888,7 @@ const confirmPcDelete = async () => {
               </div>
             </template>
           </AccordionList>
-          <button class="add-btn" @click="openMagicCreate">＋ 魔法を作成</button>
+          <button class="add-btn" @click="openMagicCreate(null, sec.type)">＋ {{ sec.type === '魔法' ? '魔法' : '魔道具・AF' }}を作成</button>
         </div>
       </template>
     </AccordionList>
@@ -589,6 +901,64 @@ const confirmPcDelete = async () => {
         <button class="save-bar-btn primary" :disabled="savingDrafts" @click="saveDrafts">保存</button>
       </div>
     </Transition>
+
+    <!-- 所持品の追加・編集 -->
+    <FormDialog
+      v-model="itemDialog.open"
+      :title="itemDialog.itemId ? '所持品の編集' : '所持品の追加'"
+      :save-disabled="itemSaving || !itemForm.name.trim()"
+      @save="saveItem"
+    >
+      <label class="edit-label">名前</label>
+      <input v-model="itemForm.name" class="edit-input" />
+
+      <div class="pc-grid">
+        <div>
+          <label class="edit-label">個数</label>
+          <input v-model.number="itemForm.quantity" type="number" min="0" inputmode="numeric" class="edit-input" />
+        </div>
+        <div>
+          <label class="edit-label">大きさ</label>
+          <select v-model="itemForm.size" class="edit-input">
+            <option v-for="sz in ITEM_SIZES" :key="sz.value" :value="sz.value">{{ sz.label }}({{ sz.points }})</option>
+          </select>
+        </div>
+      </div>
+      <label class="edit-label">何個で1つ分の大きさか(例: 御札は10、手榴弾は2)</label>
+      <input v-model.number="itemForm.perSlot" type="number" min="1" inputmode="numeric" class="edit-input" />
+      <p class="markdown-hint">荷物にしたときのコスト: {{ itemCost({ quantity: itemForm.quantity, per_slot: itemForm.perSlot, size: itemForm.size }) }}</p>
+
+      <label class="edit-label">区分</label>
+      <div class="cat-choices">
+        <label v-for="cat in ITEM_CATEGORIES" :key="cat.value" class="cat-choice" :class="{ active: itemForm.category === cat.value }">
+          <input v-model="itemForm.category" type="radio" :value="cat.value" />
+          <span class="cat-choice-label">{{ cat.label }}</span>
+          <span class="cat-choice-note">{{ cat.note }}</span>
+        </label>
+      </div>
+
+      <label class="edit-label">効果</label>
+      <textarea v-model="itemForm.effect" class="edit-textarea auto-wrap" rows="2" @input="resize" />
+
+      <label class="edit-label">ステータスへの補正(装備品のときだけ反映。例: STR に 1)</label>
+      <div class="stat-grid">
+        <label v-for="k in STAT_KEYS" :key="k" class="stat-input">
+          <span class="stat-key">{{ k }}</span>
+          <input v-model.number="itemForm.modifiers[k]" type="number" inputmode="numeric" />
+        </label>
+      </div>
+
+      <template v-if="itemDialog.itemId" #extra>
+        <button class="delete-btn" @click="showItemConfirm = true">削除</button>
+      </template>
+    </FormDialog>
+
+    <ConfirmDialog
+      v-model="showItemConfirm"
+      title="所持品の削除"
+      message="この所持品を削除します。よろしいですか?"
+      @confirm="deleteItem"
+    />
 
     <!-- 魔法の記入・編集 -->
     <FormDialog
@@ -618,6 +988,9 @@ const confirmPcDelete = async () => {
         placeholder="所持者を自由に記入"
         @input="resize"
       />
+      <p v-if="ITEM_MAGIC_TYPES.includes(magicForm.type)" class="markdown-hint">
+        {{ magicForm.ownerPcId ? '所持者のPCの倉庫にも入ります(大きさは所持品の側で設定してください)' : '所持者を自分のPCにすると、そのPCの倉庫にも入ります' }}
+      </p>
 
       <label class="edit-label">コスト</label>
       <textarea v-model="magicForm.cost" class="edit-input auto-wrap" rows="1" @input="resize" />
@@ -717,8 +1090,6 @@ const confirmPcDelete = async () => {
       <label class="edit-label">メモ</label>
       <textarea v-model="pcForm.memo" class="edit-textarea auto-wrap" rows="3" @input="resize" />
 
-      <label class="edit-label">持ち物</label>
-      <textarea v-model="pcForm.items" class="edit-textarea auto-wrap" rows="2" @input="resize" />
       <p class="markdown-hint">
         # 見出し **太字** ~~取消線~~ `コード` &gt; 引用 ||スポイラー||
       </p>
@@ -1278,5 +1649,510 @@ const confirmPcDelete = async () => {
   display: flex;
   flex-direction: column;
   padding: 0 14px 14px;
+}
+
+/* ---------- ステータス ---------- */
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.stat-cell,
+.stat-input {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  border: 1px solid var(--color-text, #000);
+  padding: 3px 2px;
+  background: var(--color-bg, #fff);
+}
+
+.stat-key {
+  font-size: 0.65rem;
+  font-weight: bold;
+  opacity: 0.7;
+}
+
+.stat-val {
+  font-size: 0.85rem;
+  font-weight: bold;
+  white-space: nowrap;
+}
+
+.stat-sub {
+  font-size: 0.62rem;
+  color: var(--color-plus, #1b7f2a);
+  font-weight: bold;
+}
+
+.stat-input input {
+  width: 100%;
+  border: none;
+  padding: 2px;
+  text-align: center;
+  font-weight: bold;
+  box-sizing: border-box;
+}
+
+.meta-line.derived {
+  margin-top: 6px;
+}
+
+/* ---------- 所持品・荷物チェッカー ---------- */
+.pc-items {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 2px solid var(--color-text, #000);
+}
+
+.pc-item-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  text-align: left;
+  border: none;
+  border-bottom: 1px solid var(--color-line, rgba(0, 0, 0, 0.14));
+  background: none;
+  color: var(--color-text, #000);
+  padding: 8px 2px;
+  cursor: pointer;
+}
+
+.pc-item-top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pc-item-name {
+  flex: 1;
+  font-weight: bold;
+  font-size: 0.9rem;
+  word-break: break-word;
+}
+
+.pc-item-qty {
+  margin-left: 4px;
+  font-weight: normal;
+  font-size: 0.8rem;
+}
+
+.pc-item-tag {
+  font-size: 0.65rem;
+  border: 1px solid currentColor;
+  padding: 0 4px;
+  opacity: 0.7;
+}
+
+.pc-item-cost {
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+.pc-item-mods {
+  font-size: 0.75rem;
+  font-weight: bold;
+  color: var(--color-plus, #1b7f2a);
+}
+
+.pc-item-effect {
+  font-size: 0.78rem;
+  opacity: 0.75;
+  white-space: pre-line;
+}
+
+.mods-total {
+  margin: 8px 0 0;
+  font-size: 0.8rem;
+  font-weight: bold;
+}
+
+.load-check {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--color-text, #000);
+  background: var(--color-bg, #fff);
+}
+
+.load-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  font-size: 0.8rem;
+}
+
+.load-head strong {
+  font-size: 1.05rem;
+}
+
+.load-bar {
+  height: 8px;
+  margin: 6px 0;
+  border: 1px solid var(--color-text, #000);
+  background: var(--color-page, #f6f5ef);
+}
+
+.load-fill {
+  height: 100%;
+  background: var(--color-accent, #ffd400);
+  transition: width 0.2s ease;
+}
+
+.load-check.over .load-fill {
+  background: var(--color-error, #c62828);
+}
+
+.load-over {
+  margin: 0 0 6px;
+  font-size: 0.78rem;
+  font-weight: bold;
+  color: var(--color-error, #c62828);
+}
+
+.copy-btn {
+  width: 100%;
+  border: 1px solid #000;
+  background: #000;
+  color: var(--color-accent, #ffd400);
+  padding: 8px;
+  font-size: 0.85rem;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.pc-item-mods.inactive {
+  color: inherit;
+  opacity: 0.5;
+  font-weight: normal;
+}
+
+.add-btn.small {
+  padding: 8px;
+  font-size: 0.82rem;
+}
+
+.cat-choices {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.cat-choice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--color-text, #000);
+  padding: 6px 10px;
+  cursor: pointer;
+}
+
+.cat-choice.active {
+  background: var(--color-accent-soft, #fff7cc);
+  border-width: 2px;
+}
+
+.cat-choice-label {
+  font-weight: bold;
+  font-size: 0.9rem;
+}
+
+.cat-choice-note {
+  font-size: 0.72rem;
+  opacity: 0.7;
+}
+
+.pc-item-line {
+  display: flex;
+  align-items: stretch;
+  border-bottom: 1px solid var(--color-line, rgba(0, 0, 0, 0.14));
+}
+
+.pc-item-line .pc-item-row {
+  border-bottom: none;
+}
+
+.cargo-check {
+  display: flex;
+  align-items: center;
+  padding: 0 8px 0 2px;
+  cursor: pointer;
+}
+
+/* ---------- アカウント(ふだんは1行) ---------- */
+.account-box {
+  padding: 0;
+}
+
+.account-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 12px 14px;
+  border: none;
+  background: none;
+  color: var(--color-text, #000);
+  cursor: pointer;
+  text-align: left;
+}
+
+.account-name {
+  font-weight: bold;
+  font-size: 1rem;
+}
+
+.chip.small {
+  padding: 1px 8px;
+  font-size: 0.7rem;
+}
+
+.account-toggle {
+  margin-left: auto;
+  font-size: 0.75rem;
+  opacity: 0.7;
+}
+
+.account-box .password-inner {
+  padding: 0 14px;
+}
+
+.account-box .password-outer.open .password-inner {
+  padding-bottom: 14px;
+}
+
+/* ---------- PCの中: 所持金・タブ ---------- */
+.pc-money {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 12px 14px 0;
+  padding: 8px 10px;
+  background: #000;
+  color: var(--color-accent, #ffd400);
+}
+
+.pc-money .money-label {
+  font-size: 0.75rem;
+  font-weight: bold;
+}
+
+.pc-money .money-value {
+  flex: 1;
+  font-size: 1.1rem;
+  font-weight: bold;
+}
+
+.pc-money .money-value.negative {
+  color: #ff6b6b;
+}
+
+.pc-tabs {
+  display: flex;
+  margin: 12px 14px 0;
+  border-bottom: 2px solid var(--color-text, #000);
+}
+
+.pc-tab {
+  flex: 1;
+  border: none;
+  background: none;
+  color: var(--color-text, #000);
+  padding: 8px 4px;
+  font-size: 0.88rem;
+  font-weight: bold;
+  opacity: 0.55;
+  cursor: pointer;
+  border-bottom: 4px solid transparent;
+  margin-bottom: -2px;
+}
+
+.pc-tab.active {
+  opacity: 1;
+  border-bottom-color: var(--color-accent, #ffd400);
+}
+
+.pc-tab-count {
+  margin-left: 4px;
+  font-size: 0.7rem;
+  font-weight: normal;
+}
+
+.pc-mode-row {
+  align-items: center;
+  gap: 8px;
+}
+
+.dirty-note.inline {
+  margin: 0 auto 0 0;
+}
+
+.sub-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.sub-head .pc-magics-title {
+  margin: 0;
+}
+
+.mini-add {
+  flex-shrink: 0;
+  border: 1px solid var(--color-text, #000);
+  background: var(--color-accent, #ffd400);
+  color: #000;
+  padding: 4px 10px;
+  font-size: 0.78rem;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.cat-note {
+  display: block;
+  margin: 2px 0 4px;
+  font-size: 0.7rem;
+  opacity: 0.6;
+}
+
+.pc-delete-row {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0 14px 14px;
+}
+
+.pc-common .pc-items:first-of-type,
+.pc-common .pc-magics {
+  border-top: none;
+}
+
+.pc-common {
+  padding-top: 4px;
+}
+
+.stats-visibility {
+  margin-left: 6px;
+  padding: 0 6px;
+  font-size: 0.65rem;
+  border: 1px solid currentColor;
+  opacity: 0.6;
+}
+
+.stats-visibility.public {
+  opacity: 1;
+  background: var(--color-accent, #ffd400);
+  border-color: var(--color-text, #000);
+}
+
+/* ---------- 編集の開始・終了 ---------- */
+.edit-start-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  border: 1px solid var(--color-text, #000);
+  background: var(--color-bg, #fff);
+  color: var(--color-text, #000);
+  padding: 6px 14px;
+  font-size: 0.85rem;
+  font-weight: bold;
+  cursor: pointer;
+  box-shadow: 2px 2px 0 var(--color-text, #000);
+}
+
+.edit-start-btn:active {
+  transform: translate(2px, 2px);
+  box-shadow: none;
+}
+
+.editing-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 10px 14px 0;
+  padding: 8px 10px;
+  background: var(--color-accent, #ffd400);
+  border: 1px solid var(--color-text, #000);
+  color: #000;
+}
+
+.editing-banner-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  font-size: 0.85rem;
+  font-weight: bold;
+  line-height: 1.3;
+}
+
+.editing-banner-text small {
+  font-size: 0.68rem;
+  font-weight: normal;
+}
+
+.edit-done-btn {
+  flex-shrink: 0;
+  border: 1px solid #000;
+  background: #000;
+  color: var(--color-accent, #ffd400);
+  padding: 6px 16px;
+  font-size: 0.85rem;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+/* ---------- 倉庫⇔荷物の移動 ---------- */
+.move-mark {
+  font-size: 0.7rem;
+  font-weight: bold;
+  padding: 0 5px;
+  background: var(--color-accent, #ffd400);
+  border: 1px solid #000;
+  color: #000;
+}
+
+.move-bar {
+  position: sticky;
+  top: 64px;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 10px 0 0;
+  padding: 8px 10px;
+  background: #000;
+  color: var(--color-accent, #ffd400);
+}
+
+.move-bar-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  font-size: 0.85rem;
+  font-weight: bold;
+  line-height: 1.3;
+}
+
+.move-bar-text small {
+  font-size: 0.7rem;
+  font-weight: normal;
+}
+
+.move-btn {
+  flex-shrink: 0;
+  border: 1px solid var(--color-accent, #ffd400);
+  background: transparent;
+  color: var(--color-accent, #ffd400);
+  padding: 6px 10px;
+  font-size: 0.8rem;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.move-btn.primary {
+  background: var(--color-accent, #ffd400);
+  color: #000;
 }
 </style>

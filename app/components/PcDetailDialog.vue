@@ -1,5 +1,16 @@
 <script setup>
 const pc = defineModel({ type: Object, default: null })
+
+// ステータスが1つでも入っていれば表示する
+const hasStats = computed(() => STAT_KEYS.some((k) => pc.value?.stats?.[k] !== undefined))
+const derived = computed(() => derivedStats(pc.value?.stats))
+const statOf = (k) => {
+  const v = pc.value?.stats?.[k]
+  if (v !== undefined) return v
+  if (k === 'HP') return derived.value.hp ?? '-'
+  if (k === 'MP') return derived.value.mp ?? '-'
+  return '-'
+}
 </script>
 
 <template>
@@ -46,13 +57,22 @@ const pc = defineModel({ type: Object, default: null })
           <span class="office-text">{{ pc.office }}</span>
         </div>
 
+        <div v-if="hasStats" class="detail-stats">
+          <div class="stat-grid">
+            <div v-for="k in STAT_KEYS" :key="k" class="stat-cell">
+              <span class="stat-key">{{ k }}</span>
+              <span class="stat-val">{{ statOf(k) }}</span>
+            </div>
+          </div>
+          <p class="stat-derived">
+            アイデア {{ derived.idea ?? '-' }} / 幸運 {{ derived.luck ?? '-' }} / 知識 {{ derived.know ?? '-' }} / DB {{ derived.db }}
+          </p>
+        </div>
+
         <div v-if="pc.memo" class="detail-memo">
           <MarkdownText :text="pc.memo" />
         </div>
-        <div v-if="pc.items" class="detail-memo">
-          <p class="detail-items-label">持ち物</p>
-          <MarkdownText :text="pc.items" />
-        </div>
+
       </div>
     </div>
   </Transition>
@@ -211,5 +231,40 @@ const pc = defineModel({ type: Object, default: null })
 .fade-enter-from,
 .fade-leave-to {
   opacity: 0;
+}
+
+.detail-stats {
+  margin: 0 16px 12px;
+}
+
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.stat-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  border: 1px solid var(--color-text, #000);
+  padding: 3px 2px;
+}
+
+.stat-key {
+  font-size: 0.62rem;
+  font-weight: bold;
+  opacity: 0.7;
+}
+
+.stat-val {
+  font-size: 0.9rem;
+  font-weight: bold;
+}
+
+.stat-derived {
+  margin: 6px 0 0;
+  font-size: 0.75rem;
+  opacity: 0.75;
 }
 </style>

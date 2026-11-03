@@ -1,6 +1,6 @@
 import { getSessionUser } from '../../utils/session'
 import { isAdmin } from '../../utils/permission'
-import { parsePcBody } from '../../utils/pc'
+import { parsePcBody, formatPc } from '../../utils/pc'
 import { invalidateCache } from '../../utils/cache'
 
 export default defineEventHandler(async (event) => {
@@ -30,15 +30,17 @@ export default defineEventHandler(async (event) => {
   await db
     .prepare(
       `UPDATE pcs
-       SET name = ?, affiliation = ?, office = ?, grade = ?, memo = ?, items = ?, is_representative = ?, is_office_representative = ?,
-           show_title = ?, show_office = ?, updated_at = datetime('now')
+       SET name = ?, affiliation = ?, office = ?, grade = ?, memo = ?, items = ?, stats = ?, is_representative = ?, is_office_representative = ?,
+           show_title = ?, show_office = ?, show_stats = ?, updated_at = datetime('now')
        WHERE id = ?`
     )
-    .bind(pc.name, pc.affiliation, pc.office, pc.grade, pc.memo, pc.items, pc.isRepresentative, pc.isOfficeRepresentative, pc.showTitle, pc.showOffice, id)
+    .bind(pc.name, pc.affiliation, pc.office, pc.grade, pc.memo, pc.items, pc.stats, pc.isRepresentative, pc.isOfficeRepresentative, pc.showTitle, pc.showOffice, pc.showStats, id)
     .run()
 
   // 魔法の所持者にPC名を出しているので魔法のキャッシュも破棄する
   invalidateCache('pcs', 'casino:dealer', 'shop:items', 'magics')
 
-  return { id: Number(id), success: true }
+  // 画面で読み込み直さずに済むよう、保存したPCを返す
+  const row = await db.prepare('SELECT * FROM pcs WHERE id = ?').bind(id).first()
+  return { id: Number(id), success: true, pc: formatPc(row) }
 })

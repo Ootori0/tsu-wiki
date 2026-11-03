@@ -51,8 +51,9 @@ export default defineEventHandler(async (event) => {
 
   // 掛金分の所持金があることを balance_checks の CHECK 制約で確かめてから増減する
   // (足りなければバッチ全体がロールバック。負けで所持金がマイナスになるのは許容)
+  let batchResults
   try {
-    await db.batch([
+    batchResults = await db.batch([
       ...(isLedger ? [] : [db.prepare('INSERT INTO balance_checks (money) SELECT money - ? FROM pcs WHERE id = ?').bind(betNum, pc.id)]),
       // 同時に遊ばれても上限を超えないよう、残り回数が0以上であることも同じ仕組みで確かめる
       db
@@ -85,6 +86,11 @@ export default defineEventHandler(async (event) => {
 
   const updated = await db.prepare('SELECT money FROM pcs WHERE id = ?').bind(pc.id).first()
   return {
+    // 画面で読み込み直さずに済むよう、記録した勝負とディーラーの増減も返す
+    gameId: batchResults.at(-1)?.meta?.last_row_id ?? null,
+    bet: betNum,
+    dealerPcId,
+    dealerDelta,
     rolls,
     hand,
     multiplier,

@@ -23,7 +23,11 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 403, statusMessage: '削除権限がありません' })
   }
 
-  await db.prepare('DELETE FROM magics WHERE id = ?').bind(id).run()
+  await db.batch([
+    // 魔道具・AFとして所持品に入れていたものも外す
+    db.prepare('DELETE FROM pc_items WHERE magic_id = ?').bind(id),
+    db.prepare('DELETE FROM magics WHERE id = ?').bind(id),
+  ])
 
   invalidateCache('magics')
 

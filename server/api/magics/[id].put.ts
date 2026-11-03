@@ -1,7 +1,7 @@
 import { getSessionUser } from '../../utils/session'
 import { isAdmin } from '../../utils/permission'
 import { invalidateCache } from '../../utils/cache'
-import { resolveMagicOwner } from '../../utils/magic'
+import { resolveMagicOwner, syncMagicItem } from '../../utils/magic'
 
 export default defineEventHandler(async (event) => {
   const db = event.context.cloudflare.env.tsu_wiki_db
@@ -54,6 +54,8 @@ export default defineEventHandler(async (event) => {
     )
     .run()
 
+  // 魔道具・AFなら所持者のPCの所持品も合わせる
+  await syncMagicItem(db, Number(id))
   invalidateCache('magics')
 
   return { id: Number(id), success: true }
