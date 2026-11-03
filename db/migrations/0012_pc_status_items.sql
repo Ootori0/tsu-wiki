@@ -27,7 +27,3 @@ ALTER TABLE shop_items ADD COLUMN item_size TEXT NOT NULL DEFAULT 'none' CHECK (
 ALTER TABLE shop_items ADD COLUMN item_per_slot INTEGER NOT NULL DEFAULT 1 CHECK (item_per_slot >= 1);
 ALTER TABLE shop_items ADD COLUMN item_category TEXT NOT NULL DEFAULT 'storage' CHECK (item_category IN ('cargo', 'equipment', 'storage'));
 ALTER TABLE shop_items ADD COLUMN item_modifiers TEXT NOT NULL DEFAULT '{}';
-
--- N個セット販売(価格・在庫・販売者への支払いはセット単位。所持品にはセットの個数×買ったセット数を入れる)
-ALTER TABLE shop_items ADD COLUMN set_size INTEGER NOT NULL DEFAULT 1 CHECK (set_size >= 1);
-ALTER TABLE purchases ADD COLUMN set_size INTEGER NOT NULL DEFAULT 1;
