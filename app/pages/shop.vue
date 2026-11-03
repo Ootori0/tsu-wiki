@@ -23,6 +23,9 @@ const priceOf = (item) => (onDiscount(item) ? item.discount_price : item.price)
 // 買える残り個数(null は無制限)。割引中は割引の残り個数まで
 const remainingOf = (item) => (onDiscount(item) ? item.discount_stock : item.stock)
 const soldOut = (item) => remainingOf(item) === 0
+// N個セット販売の1セットの個数(1なら1個ずつ)
+const setOf = (item) => item.set_size ?? 1
+const unitWord = (item) => (setOf(item) > 1 ? 'セット' : '個')
 const sellersOf = (item) => (onDiscount(item) ? item.discountSellers : item.sellers) ?? []
 
 // --- 探す: 名前検索・並び替え・売り切れを隠す ---
@@ -63,7 +66,7 @@ const blockReason = (item) => {
   if (!Number.isInteger(qty) || qty < 1) return '個数は1以上で入れてください'
   const remaining = remainingOf(item)
   if (remaining !== null && remaining < qty) {
-    return onDiscount(item) ? `割引の残りは${remaining}個です` : `在庫は${remaining}個です`
+    return onDiscount(item) ? `割引の残りは${remaining}${unitWord(item)}です` : `在庫は${remaining}${unitWord(item)}です`
   }
   // 出納帳のPCは残高を確かめない
   if (!isLedger.value && selectedPc.value.money < totalOf(item)) {
@@ -87,8 +90,9 @@ const confirmMessage = computed(() => {
   if (!pending.value) return ''
   const { item, quantity, discount, price } = pending.value
   const total = price * quantity
+  const count = setOf(item) > 1 ? `${quantity}セット(${quantity * setOf(item)}個)` : `${quantity}個`
   const after = isLedger.value ? '' : `\n購入後の所持金: ${formatMoney(selectedPc.value.money - total)}`
-  return `${selectedPc.value?.name}で「${item.name}」を${quantity}個、${discount ? '割引価格で' : ''}合計${formatMoney(total)}で購入しますか?${after}`
+  return `${selectedPc.value?.name}で「${item.name}」を${count}、${discount ? '割引価格で' : ''}合計${formatMoney(total)}で購入しますか?${after}`
 })
 
 const refreshAll = () => Promise.all([refreshItemsRaw(), refreshMyPcs(), refreshPurchases()])
@@ -103,7 +107,7 @@ const buy = async () => {
       body: { pcId: selectedPc.value.id, itemId: item.id, quantity, discount },
     })
     // 10秒間「取り消す」を押せる(買い間違えたとき用)
-    showWithUndo(`「${item.name}」を${quantity}個購入しました`, 'purchase', res.purchaseId, refreshAll)
+    showWithUndo(`「${item.name}」を${setOf(item) > 1 ? `${quantity}セット` : `${quantity}個`}購入しました`, 'purchase', res.purchaseId, refreshAll)
     quantities.value[item.id] = 1
   } catch (e) {
     show(e?.data?.statusMessage ?? '購入に失敗しました', 'error')
@@ -167,6 +171,7 @@ watch(selectedPcId, () => {
           <span class="item-title">
             <span class="item-name">{{ item.name }}</span>
             <span class="item-sub">
+              <span v-if="setOf(item) > 1" class="set-tag">{{ setOf(item) }}個セット</span>
               <span v-if="soldOut(item)" class="soldout-tag">売り切れ</span>
               <span v-else-if="onDiscount(item)" class="discount-tag">割引 残り{{ item.discount_stock }}</span>
               <span v-else-if="item.stock !== null" class="stock-tag" :class="{ few: item.stock <= 3 }">残り{{ item.stock }}</span>
@@ -181,12 +186,12 @@ watch(selectedPcId, () => {
       <template #detail="{ item }">
         <div class="item-detail">
           <p v-if="onDiscount(item)" class="discount-note">
-            割引販売中: 残り{{ item.discount_stock }}個(なくなると通常価格{{ formatMoney(item.price) }}に戻ります)
+            割引販売中: 残り{{ item.discount_stock }}{{ unitWord(item) }}(なくなると通常価格{{ formatMoney(item.price) }}に戻ります)
           </p>
           <p v-else class="item-stock">
             <template v-if="item.stock === null">在庫: 無制限</template>
             <template v-else-if="item.stock === 0">売り切れ</template>
-            <template v-else>在庫: {{ item.stock }}</template>
+            <template v-else>在庫: {{ item.stock }}{{ setOf(item) > 1 ? 'セット' : '' }}</template>
           </p>
           <p v-if="sellersOf(item).length" class="item-sellers">
             販売者: {{ sellersOf(item).map((s) => s.pcName).join('、') }}
@@ -205,7 +210,7 @@ watch(selectedPcId, () => {
                   :max="remainingOf(item) ?? undefined"
                   placeholder="1"
                   class="qty-input"
-                  aria-label="個数"
+                  :aria-label="setOf(item) > 1 ? 'セット数' : '個数'"
                 />
                 <button
                   class="qty-btn"
@@ -219,6 +224,7 @@ watch(selectedPcId, () => {
               </button>
             </div>
             <p class="buy-summary">
+              <template v-if="setOf(item) > 1">{{ qtyOf(item) }}セット = {{ (Number.isInteger(qtyOf(item)) ? qtyOf(item) : 0) * setOf(item) }}個 / </template>
               合計 <strong>{{ formatMoney(totalOf(item)) }}</strong>
               <template v-if="!isLedger"> / 購入後 {{ formatMoney(selectedPc.money - totalOf(item)) }}</template>
             </p>
@@ -600,5 +606,14 @@ watch(selectedPcId, () => {
   padding: 8px;
   font-size: 0.85rem;
   cursor: pointer;
+}
+
+.set-tag {
+  font-size: 0.68rem;
+  line-height: 1.5;
+  padding: 0 6px;
+  font-weight: bold;
+  background: #000;
+  color: var(--color-accent, #ffd400);
 }
 </style>

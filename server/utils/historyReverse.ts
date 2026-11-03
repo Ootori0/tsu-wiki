@@ -76,7 +76,7 @@ export const HISTORY_TARGETS = {
       ).bind(id),
       // 所持品に入れた分を減らす(0個になったら所持品から外す)
       db.prepare(
-        `UPDATE pc_items SET quantity = MAX(0, quantity - (SELECT quantity FROM purchases WHERE id = ?1))
+        `UPDATE pc_items SET quantity = MAX(0, quantity - (SELECT quantity * set_size FROM purchases WHERE id = ?1))
          WHERE pc_id = (SELECT pc_id FROM purchases WHERE id = ?1)
            AND shop_item_id = (SELECT item_id FROM purchases WHERE id = ?1)`
       ).bind(id),
@@ -149,7 +149,7 @@ export function deleteAllHistoryOfPc(db, pcId) {
     // 所持品に入れた分を減らす(0個になったら所持品から外す)
     db.prepare(
       `UPDATE pc_items SET quantity = MAX(0, quantity - (
-         SELECT COALESCE(SUM(quantity), 0) FROM purchases WHERE pc_id = ?1 AND item_id = pc_items.shop_item_id
+         SELECT COALESCE(SUM(quantity * set_size), 0) FROM purchases WHERE pc_id = ?1 AND item_id = pc_items.shop_item_id
        ))
        WHERE pc_id = ?1 AND shop_item_id IS NOT NULL`
     ).bind(pcId),

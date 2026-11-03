@@ -5,7 +5,7 @@ export const SHOPS = ['魔法店', '武器屋']
 export function parseShopItemBody(body) {
   const {
     shop, name, price, stock, description, sellers, discountEnabled, discountPrice, discountStock, discountSellers,
-    itemSize, itemPerSlot, itemCategory, itemModifiers,
+    itemSize, itemPerSlot, itemCategory, itemModifiers, setSize,
   } = body ?? {}
 
   if (!SHOPS.includes(shop)) {
@@ -51,6 +51,8 @@ export function parseShopItemBody(body) {
     description: description ?? '',
     sellers: parseSellers(sellers),
     discount,
+    // N個セット販売(1なら1個ずつ)
+    setSize: parsePerSlot(setSize),
     // 買ったときに所持品へ入れる設定
     asItem: {
       size: parseSize(itemSize),

@@ -192,6 +192,8 @@ const emptyItemForm = () => ({
   discountEnabled: false, discountPrice: 0, discountStock: 0, discountSellers: [],
   // 買ったときに所持品へ入れる設定
   itemSize: 'small', itemPerSlot: 1, itemCategory: 'storage',
+  // N個セット販売(1なら1個ずつ)
+  setSize: 1,
   itemModifiers: Object.fromEntries(STAT_KEYS.map((k) => [k, ''])),
 })
 
@@ -238,6 +240,7 @@ const openItemEdit = (item) => {
     itemSize: item.item_size ?? 'none',
     itemPerSlot: item.item_per_slot ?? 1,
     itemCategory: item.item_category ?? 'storage',
+    setSize: item.set_size ?? 1,
     itemModifiers: Object.fromEntries(STAT_KEYS.map((k) => [k, item.item_modifiers?.[k] ?? ''])),
   }
   itemDialogOpen.value = true
@@ -470,7 +473,7 @@ const savePayouts = async () => {
           <template #detail="{ item }">
             <div class="detail">
               <p class="item-meta">
-                {{ formatMoney(item.price) }} / 在庫: {{ item.stock === null ? '無制限' : item.stock }}
+                {{ formatMoney(item.price) }}{{ item.set_size > 1 ? `(${item.set_size}個セット)` : '' }} / 在庫: {{ item.stock === null ? '無制限' : item.stock }}
               </p>
               <p v-if="item.sellers?.length" class="item-meta">
                 販売者: {{ item.sellers.map((s) => `${s.pcName}(${formatMoney(s.amount)})`).join('、') }}
@@ -498,7 +501,7 @@ const savePayouts = async () => {
         <div v-for="p in allPurchases ?? []" :key="p.id" class="list-row">
           <span class="item-meta">
             {{ formatDateTime(p.created_at) }}<br />
-            {{ p.pc_name ?? '(削除済みPC)' }}: [{{ p.shop }}] {{ p.item_name }}{{ p.discount ? '(割引)' : '' }} ×{{ p.quantity }}
+            {{ p.pc_name ?? '(削除済みPC)' }}: [{{ p.shop }}] {{ p.item_name }}{{ p.discount ? '(割引)' : '' }} ×{{ p.quantity }}{{ p.set_size > 1 ? `セット(${p.set_size}個入)` : '' }}
             <template v-for="po in p.payouts" :key="po.purchase_id + po.pc_name">
               <br />→ {{ po.pc_name ?? '(削除済みPC)' }} +{{ formatMoney(po.amount) }}
             </template>
@@ -672,7 +675,9 @@ const savePayouts = async () => {
       <input v-model="itemForm.name" class="field-input" />
       <label class="field-label">価格({{ MONEY_UNIT }})</label>
       <input v-model.number="itemForm.price" type="number" min="0" class="field-input" />
-      <label class="field-label">在庫(空欄=無制限)</label>
+      <label class="field-label">何個セットで売るか(1なら1個ずつ。価格・在庫・販売者の金額はセット単位)</label>
+      <input v-model.number="itemForm.setSize" type="number" min="1" class="field-input" />
+      <label class="field-label">在庫(空欄=無制限){{ itemForm.setSize > 1 ? '・セット数' : '' }}</label>
       <input v-model="itemForm.stock" type="number" min="0" class="field-input" />
       <label class="field-label">説明</label>
       <textarea v-model="itemForm.description" class="field-input auto-wrap" rows="3" @input="resize" />

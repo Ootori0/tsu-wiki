@@ -29,10 +29,10 @@ export default defineEventHandler(async (event) => {
          SELECT type AS kind, id, pc_id, amount, reason AS detail, NULL AS sub, created_by AS user_id, created_at
          FROM money_logs
          UNION ALL
-         SELECT 'purchase', id, pc_id, -total, item_name || CASE WHEN discount = 1 THEN '(割引)' ELSE '' END, shop || ' ×' || quantity, purchased_by, created_at
+         SELECT 'purchase', id, pc_id, -total, item_name || CASE WHEN set_size > 1 THEN '(' || set_size || '個セット)' ELSE '' END || CASE WHEN discount = 1 THEN '(割引)' ELSE '' END, shop || ' ×' || quantity, purchased_by, created_at
          FROM purchases
          UNION ALL
-         SELECT 'sale', po.id, po.pc_id, po.amount, pu.item_name || CASE WHEN pu.discount = 1 THEN '(割引)' ELSE '' END, pu.shop || ' ×' || pu.quantity, pu.purchased_by, po.created_at
+         SELECT 'sale', po.id, po.pc_id, po.amount, pu.item_name || CASE WHEN pu.set_size > 1 THEN '(' || pu.set_size || '個セット)' ELSE '' END || CASE WHEN pu.discount = 1 THEN '(割引)' ELSE '' END, pu.shop || ' ×' || pu.quantity, pu.purchased_by, po.created_at
          FROM purchase_payouts po JOIN purchases pu ON pu.id = po.purchase_id
          UNION ALL
          -- D1 は UNION を5つまでしか重ねられないので、カジノ関係は1つにまとめる
