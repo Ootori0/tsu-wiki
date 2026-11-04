@@ -10,6 +10,9 @@ defineProps({
   title: { type: String, default: '' },
   saveLabel: { type: String, default: '保存' },
   saveDisabled: { type: Boolean, default: false },
+  // 保存ボタンを出さない(本文に専用のボタンを置く画面用。キャンセルは cancelLabel で「閉じる」などにする)
+  hideSave: { type: Boolean, default: false },
+  cancelLabel: { type: String, default: 'キャンセル' },
 })
 
 const emit = defineEmits(['save'])
@@ -25,9 +28,10 @@ const close = () => {
       <div v-if="open" class="overlay" @click.self="close">
         <div class="dialog" role="dialog" :aria-label="title">
           <div class="dialog-head">
-            <button class="head-btn head-cancel" @click="close">キャンセル</button>
+            <button class="head-btn head-cancel" @click="close">{{ cancelLabel }}</button>
             <span class="dialog-title">{{ title }}</span>
-            <button class="head-btn head-save" :disabled="saveDisabled" @click="emit('save')">{{ saveLabel }}</button>
+            <button v-if="!hideSave" class="head-btn head-save" :disabled="saveDisabled" @click="emit('save')">{{ saveLabel }}</button>
+            <span v-else class="head-btn head-spacer" aria-hidden="true">{{ cancelLabel }}</span>
             <button class="close-btn" aria-label="閉じる" @click="close">
               <v-icon icon="mdi-close" size="20" />
             </button>
@@ -41,8 +45,8 @@ const close = () => {
           </div>
 
           <div class="dialog-actions">
-            <button class="action-btn action-save" :disabled="saveDisabled" @click="emit('save')">{{ saveLabel }}</button>
-            <button class="action-btn" @click="close">キャンセル</button>
+            <button v-if="!hideSave" class="action-btn action-save" :disabled="saveDisabled" @click="emit('save')">{{ saveLabel }}</button>
+            <button class="action-btn" @click="close">{{ cancelLabel }}</button>
             <div v-if="$slots.extra" class="actions-extra">
               <slot name="extra" />
             </div>
@@ -206,6 +210,11 @@ const close = () => {
     padding: 8px 10px;
     font-size: 0.9rem;
     cursor: pointer;
+  }
+
+  /* 保存がないときにタイトルを真ん中に保つための空き */
+  .head-spacer {
+    visibility: hidden;
   }
 
   .head-save {
