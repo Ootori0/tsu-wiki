@@ -394,11 +394,13 @@ const showModifiers = computed(() =>
 )
 const showItemConfirm = ref(false)
 
-const openItemCreate = (pcId, category = 'storage') => {
+// mode: manual … 自分で入力 / shop … 店の商品から(持ち込み)。追加ボタンで選ぶ
+const openItemCreate = (pcId, mode = 'manual') => {
   itemDialog.value = { open: true, pcId, itemId: null, magic: false }
-  itemForm.value = { ...emptyItemForm(), category }
-  itemMode.value = 'manual'
+  itemForm.value = { ...emptyItemForm(), category: 'storage' }
+  carryForm.value = { itemId: null, quantity: 1, search: '' }
   modifiersOpen.value = false
+  setItemMode(mode)
 }
 
 // 持ち込み: 過去や別のルートで手に入れた店の商品を追加する(代金0・在庫は減らない。購入履歴に「持ち込み」で残る)
@@ -915,7 +917,16 @@ const confirmPcDelete = async () => {
             </p>
           </div>
 
-          <button class="add-item-btn" @click="openItemCreate(item.id)">＋ 所持品を追加</button>
+          <!-- 追加: 自分で入力するか、店の商品から選ぶか -->
+          <p class="add-item-label">所持品を追加</p>
+          <div class="add-item-row">
+            <button class="add-item-btn" @click="openItemCreate(item.id, 'manual')">
+              <v-icon icon="mdi-pencil-plus-outline" size="16" />自分で入力
+            </button>
+            <button class="add-item-btn" @click="openItemCreate(item.id, 'shop')">
+              <v-icon icon="mdi-storefront-outline" size="16" />店の商品から
+            </button>
+          </div>
 
           <!-- 倉庫⇔荷物の移動の確定 -->
           <div v-if="pendingMovesOf(item).length" class="move-bar">
@@ -1052,15 +1063,11 @@ const confirmPcDelete = async () => {
     <!-- 所持品の追加・編集 -->
     <FormDialog
       v-model="itemDialog.open"
-      :title="itemDialog.magic ? '魔道具・AFの大きさ' : itemDialog.itemId ? '所持品の編集' : '所持品の追加'"
+      :title="itemDialog.magic ? '魔道具・AFの大きさ' : itemDialog.itemId ? '所持品の編集' : itemMode === 'shop' ? '店の商品から追加' : '所持品の追加'"
       :save-label="!itemDialog.itemId && itemMode === 'shop' ? '持ち込む' : '保存'"
       :save-disabled="itemSaving || (!itemDialog.itemId && itemMode === 'shop' ? !carryItem || !(carryForm.quantity >= 1) : !itemForm.name.trim())"
       @save="!itemDialog.itemId && itemMode === 'shop' ? saveCarryIn() : saveItem()"
     >
-      <div v-if="!itemDialog.itemId" class="mode-switch" role="tablist">
-        <button :class="{ active: itemMode === 'manual' }" role="tab" @click="setItemMode('manual')">自分で入力</button>
-        <button :class="{ active: itemMode === 'shop' }" role="tab" @click="setItemMode('shop')">店の商品から</button>
-      </div>
 
       <template v-if="!itemDialog.itemId && itemMode === 'shop'">
         <p class="markdown-hint">過去や別のルートで手に入れた店の商品を追加します。代金はかからず、店の在庫も減りません。所持金の履歴に「持ち込み」として残ります。</p>
@@ -2142,9 +2149,24 @@ const confirmPcDelete = async () => {
   color: var(--color-plus, #1b7f2a);
 }
 
+.add-item-label {
+  margin: 12px 0 4px;
+  font-size: 0.75rem;
+  font-weight: bold;
+}
+
+.add-item-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
 .add-item-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
   width: 100%;
-  margin-top: 10px;
   border: 1px solid var(--color-text, #000);
   background: var(--color-accent, #ffd400);
   color: #000;
@@ -2277,33 +2299,6 @@ const confirmPcDelete = async () => {
   font-size: 0.8rem;
   text-decoration: underline;
   cursor: pointer;
-}
-
-/* 所持品の追加: 「自分で入力」「店の商品から」の切り替え */
-.mode-switch {
-  display: flex;
-  border: 1px solid var(--color-text, #000);
-  margin-bottom: 6px;
-}
-
-.mode-switch button {
-  flex: 1;
-  border: none;
-  background: none;
-  color: var(--color-text, #000);
-  padding: 8px;
-  font-size: 0.85rem;
-  cursor: pointer;
-}
-
-.mode-switch button + button {
-  border-left: 1px solid var(--color-text, #000);
-}
-
-.mode-switch button.active {
-  background: var(--color-accent, #ffd400);
-  color: #000;
-  font-weight: bold;
 }
 
 .carry-list {
