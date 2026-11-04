@@ -12,7 +12,7 @@ export default defineEventHandler(async (event) => {
   await requirePcOwner(event, db, existing.pc_id)
   // 店で買った品物はマイページでは荷物と倉庫の出し入れだけ(個数などは購入・取り消しで変わる)
   if (existing.shop_item_id) {
-    throw createError({ statusCode: 400, statusMessage: '店で買った品物は編集できません(荷物と倉庫の出し入れだけできます)' })
+    throw createError({ statusCode: 400, statusMessage: '店で買った品物は編集できません(荷物と倉庫の出し入れ、消費、削除だけできます)' })
   }
   const item = parsePcItemBody(await readBody(event))
 
