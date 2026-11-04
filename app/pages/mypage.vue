@@ -438,6 +438,58 @@ const saveCarryIn = async () => {
   }
 }
 
+// 店の商品: 名前などは店で決まるので、マイページでは消費(個数を減らす)と削除だけ
+const consumeDialog = ref({ open: false, pcId: null, item: null, qty: 1 })
+const showConsumeDeleteConfirm = ref(false)
+const consumeSaving = ref(false)
+const openConsume = (pcId, item) => {
+  consumeDialog.value = { open: true, pcId, item, qty: 1 }
+}
+const setConsumeQty = (qty) => {
+  const max = consumeDialog.value.item?.quantity ?? 1
+  consumeDialog.value.qty = Math.min(max, Math.max(1, Math.floor(Number(qty)) || 1))
+}
+// 消費・削除した品物の「移動」の予定は取りやめる(個数が合わなくなるため)
+const dropPendingMove = (itemId) => {
+  if (!pendingMoves.value[itemId]) return
+  const { [itemId]: _, ...rest } = pendingMoves.value
+  pendingMoves.value = rest
+}
+const applyItemResult = (pcId, itemId, item) => {
+  dropPendingMove(itemId)
+  updatePc(pcId, (p) => ({
+    ...p,
+    pcItems: item ? p.pcItems.map((i) => (i.id === itemId ? item : i)) : p.pcItems.filter((i) => i.id !== itemId),
+  }))
+}
+const consumeItem = async () => {
+  const { pcId, item, qty } = consumeDialog.value
+  if (!item) return
+  consumeSaving.value = true
+  try {
+    const res = await $fetch(`/api/pc-items/${item.id}/consume`, { method: 'POST', body: { quantity: qty } })
+    consumeDialog.value.open = false
+    applyItemResult(pcId, item.id, res.item)
+    show(`「${item.name}」を${qty}個消費しました`)
+  } catch (e) {
+    show(e?.data?.statusMessage ?? '消費に失敗しました', 'error')
+  } finally {
+    consumeSaving.value = false
+  }
+}
+const deleteShopItem = async () => {
+  const { pcId, item } = consumeDialog.value
+  if (!item) return
+  try {
+    await $fetch(`/api/pc-items/${item.id}`, { method: 'DELETE' })
+    consumeDialog.value.open = false
+    applyItemResult(pcId, item.id, null)
+    show(`「${item.name}」を削除しました`)
+  } catch (e) {
+    show(e?.data?.statusMessage ?? '削除に失敗しました', 'error')
+  }
+}
+
 const openItemEdit = (pcId, item) => {
   itemDialog.value = { open: true, pcId, itemId: item.id, magic: !!item.magic_id }
   itemForm.value = {
@@ -855,12 +907,10 @@ const confirmPcDelete = async () => {
             </div>
             <p class="cat-note">{{ cat.note }}</p>
             <div v-for="it in itemsOf(item.pcItems, cat.value)" :key="it.id" class="pc-item-line">
-            <!-- 店で買った品物は編集できない(荷物と倉庫の出し入れだけ) -->
-            <component
-              :is="it.shop_item_id ? 'div' : 'button'"
+            <!-- 店で買った品物は編集できず、押すと消費・削除の画面を開く -->
+            <button
               class="pc-item-row"
-              :class="{ locked: it.shop_item_id }"
-              @click="!it.shop_item_id && openItemEdit(item.id, it)"
+              @click="it.shop_item_id ? openConsume(item.id, it) : openItemEdit(item.id, it)"
             >
               <span class="pc-item-top">
                 <span class="pc-item-name">{{ it.name }}<span class="pc-item-qty">×{{ it.quantity }}</span></span>
@@ -872,7 +922,7 @@ const confirmPcDelete = async () => {
                 {{ modifiersText(it.modifiers) }}<template v-if="cat.value !== 'equipment'">(装備・装飾品にすると反映)</template>
               </span>
               <span v-if="it.effect" class="pc-item-effect">{{ it.effect }}</span>
-            </component>
+            </button>
             <!-- 荷物と倉庫の間の出し入れ(個数を選んで「移動を確定」) -->
             <div v-if="cat.value !== 'equipment'" class="move-ctl">
               <button
@@ -1081,6 +1131,45 @@ const confirmPcDelete = async () => {
       title="所持品の削除"
       message="この所持品を削除します。よろしいですか?"
       @confirm="deleteItem"
+    />
+
+    <!-- 店の商品の消費・削除 -->
+    <FormDialog
+      v-model="consumeDialog.open"
+      :title="consumeDialog.item?.name ?? ''"
+      save-label="消費"
+      :save-disabled="consumeSaving || !consumeDialog.item"
+      @save="consumeItem"
+    >
+      <template v-if="consumeDialog.item">
+        <p class="markdown-hint">店の商品です。名前や効果は店の内容に合わせて変わります。使った分を「消費」で減らせます(0個になると所持品から外れます)。</p>
+        <p v-if="consumeDialog.item.effect" class="pc-item-effect">{{ consumeDialog.item.effect }}</p>
+        <label class="edit-label">消費する個数(持っている数: {{ consumeDialog.item.quantity }})</label>
+        <div class="move-stepper consume-stepper">
+          <button :disabled="consumeDialog.qty <= 1" aria-label="1個減らす" @click="setConsumeQty(consumeDialog.qty - 1)">−</button>
+          <input
+            :value="consumeDialog.qty"
+            type="number"
+            inputmode="numeric"
+            min="1"
+            :max="consumeDialog.item.quantity"
+            aria-label="消費する個数"
+            @change="setConsumeQty($event.target.value)"
+          />
+          <button :disabled="consumeDialog.qty >= consumeDialog.item.quantity" aria-label="1個増やす" @click="setConsumeQty(consumeDialog.qty + 1)">＋</button>
+        </div>
+        <p class="markdown-hint">消費後: {{ consumeDialog.item.quantity - consumeDialog.qty }}個</p>
+      </template>
+      <template #extra>
+        <button class="delete-btn" @click="showConsumeDeleteConfirm = true">削除</button>
+      </template>
+    </FormDialog>
+
+    <ConfirmDialog
+      v-model="showConsumeDeleteConfirm"
+      title="所持品の削除"
+      :message="`「${consumeDialog.item?.name ?? ''}」(${consumeDialog.item?.quantity ?? 0}個)を所持品から削除します。よろしいですか?`"
+      @confirm="deleteShopItem"
     />
 
     <!-- 魔法の記入・編集 -->
@@ -1844,8 +1933,18 @@ const confirmPcDelete = async () => {
   cursor: pointer;
 }
 
-.pc-item-row.locked {
-  cursor: default;
+.consume-stepper {
+  align-self: flex-start;
+}
+
+.consume-stepper button {
+  width: 44px;
+  font-size: 1.1rem;
+}
+
+.consume-stepper input {
+  width: 72px;
+  padding: 8px 0;
 }
 
 .pc-item-top {
