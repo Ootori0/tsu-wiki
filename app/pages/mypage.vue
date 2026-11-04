@@ -385,12 +385,20 @@ const emptyItemForm = () => ({
 const itemDialog = ref({ open: false, pcId: null, itemId: null, magic: false }) // magic: 魔道具・AF(大きさだけ編集できる)
 const itemForm = ref(emptyItemForm())
 const itemSaving = ref(false)
+// 追加・編集の画面でステータス補正の欄を出すか(装備・装飾品か、補正が入っているとき。ほかは「補正を付ける」で開く)
+const modifiersOpen = ref(false)
+const showModifiers = computed(() =>
+  modifiersOpen.value
+  || itemForm.value.category === 'equipment'
+  || STAT_KEYS.some((k) => itemForm.value.modifiers?.[k] !== '' && itemForm.value.modifiers?.[k] != null),
+)
 const showItemConfirm = ref(false)
 
-const openItemCreate = (pcId, category = 'cargo') => {
+const openItemCreate = (pcId, category = 'storage') => {
   itemDialog.value = { open: true, pcId, itemId: null, magic: false }
   itemForm.value = { ...emptyItemForm(), category }
   itemMode.value = 'manual'
+  modifiersOpen.value = false
 }
 
 // 持ち込み: 過去や別のルートで手に入れた店の商品を追加する(代金0・在庫は減らない。購入履歴に「持ち込み」で残る)
@@ -492,6 +500,7 @@ const deleteShopItem = async () => {
 
 const openItemEdit = (pcId, item) => {
   itemDialog.value = { open: true, pcId, itemId: item.id, magic: !!item.magic_id }
+  modifiersOpen.value = false
   itemForm.value = {
     name: item.name,
     quantity: item.quantity,
@@ -887,8 +896,27 @@ const confirmPcDelete = async () => {
         <div v-else class="pc-common">
 
 
-          <!-- 所持品: 装備品・荷物(荷物チェッカー)・倉庫 -->
+          <!-- 所持品: 上に荷物のコストと装備の補正、下に荷物・倉庫・装備・装飾品 -->
           <template v-if="tabOf(item.id) === 'items'">
+          <div class="items-summary" :class="{ over: totalCost(item.pcItems) > LOAD_LIMIT }">
+            <div class="sum-head">
+              <span class="sum-label">荷物のコスト</span>
+              <strong class="sum-value">{{ totalCost(item.pcItems) }}<small> / {{ LOAD_LIMIT }}</small></strong>
+              <button class="copy-btn" @click="copyLoadCheck(item)">
+                <v-icon icon="mdi-content-copy" size="14" />ココフォリア用
+              </button>
+            </div>
+            <div class="load-bar">
+              <div class="load-fill" :style="{ width: `${Math.min(100, (totalCost(item.pcItems) / LOAD_LIMIT) * 100)}%` }" />
+            </div>
+            <p v-if="totalCost(item.pcItems) > LOAD_LIMIT" class="load-over">上限を{{ totalCost(item.pcItems) - LOAD_LIMIT }}超えています</p>
+            <p class="sum-mods">
+              装備の補正: <strong>{{ Object.keys(totalModifiers(item.pcItems)).length ? modifiersText(totalModifiers(item.pcItems)) : 'なし' }}</strong>
+            </p>
+          </div>
+
+          <button class="add-item-btn" @click="openItemCreate(item.id)">＋ 所持品を追加</button>
+
           <!-- 倉庫⇔荷物の移動の確定 -->
           <div v-if="pendingMovesOf(item).length" class="move-bar">
             <span class="move-bar-text">
@@ -898,79 +926,68 @@ const confirmPcDelete = async () => {
             <button class="move-btn" :disabled="movingPcId === item.id" @click="cancelMoves(item)">取り消す</button>
             <button class="move-btn primary" :disabled="movingPcId === item.id" @click="confirmMoves(item)">移動を確定</button>
           </div>
-          <div v-for="cat in ITEM_CATEGORIES" :key="cat.value" class="pc-items">
-            <div class="sub-head">
-              <h3 class="pc-magics-title">
-                {{ cat.label }}<span class="section-count">{{ itemsOf(item.pcItems, cat.value).length }}件</span>
-              </h3>
-              <button class="mini-add" @click="openItemCreate(item.id, cat.value)">＋ 追加</button>
-            </div>
-            <p class="cat-note">{{ cat.note }}</p>
+
+          <section v-for="cat in ITEM_CATEGORIES" :key="cat.value" class="pc-items">
+            <h3 class="items-head">
+              {{ cat.label }}<span class="section-count">{{ itemsOf(item.pcItems, cat.value).length }}件</span>
+              <span class="items-head-note">{{ cat.note }}</span>
+            </h3>
+            <p v-if="itemsOf(item.pcItems, cat.value).length === 0" class="items-empty">なし</p>
             <div v-for="it in itemsOf(item.pcItems, cat.value)" :key="it.id" class="pc-item-line">
-            <!-- 店で買った品物は編集できず、押すと消費・削除の画面を開く -->
-            <button
-              class="pc-item-row"
-              @click="it.shop_item_id ? openConsume(item.id, it) : openItemEdit(item.id, it)"
-            >
-              <span class="pc-item-top">
-                <span class="pc-item-name">{{ it.name }}<span class="pc-item-qty">×{{ it.quantity }}</span></span>
-                <span v-if="it.shop_item_id" class="pc-item-tag">店</span>
-                <span v-if="it.magic_id" class="pc-item-tag">魔道具・AF</span>
-                <span v-if="cat.value !== 'equipment'" class="pc-item-cost">{{ it.size === 'none' ? 'なし' : sizeLabel(it.size) }}{{ it.per_slot > 1 ? `(${it.per_slot}個で1つ)` : '' }} / {{ itemCost(it) }}</span>
-              </span>
-              <span v-if="Object.keys(it.modifiers ?? {}).length" class="pc-item-mods" :class="{ inactive: cat.value !== 'equipment' }">
-                {{ modifiersText(it.modifiers) }}<template v-if="cat.value !== 'equipment'">(装備・装飾品にすると反映)</template>
-              </span>
-              <span v-if="it.effect" class="pc-item-effect">{{ it.effect }}</span>
-            </button>
-            <!-- 荷物と倉庫の間の出し入れ(個数を選んで「移動を確定」) -->
-            <div v-if="cat.value !== 'equipment'" class="move-ctl">
+              <!-- 押すと: 自分で入力した品物は編集、店の商品は消費・削除、魔道具・AFは大きさの変更 -->
               <button
-                v-if="!pendingMoves[it.id]"
-                class="move-start"
-                :disabled="movingPcId === item.id"
-                @click="startMove(it)"
+                class="pc-item-row"
+                @click="it.shop_item_id ? openConsume(item.id, it) : openItemEdit(item.id, it)"
               >
-                {{ cat.value === 'cargo' ? '倉庫へ' : '荷物へ' }}
+                <span class="pc-item-top">
+                  <span class="pc-item-name">
+                    {{ it.name }}<span class="pc-item-qty">×{{ it.quantity }}</span>
+                    <span v-if="it.shop_item_id" class="pc-item-tag">店</span>
+                    <span v-if="it.magic_id" class="pc-item-tag">魔道具・AF</span>
+                  </span>
+                  <span v-if="cat.value === 'cargo'" class="pc-item-cost" :title="it.per_slot > 1 ? `${it.per_slot}個で1つ分` : ''">
+                    {{ sizeLabel(it.size) }}<template v-if="it.per_slot > 1">/{{ it.per_slot }}個</template>
+                    <strong>{{ itemCost(it) }}</strong>
+                  </span>
+                  <span v-else-if="cat.value === 'storage'" class="pc-item-cost dim">{{ sizeLabel(it.size) }}</span>
+                  <v-icon icon="mdi-chevron-right" size="16" class="pc-item-chevron" />
+                </span>
+                <span v-if="Object.keys(it.modifiers ?? {}).length" class="pc-item-mods" :class="{ inactive: cat.value !== 'equipment' }">
+                  {{ modifiersText(it.modifiers) }}<template v-if="cat.value !== 'equipment'">(装備すると反映)</template>
+                </span>
+                <span v-if="it.effect" class="pc-item-effect">{{ it.effect }}</span>
               </button>
-              <div v-else class="move-qty">
-                <span class="move-qty-label">→{{ pendingMoves[it.id].to === 'cargo' ? '荷物' : '倉庫' }}</span>
-                <div class="move-stepper">
-                  <button :disabled="pendingMoves[it.id].qty <= 1" aria-label="1個減らす" @click="setMoveQty(it, pendingMoves[it.id].qty - 1)">−</button>
-                  <input
-                    :value="pendingMoves[it.id].qty"
-                    type="number"
-                    inputmode="numeric"
-                    min="1"
-                    :max="it.quantity"
-                    aria-label="移す個数"
-                    @change="setMoveQty(it, $event.target.value)"
-                  />
-                  <button :disabled="pendingMoves[it.id].qty >= it.quantity" aria-label="1個増やす" @click="setMoveQty(it, pendingMoves[it.id].qty + 1)">＋</button>
+              <!-- 荷物と倉庫の間の出し入れ(個数を選んで「移動を確定」) -->
+              <div v-if="cat.value !== 'equipment'" class="move-ctl">
+                <button
+                  v-if="!pendingMoves[it.id]"
+                  class="move-start"
+                  :disabled="movingPcId === item.id"
+                  @click="startMove(it)"
+                >
+                  <v-icon :icon="cat.value === 'cargo' ? 'mdi-arrow-down' : 'mdi-arrow-up'" size="13" />{{ cat.value === 'cargo' ? '倉庫へ' : '荷物へ' }}
+                </button>
+                <div v-else class="move-qty">
+                  <span class="move-qty-label">→{{ pendingMoves[it.id].to === 'cargo' ? '荷物' : '倉庫' }}</span>
+                  <div class="move-stepper">
+                    <button :disabled="pendingMoves[it.id].qty <= 1" aria-label="1個減らす" @click="setMoveQty(it, pendingMoves[it.id].qty - 1)">−</button>
+                    <input
+                      :value="pendingMoves[it.id].qty"
+                      type="number"
+                      inputmode="numeric"
+                      min="1"
+                      :max="it.quantity"
+                      aria-label="移す個数"
+                      @change="setMoveQty(it, $event.target.value)"
+                    />
+                    <button :disabled="pendingMoves[it.id].qty >= it.quantity" aria-label="1個増やす" @click="setMoveQty(it, pendingMoves[it.id].qty + 1)">＋</button>
+                  </div>
+                  <span class="move-of">/{{ it.quantity }}</span>
+                  <button class="move-cancel" aria-label="この移動をやめる" @click="cancelMove(it)">×</button>
                 </div>
-                <span class="move-of">/{{ it.quantity }}</span>
-                <button class="move-cancel" aria-label="この移動をやめる" @click="cancelMove(it)">×</button>
               </div>
             </div>
-            </div>
-            <p v-if="cat.value === 'equipment' && Object.keys(totalModifiers(item.pcItems)).length" class="mods-total">
-              補正の合計: {{ modifiersText(totalModifiers(item.pcItems)) }}
-            </p>
-
-            <!-- 荷物チェッカー -->
-            <div v-if="cat.value === 'cargo'" class="load-check" :class="{ over: totalCost(item.pcItems) > LOAD_LIMIT }">
-              <div class="load-head">
-                <span>荷物のコスト(大5・中3・小1)</span>
-                <strong>{{ totalCost(item.pcItems) }} / {{ LOAD_LIMIT }}</strong>
-              </div>
-              <div class="load-bar">
-                <div class="load-fill" :style="{ width: `${Math.min(100, (totalCost(item.pcItems) / LOAD_LIMIT) * 100)}%` }" />
-              </div>
-              <p v-if="totalCost(item.pcItems) > LOAD_LIMIT" class="load-over">上限を{{ totalCost(item.pcItems) - LOAD_LIMIT }}超えています</p>
-              <button class="copy-btn" @click="copyLoadCheck(item)">ココフォリア用にコピー</button>
-            </div>
-          </div>
-
+          </section>
           </template>
 
           <!-- このPCが所持者の魔法と魔道具・AF -->
@@ -1059,7 +1076,7 @@ const confirmPcDelete = async () => {
           >
             <input v-model="carryForm.itemId" type="radio" :value="si.id" />
             <span class="cat-choice-label">{{ si.name }}</span>
-            <span class="cat-choice-note">{{ si.shop }}</span>
+            <span class="cat-choice-note">{{ si.shop }}・{{ sizeLabel(si.item_size) }}・{{ categoryLabel(si.item_category ?? 'storage') }}へ</span>
           </label>
           <p v-if="filteredShopItems.length === 0" class="markdown-hint">該当する商品がありません</p>
         </div>
@@ -1072,53 +1089,86 @@ const confirmPcDelete = async () => {
         <!-- 魔道具・AF: 名前と効果は魔道具・AFの欄で変える。ここでは元になった物の大きさだけ -->
         <p class="markdown-hint">「{{ itemForm.name }}」の名前と効果は、魔道具・AFの欄で編集します。ここでは荷物にしたときの大きさ(元になった物の大きさ)だけ変えられます。</p>
         <label class="edit-label">大きさ</label>
-        <select v-model="itemForm.size" class="edit-input">
-          <option v-for="sz in ITEM_SIZES" :key="sz.value" :value="sz.value">{{ sz.label }}({{ sz.points }})</option>
-        </select>
+        <div class="seg" role="radiogroup" aria-label="大きさ">
+          <button
+            v-for="sz in ITEM_SIZES"
+            :key="sz.value"
+            type="button"
+            role="radio"
+            :aria-checked="itemForm.size === sz.value"
+            :class="{ active: itemForm.size === sz.value }"
+            @click="itemForm.size = sz.value"
+          >
+            {{ sz.label }}<small>{{ sz.points }}</small>
+          </button>
+        </div>
         <label class="edit-label">何個で1つ分の大きさか</label>
         <input v-model.number="itemForm.perSlot" type="number" min="1" inputmode="numeric" class="edit-input" />
         <p class="markdown-hint">荷物にしたときのコスト: {{ itemCost({ quantity: itemForm.quantity, per_slot: itemForm.perSlot, size: itemForm.size }) }}</p>
       </template>
 
       <template v-else>
-      <label class="edit-label">名前</label>
-      <input v-model="itemForm.name" class="edit-input" />
+        <label class="edit-label">名前</label>
+        <input v-model="itemForm.name" class="edit-input" />
 
-      <div class="pc-grid">
-        <div>
-          <label class="edit-label">個数</label>
-          <input v-model.number="itemForm.quantity" type="number" min="0" inputmode="numeric" class="edit-input" />
+        <label class="edit-label">区分</label>
+        <div class="seg" role="radiogroup" aria-label="区分">
+          <button
+            v-for="cat in ITEM_CATEGORIES"
+            :key="cat.value"
+            type="button"
+            role="radio"
+            :aria-checked="itemForm.category === cat.value"
+            :class="{ active: itemForm.category === cat.value }"
+            @click="itemForm.category = cat.value"
+          >
+            {{ cat.label }}
+          </button>
         </div>
-        <div>
-          <label class="edit-label">大きさ</label>
-          <select v-model="itemForm.size" class="edit-input">
-            <option v-for="sz in ITEM_SIZES" :key="sz.value" :value="sz.value">{{ sz.label }}({{ sz.points }})</option>
-          </select>
+        <p class="seg-note">{{ ITEM_CATEGORIES.find((c) => c.value === itemForm.category)?.note }}</p>
+
+        <div class="pc-grid">
+          <div>
+            <label class="edit-label">個数</label>
+            <input v-model.number="itemForm.quantity" type="number" min="0" inputmode="numeric" class="edit-input" />
+          </div>
+          <div>
+            <label class="edit-label">何個で1つ分か</label>
+            <input v-model.number="itemForm.perSlot" type="number" min="1" inputmode="numeric" class="edit-input" />
+          </div>
         </div>
-      </div>
-      <label class="edit-label">何個で1つ分の大きさか(例: 御札は10、手榴弾は2)</label>
-      <input v-model.number="itemForm.perSlot" type="number" min="1" inputmode="numeric" class="edit-input" />
-      <p class="markdown-hint">荷物にしたときのコスト: {{ itemCost({ quantity: itemForm.quantity, per_slot: itemForm.perSlot, size: itemForm.size }) }}</p>
+        <p class="seg-note">例: 御札は10枚で小1つ分、手榴弾は2個で1つ分。ふつうは1</p>
 
-      <label class="edit-label">区分</label>
-      <div class="cat-choices">
-        <label v-for="cat in ITEM_CATEGORIES" :key="cat.value" class="cat-choice" :class="{ active: itemForm.category === cat.value }">
-          <input v-model="itemForm.category" type="radio" :value="cat.value" />
-          <span class="cat-choice-label">{{ cat.label }}</span>
-          <span class="cat-choice-note">{{ cat.note }}</span>
-        </label>
-      </div>
+        <label class="edit-label">大きさ</label>
+        <div class="seg" role="radiogroup" aria-label="大きさ">
+          <button
+            v-for="sz in ITEM_SIZES"
+            :key="sz.value"
+            type="button"
+            role="radio"
+            :aria-checked="itemForm.size === sz.value"
+            :class="{ active: itemForm.size === sz.value }"
+            @click="itemForm.size = sz.value"
+          >
+            {{ sz.label }}<small>{{ sz.points }}</small>
+          </button>
+        </div>
+        <p class="seg-note">荷物にしたときのコスト: <strong>{{ itemCost({ quantity: itemForm.quantity, per_slot: itemForm.perSlot, size: itemForm.size }) }}</strong></p>
 
-      <label class="edit-label">効果</label>
-      <textarea v-model="itemForm.effect" class="edit-textarea auto-wrap" rows="2" @input="resize" />
+        <label class="edit-label">効果</label>
+        <textarea v-model="itemForm.effect" class="edit-textarea auto-wrap" rows="2" @input="resize" />
 
-      <label class="edit-label">ステータスへの補正(装備品のときだけ反映。例: STR に 1)</label>
-      <div class="stat-grid">
-        <label v-for="k in STAT_KEYS" :key="k" class="stat-input">
-          <span class="stat-key">{{ k }}</span>
-          <input v-model.number="itemForm.modifiers[k]" type="number" inputmode="numeric" />
-        </label>
-      </div>
+        <!-- ステータス補正: 装備・装飾品か、すでに補正があるときだけ出す -->
+        <template v-if="showModifiers">
+          <label class="edit-label">ステータスへの補正<small class="label-note">(装備・装飾品のときだけ反映)</small></label>
+          <div class="stat-grid">
+            <label v-for="k in STAT_KEYS" :key="k" class="stat-input">
+              <span class="stat-key">{{ k }}</span>
+              <input v-model.number="itemForm.modifiers[k]" type="number" inputmode="numeric" />
+            </label>
+          </div>
+        </template>
+        <button v-else type="button" class="text-link" @click="modifiersOpen = true">＋ ステータスへの補正を付ける</button>
       </template>
 
       <template v-if="itemDialog.itemId && !itemDialog.magic" #extra>
@@ -1914,8 +1964,8 @@ const confirmPcDelete = async () => {
 
 /* ---------- 所持品・荷物チェッカー ---------- */
 .pc-items {
-  margin-top: 10px;
-  padding-top: 10px;
+  margin-top: 14px;
+  padding-top: 8px;
   border-top: 2px solid var(--color-text, #000);
 }
 
@@ -1967,15 +2017,31 @@ const confirmPcDelete = async () => {
 }
 
 .pc-item-tag {
-  font-size: 0.65rem;
+  margin-left: 6px;
+  vertical-align: 1px;
+  font-weight: normal;
+  font-size: 0.62rem;
   border: 1px solid currentColor;
   padding: 0 4px;
   opacity: 0.7;
 }
 
 .pc-item-cost {
-  font-size: 0.75rem;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  font-size: 0.72rem;
   white-space: nowrap;
+}
+
+.pc-item-cost strong {
+  min-width: 1.6em;
+  text-align: right;
+  font-size: 0.9rem;
+}
+
+.pc-item-cost.dim {
+  opacity: 0.55;
 }
 
 .pc-item-mods {
@@ -1988,30 +2054,11 @@ const confirmPcDelete = async () => {
   font-size: 0.78rem;
   opacity: 0.75;
   white-space: pre-line;
-}
-
-.mods-total {
-  margin: 8px 0 0;
-  font-size: 0.8rem;
-  font-weight: bold;
-}
-
-.load-check {
-  margin-top: 12px;
-  padding: 10px 12px;
-  border: 1px solid var(--color-text, #000);
-  background: var(--color-bg, #fff);
-}
-
-.load-head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  font-size: 0.8rem;
-}
-
-.load-head strong {
-  font-size: 1.05rem;
+  /* 一覧では2行まで(全文は押して開く画面で見る) */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .load-bar {
@@ -2027,7 +2074,7 @@ const confirmPcDelete = async () => {
   transition: width 0.2s ease;
 }
 
-.load-check.over .load-fill {
+.items-summary.over .load-fill {
   background: var(--color-error, #c62828);
 }
 
@@ -2039,14 +2086,98 @@ const confirmPcDelete = async () => {
 }
 
 .copy-btn {
-  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
   border: 1px solid #000;
   background: #000;
   color: var(--color-accent, #ffd400);
-  padding: 8px;
+  padding: 5px 10px;
+  font-size: 0.75rem;
+  font-weight: bold;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+/* 所持品タブの上: 荷物のコストと装備の補正 */
+.items-summary {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--color-text, #000);
+  background: var(--color-bg, #fff);
+}
+
+.sum-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.sum-label {
+  font-size: 0.78rem;
+  font-weight: bold;
+}
+
+.sum-value {
+  font-size: 1.3rem;
+  line-height: 1;
+}
+
+.sum-value small {
+  font-size: 0.75rem;
+  font-weight: normal;
+}
+
+.items-summary.over .sum-value {
+  color: var(--color-error, #c62828);
+}
+
+.sum-mods {
+  margin: 2px 0 0;
+  font-size: 0.75rem;
+}
+
+.sum-mods strong {
+  color: var(--color-plus, #1b7f2a);
+}
+
+.add-item-btn {
+  width: 100%;
+  margin-top: 10px;
+  border: 1px solid var(--color-text, #000);
+  background: var(--color-accent, #ffd400);
+  color: #000;
+  padding: 9px;
   font-size: 0.85rem;
   font-weight: bold;
   cursor: pointer;
+}
+
+.items-head {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0 6px;
+  margin: 0 0 2px;
+  font-size: 0.95rem;
+}
+
+.items-head-note {
+  font-size: 0.7rem;
+  font-weight: normal;
+  opacity: 0.6;
+}
+
+.items-empty {
+  margin: 4px 0;
+  font-size: 0.78rem;
+  opacity: 0.5;
+}
+
+.pc-item-chevron {
+  flex-shrink: 0;
+  opacity: 0.35;
 }
 
 .pc-item-mods.inactive {
@@ -2088,6 +2219,64 @@ const confirmPcDelete = async () => {
 .cat-choice-note {
   font-size: 0.72rem;
   opacity: 0.7;
+}
+
+/* 所持品の追加・編集: 区分・大きさを選ぶボタンの列 */
+.seg {
+  display: flex;
+  border: 1px solid var(--color-text, #000);
+}
+
+.seg button {
+  flex: 1;
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 3px;
+  border: none;
+  background: var(--color-bg, #fff);
+  color: var(--color-text, #000);
+  padding: 9px 4px;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.seg button + button {
+  border-left: 1px solid var(--color-text, #000);
+}
+
+.seg button small {
+  font-size: 0.68rem;
+  opacity: 0.6;
+}
+
+.seg button.active {
+  background: var(--color-accent, #ffd400);
+  color: #000;
+  font-weight: bold;
+}
+
+.seg-note {
+  margin: 2px 0 4px;
+  font-size: 0.72rem;
+  opacity: 0.7;
+}
+
+.label-note {
+  margin-left: 4px;
+  font-weight: normal;
+  opacity: 0.6;
+}
+
+.text-link {
+  align-self: flex-start;
+  border: none;
+  background: none;
+  color: var(--color-text, #000);
+  padding: 6px 0;
+  font-size: 0.8rem;
+  text-decoration: underline;
+  cursor: pointer;
 }
 
 /* 所持品の追加: 「自分で入力」「店の商品から」の切り替え */
@@ -2428,6 +2617,9 @@ const confirmPcDelete = async () => {
 }
 
 .move-start {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
   border: 1px solid var(--color-text, #000);
   background: var(--color-bg, #fff);
   color: var(--color-text, #000);

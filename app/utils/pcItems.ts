@@ -35,9 +35,9 @@ export const ITEM_SIZES = [
 ]
 // 所持品の区分
 export const ITEM_CATEGORIES = [
-  { value: 'cargo', label: '荷物', note: 'コストに数える。「倉庫へ」で個数を選び「移動を確定」' },
-  { value: 'storage', label: '倉庫', note: 'コストにも補正にも数えない。「荷物へ」で個数を選び「移動を確定」' },
-  { value: 'equipment', label: '装備・装飾品', note: 'コストに数えない・ステータス補正あり' },
+  { value: 'cargo', label: '荷物', note: 'コストに数える' },
+  { value: 'storage', label: '倉庫', note: 'コスト・補正に数えない' },
+  { value: 'equipment', label: '装備・装飾品', note: '補正に数える(コストなし)' },
 ]
 export const categoryLabel = (value) => ITEM_CATEGORIES.find((c) => c.value === value)?.label ?? '倉庫'
 export const itemsOf = (items, category) => (items ?? []).filter((item) => (item.category ?? 'cargo') === category)
