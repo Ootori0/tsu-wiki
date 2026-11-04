@@ -1194,15 +1194,19 @@ const confirmPcDelete = async () => {
     <FormDialog
       v-model="consumeDialog.open"
       :title="consumeDialog.item?.name ?? ''"
-      save-label="消費"
-      :save-disabled="consumeSaving || !consumeDialog.item"
-      @save="consumeItem"
+      hide-save
+      cancel-label="閉じる"
     >
       <template v-if="consumeDialog.item">
-        <p class="markdown-hint">店の商品です。名前や効果は店の内容に合わせて変わります。使った分を「消費」で減らせます(0個になると所持品から外れます)。</p>
-        <p v-if="consumeDialog.item.effect" class="pc-item-effect">{{ consumeDialog.item.effect }}</p>
-        <label class="edit-label">消費する個数(持っている数: {{ consumeDialog.item.quantity }})</label>
-        <div class="move-stepper consume-stepper">
+        <div class="consume-info">
+          <p class="consume-have">持っている数 <strong>{{ consumeDialog.item.quantity }}</strong>個</p>
+          <p v-if="consumeDialog.item.effect" class="consume-effect">{{ consumeDialog.item.effect }}</p>
+          <p class="markdown-hint">店の商品です。名前や効果は店の内容に合わせて変わります。</p>
+        </div>
+
+        <div class="consume-box">
+          <label class="edit-label">使った個数</label>
+          <div class="move-stepper consume-stepper">
           <button :disabled="consumeDialog.qty <= 1" aria-label="1個減らす" @click="setConsumeQty(consumeDialog.qty - 1)">−</button>
           <input
             :value="consumeDialog.qty"
@@ -1214,8 +1218,14 @@ const confirmPcDelete = async () => {
             @change="setConsumeQty($event.target.value)"
           />
           <button :disabled="consumeDialog.qty >= consumeDialog.item.quantity" aria-label="1個増やす" @click="setConsumeQty(consumeDialog.qty + 1)">＋</button>
+          </div>
+          <button class="consume-btn" :disabled="consumeSaving" @click="consumeItem">
+            {{ consumeDialog.qty }}個消費する
+          </button>
+          <p class="consume-after">
+            残り {{ consumeDialog.item.quantity - consumeDialog.qty }}個<template v-if="consumeDialog.item.quantity === consumeDialog.qty">(所持品から外れます)</template>
+          </p>
         </div>
-        <p class="markdown-hint">消費後: {{ consumeDialog.item.quantity - consumeDialog.qty }}個</p>
       </template>
       <template #extra>
         <button class="delete-btn" @click="showConsumeDeleteConfirm = true">削除</button>
@@ -1990,18 +2000,74 @@ const confirmPcDelete = async () => {
   cursor: pointer;
 }
 
+/* 店の商品の消費: 上に品物の情報、下に個数と「N個消費する」 */
+.consume-info {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.consume-have {
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+.consume-have strong {
+  font-size: 1.3rem;
+}
+
+.consume-effect {
+  margin: 0;
+  font-size: 0.85rem;
+  white-space: pre-line;
+}
+
+.consume-box {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--color-line, rgba(0, 0, 0, 0.14));
+}
+
 .consume-stepper {
-  align-self: flex-start;
+  align-self: stretch;
 }
 
 .consume-stepper button {
-  width: 44px;
-  font-size: 1.1rem;
+  width: 56px;
+  font-size: 1.3rem;
 }
 
 .consume-stepper input {
-  width: 72px;
-  padding: 8px 0;
+  flex: 1;
+  width: auto;
+  padding: 10px 0;
+  font-size: 1.2rem;
+  font-weight: bold;
+}
+
+.consume-btn {
+  border: 1px solid #000;
+  background: var(--color-accent, #ffd400);
+  color: #000;
+  padding: 12px;
+  font-size: 0.95rem;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.consume-btn:disabled {
+  opacity: 0.4;
+}
+
+.consume-after {
+  margin: 0;
+  text-align: center;
+  font-size: 0.8rem;
+  opacity: 0.75;
 }
 
 .pc-item-top {
@@ -2305,8 +2371,22 @@ const confirmPcDelete = async () => {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  max-height: 240px;
+  max-height: 50vh;
   overflow-y: auto;
+}
+
+/* スマホ(全画面)では、商品の一覧を画面の残りの高さいっぱいに広げる */
+@media (max-width: 600px) {
+  /* 消費の操作は画面の下側(親指の届くところ)に置く */
+  .consume-box {
+    margin-top: auto;
+  }
+
+  .carry-list.carry-list {
+    flex: 1 1 0;
+    min-height: 160px;
+    max-height: none;
+  }
 }
 
 .pc-item-line {
