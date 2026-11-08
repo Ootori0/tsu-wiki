@@ -284,6 +284,7 @@ const LOG_CATEGORIES = [
   { value: 'weapon_shop', label: '武器屋' },
   { value: 'casino', label: 'カジノ' },
   { value: 'casino_month', label: 'カジノ月計' },
+  { value: 'dealer_month', label: 'ディーラー月計' },
   { value: 'ledger', label: '清算・切替' },
 ]
 const { data: moneyLogs, execute: loadMoneyLogs, pending: loadingLogs } = await useFetch('/api/admin/money-logs', {
