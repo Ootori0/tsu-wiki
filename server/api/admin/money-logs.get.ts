@@ -19,6 +19,7 @@ export default defineEventHandler(async (event) => {
     magic_shop: "l.kind IN ('purchase', 'sale') AND l.sub LIKE '魔法店%'",
     weapon_shop: "l.kind IN ('purchase', 'sale') AND l.sub LIKE '武器屋%'",
     casino: "l.kind IN ('casino', 'dealer', 'casino_month', 'dealer_month')",
+    casino_month: "l.kind IN ('casino_month', 'dealer_month')",
     ledger: "l.kind IN ('settle', 'mode')",
   }
   const categoryWhere = CATEGORY_WHERE[query.category] ?? '1 = 1'
