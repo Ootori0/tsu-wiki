@@ -2781,5 +2781,26 @@ const confirmPcDelete = async () => {
 
 .item-cats {
   margin-top: var(--space-3, 12px);
+  gap: 0;
+}
+
+/* 2重目のアコーディオンは枠を付けない(魔法タブのタグ絞り込みと同じ見た目) */
+.item-cats > :deep(.accordion-item) {
+  border: none;
+  background: none;
+  box-shadow: none;
+}
+
+.item-cats > :deep(.accordion-item) > .accordion-header {
+  min-height: 0;
+  padding: 8px 0;
+}
+
+.item-cats > :deep(.accordion-item) > .accordion-header .accordion-title {
+  font-size: 0.85rem;
+}
+
+.item-cats > :deep(.accordion-item) > .detail-outer > .detail-inner {
+  padding: 0 0 6px;
 }
 </style>
