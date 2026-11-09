@@ -569,12 +569,17 @@ const deleteItem = async () => {
 // 倉庫⇔荷物の出し入れ: 「荷物へ」「倉庫へ」で移す個数を選び、「移動を確定」でまとめて保存する
 const pendingMoves = ref({}) // 所持品のid → { to: 移す先の区分, qty: 移す個数 }
 const otherSide = (category) => (category === 'cargo' ? 'storage' : 'cargo')
+// ボタンを1回押すごとに1個ずつ移す(移動先の区分のボタンを押すと1個ずつ戻る)
 const startMove = (it) => {
-  pendingMoves.value = { ...pendingMoves.value, [it.id]: { to: otherSide(it.category), qty: it.quantity, max: it.quantity } }
+  const m = pendingMoves.value[it.id]
+  const max = m?.max ?? it.quantity
+  pendingMoves.value = { ...pendingMoves.value, [it.id]: { to: m?.to ?? otherSide(it.category), qty: Math.min(max, (m?.qty ?? 0) + 1), max } }
 }
-const setMoveQty = (it, qty) => {
-  const n = Math.min(Math.max(1, Number(qty) || 1), pendingMoves.value[it.id].max)
-  pendingMoves.value = { ...pendingMoves.value, [it.id]: { ...pendingMoves.value[it.id], qty: n } }
+const undoMove = (it) => {
+  const m = pendingMoves.value[it.id]
+  if (!m) return
+  if (m.qty <= 1) cancelMove(it)
+  else pendingMoves.value = { ...pendingMoves.value, [it.id]: { ...m, qty: m.qty - 1 } }
 }
 const cancelMove = (it) => {
   const next = { ...pendingMoves.value }
@@ -990,34 +995,15 @@ const confirmPcDelete = async () => {
                 </span>
                 <span v-if="it.effect" class="pc-item-effect">{{ it.effect }}</span>
               </button>
-              <!-- 荷物と倉庫の間の出し入れ(個数を選んで「移動を確定」) -->
+              <!-- 荷物と倉庫の間の出し入れ(押した回数だけ「移動を確定」) -->
               <div v-if="cat.value !== 'equipment'" class="move-ctl">
                 <button
-                  v-if="!pendingMoves[it.id]"
                   class="move-start"
                   :disabled="movingPcId === item.id"
-                  @click="startMove(it)"
+                  @click="it.moved ? undoMove(it) : startMove(it)"
                 >
                   <v-icon :icon="cat.value === 'cargo' ? 'mdi-arrow-down' : 'mdi-arrow-up'" size="13" />{{ cat.value === 'cargo' ? '倉庫へ' : '荷物へ' }}
                 </button>
-                <div v-else-if="it.moved" class="move-qty">
-                  <span class="move-qty-label">→{{ pendingMoves[it.id].to === 'cargo' ? '荷物' : '倉庫' }}</span>
-                  <div class="move-stepper">
-                    <button :disabled="pendingMoves[it.id].qty <= 1" aria-label="1個減らす" @click="setMoveQty(it, pendingMoves[it.id].qty - 1)">−</button>
-                    <input
-                      :value="pendingMoves[it.id].qty"
-                      type="number"
-                      inputmode="numeric"
-                      min="1"
-                      :max="pendingMoves[it.id].max"
-                      aria-label="移す個数"
-                      @change="setMoveQty(it, $event.target.value)"
-                    />
-                    <button :disabled="pendingMoves[it.id].qty >= pendingMoves[it.id].max" aria-label="1個増やす" @click="setMoveQty(it, pendingMoves[it.id].qty + 1)">＋</button>
-                  </div>
-                  <span class="move-of">/{{ pendingMoves[it.id].max }}</span>
-                  <button class="move-cancel" aria-label="この移動をやめる" @click="cancelMove(it)">×</button>
-                </div>
               </div>
             </div>
           </section>
