@@ -228,6 +228,14 @@ const updatePc = (id, fn) => {
   fetchedPcs.value = (fetchedPcs.value ?? []).map((pc) => (pc.id === id ? fn({ ...pc, pcItems: [...(pc.pcItems ?? [])] }) : pc))
 }
 
+// 所持品を変えたら、他のページ(PC一覧・店)にもすぐ反映されるよう、サーバーから取り直す
+const syncPcItems = () => {
+  clearNuxtData('pcs-list')
+  clearNuxtData('shop-items')
+  clearNuxtData('shop-purchases')
+  return refreshPcsRaw()
+}
+
 const refreshPcs = async () => {
   // PCタブの一覧キャッシュも破棄して次回表示時に再取得させる
   clearNuxtData('pcs-list')
@@ -439,6 +447,7 @@ const saveCarryIn = async () => {
     })
     itemDialog.value.open = false
     updatePc(pcId, (p) => ({ ...p, pcItems: res.items }))
+    syncPcItems()
     carryForm.value = { itemId: null, quantity: 1, search: '' }
     showWithUndo(`「${item.name}」を持ち込みました`, 'purchase', res.purchaseId, refreshPcs)
   } catch (e) {
@@ -471,6 +480,7 @@ const applyItemResult = (pcId, itemId, item) => {
     ...p,
     pcItems: item ? p.pcItems.map((i) => (i.id === itemId ? item : i)) : p.pcItems.filter((i) => i.id !== itemId),
   }))
+  syncPcItems()
 }
 const consumeItem = async () => {
   const { pcId, item, qty } = consumeDialog.value
@@ -533,6 +543,7 @@ const saveItem = async () => {
         return p
       })
     }
+    syncPcItems()
     show(itemId ? '所持品を保存しました' : '所持品を追加しました')
   } catch (e) {
     show(e?.data?.statusMessage ?? '保存に失敗しました', 'error')
@@ -548,6 +559,7 @@ const deleteItem = async () => {
     await $fetch(`/api/pc-items/${itemId}`, { method: 'DELETE' })
     itemDialog.value.open = false
     updatePc(itemDialog.value.pcId, (p) => ({ ...p, pcItems: p.pcItems.filter((i) => i.id !== itemId) }))
+    syncPcItems()
     show('所持品を削除しました')
   } catch (e) {
     show(e?.data?.statusMessage ?? '削除に失敗しました', 'error')
@@ -558,10 +570,10 @@ const deleteItem = async () => {
 const pendingMoves = ref({}) // 所持品のid → { to: 移す先の区分, qty: 移す個数 }
 const otherSide = (category) => (category === 'cargo' ? 'storage' : 'cargo')
 const startMove = (it) => {
-  pendingMoves.value = { ...pendingMoves.value, [it.id]: { to: otherSide(it.category), qty: it.quantity } }
+  pendingMoves.value = { ...pendingMoves.value, [it.id]: { to: otherSide(it.category), qty: it.quantity, max: it.quantity } }
 }
 const setMoveQty = (it, qty) => {
-  const n = Math.min(Math.max(1, Number(qty) || 1), it.quantity)
+  const n = Math.min(Math.max(1, Number(qty) || 1), pendingMoves.value[it.id].max)
   pendingMoves.value = { ...pendingMoves.value, [it.id]: { ...pendingMoves.value[it.id], qty: n } }
 }
 const cancelMove = (it) => {
@@ -569,6 +581,14 @@ const cancelMove = (it) => {
   delete next[it.id]
   pendingMoves.value = next
 }
+// 画面に出す所持品: 移動の予定は、確定前でも移動先に移った表示にする(一部だけ移すときは元の区分に残りを出す)
+const displayItems = (pc) => pc.pcItems.flatMap((i) => {
+  const m = pendingMoves.value[i.id]
+  if (!m) return [i]
+  const rest = m.max - m.qty
+  return [...(rest > 0 ? [{ ...i, quantity: rest }] : []), { ...i, category: m.to, quantity: m.qty, moved: true }]
+})
+const displayItemsOf = (pc, category) => itemsOf(displayItems(pc), category)
 const pendingMovesOf = (pc) => pc.pcItems.filter((i) => pendingMoves.value[i.id])
 // 確定したときの荷物のコスト(移動を反映した見込み。一部だけ移すものは2つに分けて数える)
 const projectedCost = (pc) => totalCost(pc.pcItems.flatMap((i) => {
@@ -593,6 +613,7 @@ const confirmMoves = async (pc) => {
     // 分けたり合わせたりした結果の所持品が返ってくるので、それで置き換える
     updatePc(pc.id, (p) => ({ ...p, pcItems: res.items }))
     cancelMoves(pc)
+    syncPcItems()
     show(`${moves.length}件を移動しました`)
   } catch (e) {
     show(e?.data?.statusMessage ?? '移動できませんでした', 'error')
@@ -940,14 +961,15 @@ const confirmPcDelete = async () => {
 
           <section v-for="cat in ITEM_CATEGORIES" :key="cat.value" class="pc-items">
             <h3 class="items-head">
-              {{ cat.label }}<span class="section-count">{{ itemsOf(item.pcItems, cat.value).length }}件</span>
+              {{ cat.label }}<span class="section-count">{{ displayItemsOf(item, cat.value).length }}件</span>
               <span class="items-head-note">{{ cat.note }}</span>
             </h3>
-            <p v-if="itemsOf(item.pcItems, cat.value).length === 0" class="items-empty">なし</p>
-            <div v-for="it in itemsOf(item.pcItems, cat.value)" :key="it.id" class="pc-item-line">
+            <p v-if="displayItemsOf(item, cat.value).length === 0" class="items-empty">なし</p>
+            <div v-for="it in displayItemsOf(item, cat.value)" :key="`${it.id}${it.moved ? '-moved' : ''}`" class="pc-item-line">
               <!-- 押すと: 自分で入力した品物は編集、店の商品は消費・削除、魔道具・AFは大きさの変更 -->
               <button
                 class="pc-item-row"
+                :disabled="!!pendingMoves[it.id]"
                 @click="it.shop_item_id ? openConsume(item.id, it) : openItemEdit(item.id, it)"
               >
                 <span class="pc-item-top">
@@ -978,7 +1000,7 @@ const confirmPcDelete = async () => {
                 >
                   <v-icon :icon="cat.value === 'cargo' ? 'mdi-arrow-down' : 'mdi-arrow-up'" size="13" />{{ cat.value === 'cargo' ? '倉庫へ' : '荷物へ' }}
                 </button>
-                <div v-else class="move-qty">
+                <div v-else-if="it.moved" class="move-qty">
                   <span class="move-qty-label">→{{ pendingMoves[it.id].to === 'cargo' ? '荷物' : '倉庫' }}</span>
                   <div class="move-stepper">
                     <button :disabled="pendingMoves[it.id].qty <= 1" aria-label="1個減らす" @click="setMoveQty(it, pendingMoves[it.id].qty - 1)">−</button>
@@ -987,13 +1009,13 @@ const confirmPcDelete = async () => {
                       type="number"
                       inputmode="numeric"
                       min="1"
-                      :max="it.quantity"
+                      :max="pendingMoves[it.id].max"
                       aria-label="移す個数"
                       @change="setMoveQty(it, $event.target.value)"
                     />
-                    <button :disabled="pendingMoves[it.id].qty >= it.quantity" aria-label="1個増やす" @click="setMoveQty(it, pendingMoves[it.id].qty + 1)">＋</button>
+                    <button :disabled="pendingMoves[it.id].qty >= pendingMoves[it.id].max" aria-label="1個増やす" @click="setMoveQty(it, pendingMoves[it.id].qty + 1)">＋</button>
                   </div>
-                  <span class="move-of">/{{ it.quantity }}</span>
+                  <span class="move-of">/{{ pendingMoves[it.id].max }}</span>
                   <button class="move-cancel" aria-label="この移動をやめる" @click="cancelMove(it)">×</button>
                 </div>
               </div>
