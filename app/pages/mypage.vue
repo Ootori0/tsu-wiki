@@ -627,6 +627,16 @@ const confirmMoves = async (pc) => {
   }
 }
 
+// 画面左下の移動バー: 移動の予定があるPCをまとめて確定・取り消しする
+const movingPcs = computed(() => (fetchedPcs.value ?? []).filter((pc) => pendingMovesOf(pc).length))
+const movingCount = computed(() => movingPcs.value.reduce((n, pc) => n + pendingMovesOf(pc).length, 0))
+const confirmAllMoves = async () => {
+  for (const pc of movingPcs.value) await confirmMoves(pc)
+}
+const cancelAllMoves = () => {
+  pendingMoves.value = {}
+}
+
 // 荷物チェッカー: ココフォリアに貼る文章をコピーする
 const copyLoadCheck = async (pc) => {
   try {
@@ -954,15 +964,6 @@ const confirmPcDelete = async () => {
             </button>
           </div>
 
-          <!-- 倉庫⇔荷物の移動の確定 -->
-          <div v-if="pendingMovesOf(item).length" class="move-bar">
-            <span class="move-bar-text">
-              {{ pendingMovesOf(item).length }}件を移動
-              <small>確定後のコスト {{ projectedCost(item) }} / {{ LOAD_LIMIT }}</small>
-            </span>
-            <button class="move-btn" :disabled="movingPcId === item.id" @click="cancelMoves(item)">取り消す</button>
-            <button class="move-btn primary" :disabled="movingPcId === item.id" @click="confirmMoves(item)">移動を確定</button>
-          </div>
 
           <!-- 荷物・倉庫・装備装飾品はそれぞれアコーディオン -->
           <AccordionList :items="ITEM_CATEGORIES.map((c) => ({ ...c, id: c.value }))" multiple :default-open="['cargo']" class="item-cats">
@@ -972,7 +973,7 @@ const confirmPcDelete = async () => {
             <template #detail="{ item: cat }">
               <p class="items-head-note">{{ cat.note }}</p>
               <p v-if="displayItemsOf(item, cat.value).length === 0" class="items-empty">なし</p>
-              <div v-for="it in displayItemsOf(item, cat.value)" :key="`${it.id}${it.moved ? '-moved' : ''}`" class="pc-item-line">
+              <div v-for="it in displayItemsOf(item, cat.value)" :key="`${it.id}${it.moved ? '-moved' : ''}`" class="pc-item-line" :class="{ moved: it.moved }">
                 <!-- 押すと: 自分で入力した品物は編集、店の商品は消費・削除、魔道具・AFは大きさの変更 -->
                 <button
                   class="pc-item-row"
@@ -980,8 +981,8 @@ const confirmPcDelete = async () => {
                   @click="it.shop_item_id ? openConsume(item.id, it) : openItemEdit(item.id, it)"
                 >
                   <span class="pc-item-top">
-                    <span class="pc-item-name">{{ it.name }}<span class="pc-item-qty">×{{ it.quantity }}</span></span>
-                    <span v-if="cat.value === 'cargo'" class="pc-item-cost">コスト<strong>{{ itemCost(it) }}</strong></span>
+                    <span class="pc-item-name">{{ it.name }}<span class="pc-item-qty">×{{ it.quantity }}</span><span v-if="it.moved" class="moved-tag">移動予定</span></span>
+                    <span v-if="cat.value === 'cargo'" class="pc-item-cost">コスト <strong>{{ itemCost(it) }}</strong></span>
                     <v-icon icon="mdi-chevron-right" size="16" class="pc-item-chevron" />
                   </span>
                   <span v-if="cat.value === 'equipment' && Object.keys(it.modifiers ?? {}).length" class="pc-item-mods">
@@ -1065,6 +1066,18 @@ const confirmPcDelete = async () => {
         <span class="save-bar-text">未保存の変更</span>
         <button class="save-bar-btn" :disabled="savingDrafts" @click="revertDrafts">戻す</button>
         <button class="save-bar-btn primary" :disabled="savingDrafts" @click="saveDrafts">保存</button>
+      </div>
+    </Transition>
+
+    <!-- 荷物⇔倉庫の移動の予定があるときだけ、画面左下に出す(保存バーと同時なら上に重ねる) -->
+    <Transition name="save-bar">
+      <div v-if="movingPcs.length" class="save-bar move-float" :class="{ stacked: dirtyIds.length }" role="status">
+        <span class="save-bar-text move-float-text">
+          荷物の移動 {{ movingCount }}件
+          <small v-if="movingPcs.length === 1">確定後のコスト {{ projectedCost(movingPcs[0]) }} / {{ LOAD_LIMIT }}</small>
+        </span>
+        <button class="save-bar-btn" :disabled="movingPcId !== null" @click="cancelAllMoves">戻す</button>
+        <button class="save-bar-btn primary" :disabled="movingPcId !== null" @click="confirmAllMoves">確定</button>
       </div>
     </Transition>
 
@@ -2770,13 +2783,56 @@ const confirmPcDelete = async () => {
 </style>
 
 <style scoped>
+/* 品物の行の右のボタン(消費・倉庫へ/荷物へ)は同じ大きさにそろえる */
+.move-ctl {
+  gap: 6px;
+}
+
 .consume-open {
   border: 1px solid #c00;
   background: var(--color-bg, #fff);
   color: #c00;
-  padding: 6px 14px;
-  font-size: 0.85rem;
+  padding: 4px 8px;
+  font-size: 0.75rem;
+  font-weight: bold;
+  white-space: nowrap;
   cursor: pointer;
+}
+
+/* 移動予定の行は色を付けて分かるようにする */
+.pc-item-line.moved {
+  background: var(--color-accent-soft, #fff7cc);
+}
+
+.moved-tag {
+  margin-left: 6px;
+  padding: 0 6px;
+  font-size: 0.68rem;
+  font-weight: bold;
+  background: var(--color-accent, #ffd400);
+  border: 1px solid var(--color-text, #000);
+  vertical-align: middle;
+}
+
+.items-head-note {
+  display: block;
+  margin: 0 0 2px;
+}
+
+/* 移動バー: 保存バーと同時に出るときは上に重ねる */
+.move-float.stacked {
+  bottom: 72px;
+}
+
+.move-float-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.3;
+}
+
+.move-float-text small {
+  font-size: 0.7rem;
+  font-weight: normal;
 }
 
 .item-cats {
@@ -2785,10 +2841,15 @@ const confirmPcDelete = async () => {
 }
 
 /* 2重目のアコーディオンは枠を付けない(魔法タブのタグ絞り込みと同じ見た目) */
-.item-cats > :deep(.accordion-item) {
+.item-cats > :deep(.accordion-item),
+.item-cats > :deep(.accordion-item:has(> .detail-outer.open)) {
   border: none;
   background: none;
   box-shadow: none;
+}
+
+.item-cats :deep(.accordion-item + .accordion-item) {
+  border-top: 1px solid var(--color-line, rgba(0, 0, 0, 0.14));
 }
 
 .item-cats > :deep(.accordion-item) > .accordion-header {
@@ -2801,6 +2862,10 @@ const confirmPcDelete = async () => {
 }
 
 .item-cats > :deep(.accordion-item) > .detail-outer > .detail-inner {
+  padding: 0;
+}
+
+.item-cats > :deep(.accordion-item) > .detail-outer.open > .detail-inner {
   padding: 0 0 6px;
 }
 </style>
