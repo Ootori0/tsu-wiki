@@ -964,49 +964,49 @@ const confirmPcDelete = async () => {
             <button class="move-btn primary" :disabled="movingPcId === item.id" @click="confirmMoves(item)">移動を確定</button>
           </div>
 
-          <section v-for="cat in ITEM_CATEGORIES" :key="cat.value" class="pc-items">
-            <h3 class="items-head">
+          <!-- 荷物・倉庫・装備装飾品はそれぞれアコーディオン -->
+          <AccordionList :items="ITEM_CATEGORIES.map((c) => ({ ...c, id: c.value }))" multiple :default-open="['cargo']" class="item-cats">
+            <template #title="{ item: cat }">
               {{ cat.label }}<span class="section-count">{{ displayItemsOf(item, cat.value).length }}件</span>
-              <span class="items-head-note">{{ cat.note }}</span>
-            </h3>
-            <p v-if="displayItemsOf(item, cat.value).length === 0" class="items-empty">なし</p>
-            <div v-for="it in displayItemsOf(item, cat.value)" :key="`${it.id}${it.moved ? '-moved' : ''}`" class="pc-item-line">
-              <!-- 押すと: 自分で入力した品物は編集、店の商品は消費・削除、魔道具・AFは大きさの変更 -->
-              <button
-                class="pc-item-row"
-                :disabled="!!pendingMoves[it.id]"
-                @click="it.shop_item_id ? openConsume(item.id, it) : openItemEdit(item.id, it)"
-              >
-                <span class="pc-item-top">
-                  <span class="pc-item-name">
-                    {{ it.name }}<span class="pc-item-qty">×{{ it.quantity }}</span>
-                    <span v-if="it.shop_item_id" class="pc-item-tag">店</span>
-                    <span v-if="it.magic_id" class="pc-item-tag">魔道具・AF</span>
-                  </span>
-                  <span v-if="cat.value === 'cargo'" class="pc-item-cost" :title="it.per_slot > 1 ? `${it.per_slot}個で1つ分` : ''">
-                    {{ sizeLabel(it.size) }}<template v-if="it.per_slot > 1">/{{ it.per_slot }}個</template>
-                    <strong>{{ itemCost(it) }}</strong>
-                  </span>
-                  <span v-else-if="cat.value === 'storage'" class="pc-item-cost dim">{{ sizeLabel(it.size) }}</span>
-                  <v-icon icon="mdi-chevron-right" size="16" class="pc-item-chevron" />
-                </span>
-                <span v-if="Object.keys(it.modifiers ?? {}).length" class="pc-item-mods" :class="{ inactive: cat.value !== 'equipment' }">
-                  {{ modifiersText(it.modifiers) }}<template v-if="cat.value !== 'equipment'">(装備すると反映)</template>
-                </span>
-                <span v-if="it.effect" class="pc-item-effect">{{ it.effect }}</span>
-              </button>
-              <!-- 荷物と倉庫の間の出し入れ(押した回数だけ「移動を確定」) -->
-              <div v-if="cat.value !== 'equipment'" class="move-ctl">
+            </template>
+            <template #detail="{ item: cat }">
+              <p class="items-head-note">{{ cat.note }}</p>
+              <p v-if="displayItemsOf(item, cat.value).length === 0" class="items-empty">なし</p>
+              <div v-for="it in displayItemsOf(item, cat.value)" :key="`${it.id}${it.moved ? '-moved' : ''}`" class="pc-item-line">
+                <!-- 押すと: 自分で入力した品物は編集、店の商品は消費・削除、魔道具・AFは大きさの変更 -->
                 <button
-                  class="move-start"
-                  :disabled="movingPcId === item.id"
-                  @click="it.moved ? undoMove(it) : startMove(it)"
+                  class="pc-item-row"
+                  :disabled="!!pendingMoves[it.id]"
+                  @click="it.shop_item_id ? openConsume(item.id, it) : openItemEdit(item.id, it)"
                 >
-                  <v-icon :icon="cat.value === 'cargo' ? 'mdi-arrow-down' : 'mdi-arrow-up'" size="13" />{{ cat.value === 'cargo' ? '倉庫へ' : '荷物へ' }}
+                  <span class="pc-item-top">
+                    <span class="pc-item-name">{{ it.name }}<span class="pc-item-qty">×{{ it.quantity }}</span></span>
+                    <span v-if="cat.value === 'cargo'" class="pc-item-cost">コスト<strong>{{ itemCost(it) }}</strong></span>
+                    <v-icon icon="mdi-chevron-right" size="16" class="pc-item-chevron" />
+                  </span>
+                  <span v-if="cat.value === 'equipment' && Object.keys(it.modifiers ?? {}).length" class="pc-item-mods">
+                    {{ modifiersText(it.modifiers) }}
+                  </span>
                 </button>
+                <div class="move-ctl">
+                  <!-- 店の商品は「消費」ボタンから個数を選んで消費する -->
+                  <button
+                    v-if="it.shop_item_id && !pendingMoves[it.id]"
+                    class="consume-open"
+                    @click="openConsume(item.id, it)"
+                  >消費</button>
+                  <button
+                    v-if="cat.value !== 'equipment'"
+                    class="move-start"
+                    :disabled="movingPcId === item.id"
+                    @click="it.moved ? undoMove(it) : startMove(it)"
+                  >
+                    <v-icon :icon="cat.value === 'cargo' ? 'mdi-arrow-down' : 'mdi-arrow-up'" size="13" />{{ cat.value === 'cargo' ? '倉庫へ' : '荷物へ' }}
+                  </button>
+                </div>
               </div>
-            </div>
-          </section>
+            </template>
+          </AccordionList>
           </template>
 
           <!-- このPCが所持者の魔法と魔道具・AF -->
@@ -1213,7 +1213,7 @@ const confirmPcDelete = async () => {
         </div>
 
         <div class="consume-box">
-          <label class="edit-label">使った個数</label>
+          <label class="edit-label">消費する個数</label>
           <div class="move-stepper consume-stepper">
           <button :disabled="consumeDialog.qty <= 1" aria-label="1個減らす" @click="setConsumeQty(consumeDialog.qty - 1)">−</button>
           <input
@@ -2058,9 +2058,9 @@ const confirmPcDelete = async () => {
 }
 
 .consume-btn {
-  border: 1px solid #000;
-  background: var(--color-accent, #ffd400);
-  color: #000;
+  border: 1px solid #c00;
+  background: var(--color-bg, #fff);
+  color: #c00;
   padding: 12px;
   font-size: 0.95rem;
   font-weight: bold;
@@ -2766,5 +2766,20 @@ const confirmPcDelete = async () => {
   font-weight: bold;
   cursor: pointer;
   padding: 0 4px;
+}
+</style>
+
+<style scoped>
+.consume-open {
+  border: 1px solid #c00;
+  background: var(--color-bg, #fff);
+  color: #c00;
+  padding: 6px 14px;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.item-cats {
+  margin-top: var(--space-3, 12px);
 }
 </style>
