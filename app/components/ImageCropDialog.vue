@@ -78,8 +78,9 @@ const crop = async () => {
     canvas.height = out
     canvas.getContext('2d').drawImage(imgEl.value, -pos.value.x / scale.value, -pos.value.y / scale.value, size, size, 0, 0, out, out)
     const toBlob = (type) => new Promise((resolve) => canvas.toBlob(resolve, type, 0.85))
+    // WebP を作れないブラウザ(iPhone の Safari など)は PNG にする。JPEG は透過できず背景が黒くなるため使わない
     const webp = await toBlob('image/webp')
-    emit('crop', webp?.type === 'image/webp' ? webp : await toBlob('image/jpeg'))
+    emit('crop', webp?.type === 'image/webp' ? webp : await toBlob('image/png'))
   } finally {
     saving.value = false
   }
