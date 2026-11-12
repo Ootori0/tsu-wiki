@@ -259,6 +259,7 @@ const pcToForm = (pc) => ({
   showOffice: !!pc.show_office,
   showStats: !!pc.show_stats,
   stats: Object.fromEntries(STAT_KEYS.map((k) => [k, pc.stats?.[k] ?? ''])),
+  imageBg: pc.image_bg ?? '',
 })
 
 // PCの中のタブ(PCごとに覚える)
@@ -627,6 +628,17 @@ const confirmMoves = async (pc) => {
   }
 }
 
+// 画像の背景色の候補(空 = 標準の黄色)
+const IMAGE_BG_PRESETS = [
+  { value: '', label: '標準(黄)' },
+  { value: '#ffffff', label: '白' },
+  { value: '#000000', label: '黒' },
+  { value: '#d9d9d9', label: '灰' },
+  { value: '#f4b6c2', label: '桃' },
+  { value: '#a8d8ea', label: '水色' },
+  { value: '#b8e0a8', label: '緑' },
+]
+
 // --- PCの画像(R2): 選んだらすぐ縮小してアップロードする ---
 const imageInput = ref(null)
 const imageTargetId = ref(null)
@@ -637,39 +649,34 @@ const confirmRemoveImage = (pcId) => {
   imageRemoveTarget.value = pcId
   showImageRemove.value = true
 }
-const IMAGE_MAX_SIZE = 512 // 長い辺をこのピクセルまで縮める
 
 const pickImage = (pcId) => {
   imageTargetId.value = pcId
   imageInput.value?.click()
 }
 
-// 縦横を IMAGE_MAX_SIZE 以内に縮めて WebP(使えなければ JPEG)にする
-const shrinkImage = async (file) => {
-  const bitmap = await createImageBitmap(file)
-  const scale = Math.min(1, IMAGE_MAX_SIZE / Math.max(bitmap.width, bitmap.height))
-  const canvas = document.createElement('canvas')
-  canvas.width = Math.round(bitmap.width * scale)
-  canvas.height = Math.round(bitmap.height * scale)
-  canvas.getContext('2d').drawImage(bitmap, 0, 0, canvas.width, canvas.height)
-  bitmap.close?.()
-  const toBlob = (type) => new Promise((resolve) => canvas.toBlob(resolve, type, 0.85))
-  const webp = await toBlob('image/webp')
-  return webp?.type === 'image/webp' ? webp : await toBlob('image/jpeg')
-}
+// 選んだ画像は切り抜きのポップアップで正方形にしてからアップロードする
+const cropFile = ref(null)
+const cropOpen = ref(false)
 
-const onImagePicked = async (e) => {
+const onImagePicked = (e) => {
   const file = e.target.files?.[0]
   e.target.value = ''
-  const pcId = imageTargetId.value
-  if (!file || !pcId) return
+  if (!file || !imageTargetId.value) return
   if (!file.type.startsWith('image/')) {
     show('画像ファイルを選んでください', 'error')
     return
   }
+  cropFile.value = file
+  cropOpen.value = true
+}
+
+const uploadCropped = async (blob) => {
+  const pcId = imageTargetId.value
+  if (!blob || !pcId) return
+  cropOpen.value = false
   imageUploadingId.value = pcId
   try {
-    const blob = await shrinkImage(file)
     const body = new FormData()
     body.append('image', blob, blob.type === 'image/webp' ? 'image.webp' : 'image.jpg')
     const res = await $fetch(`/api/pcs/${pcId}/image`, { method: 'POST', body })
@@ -906,16 +913,34 @@ const confirmPcDelete = async () => {
         </div>
 
         <!-- PCの画像: 編集中だけ登録・変更・削除できる -->
-        <div class="pc-image-row">
+        <div v-if="isEditing(item.id) || item.image_url" class="pc-image-row">
           <div class="pc-image-box">
-            <PcImage :src="item.image_url" :alt="item.name" :icon-size="40" />
+            <PcImage :src="item.image_url" :bg="isEditing(item.id) ? drafts[item.id]?.imageBg : item.image_bg" :alt="item.name" :icon-size="40" />
           </div>
           <div v-if="isEditing(item.id)" class="pc-image-actions">
             <button class="image-btn" :disabled="imageUploadingId === item.id" @click="pickImage(item.id)">
               {{ imageUploadingId === item.id ? 'アップロード中…' : item.image_url ? '画像を変更' : '画像を登録' }}
             </button>
             <button v-if="item.image_url" class="delete-btn" :disabled="imageUploadingId === item.id" @click="confirmRemoveImage(item.id)">画像を外す</button>
-            <p class="markdown-hint">選ぶとすぐ保存されます(512px以内に縮小)</p>
+            <p class="markdown-hint">選んだあと、正方形に切り抜く位置を決めます。決定するとすぐ保存されます</p>
+            <!-- 背景色: 透過した画像の後ろと、画像がないときに出る。ほかの項目と一緒に左下の「保存」で保存する -->
+            <div v-if="drafts[item.id]" class="image-bg-row">
+              <span class="image-bg-label">背景色</span>
+              <button
+                v-for="c in IMAGE_BG_PRESETS"
+                :key="c.value"
+                class="bg-swatch"
+                :class="{ active: drafts[item.id].imageBg === c.value }"
+                :style="{ backgroundColor: c.value || 'var(--color-accent, #ffd400)' }"
+                :aria-label="c.label"
+                :title="c.label"
+                @click="drafts[item.id].imageBg = c.value"
+              />
+              <label class="bg-swatch bg-custom" :class="{ active: drafts[item.id].imageBg && !IMAGE_BG_PRESETS.some((c) => c.value === drafts[item.id].imageBg) }" title="好きな色">
+                <v-icon icon="mdi-palette-outline" size="16" />
+                <input v-model="drafts[item.id].imageBg" type="color" aria-label="好きな色" />
+              </label>
+            </div>
           </div>
         </div>
 
@@ -1170,6 +1195,7 @@ const confirmPcDelete = async () => {
 
     <!-- PCの画像の選択(見えない入力欄) -->
     <input ref="imageInput" type="file" accept="image/*" hidden @change="onImagePicked" />
+    <ImageCropDialog v-model="cropOpen" :file="cropFile" @crop="uploadCropped" />
     <ConfirmDialog
       v-model="showImageRemove"
       title="画像を外す"
@@ -2968,9 +2994,9 @@ const confirmPcDelete = async () => {
 /* ---------- PCの画像 ---------- */
 .pc-image-row {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: var(--space-3, 12px);
-  margin: 12px 0 4px;
+  margin: 12px 14px 0;
 }
 
 .pc-image-box {
@@ -2980,10 +3006,18 @@ const confirmPcDelete = async () => {
 }
 
 .pc-image-actions {
+  flex: 1;
+  min-width: 0;
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
+  flex-wrap: wrap;
+  align-items: center;
   gap: 6px;
+}
+
+.pc-image-actions .image-btn,
+.pc-image-actions .delete-btn {
+  padding: 6px 12px;
+  font-size: 0.8rem;
 }
 
 .image-btn {
@@ -3003,7 +3037,55 @@ const confirmPcDelete = async () => {
   opacity: 0.5;
 }
 
+.image-bg-row {
+  flex-basis: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+.image-bg-label {
+  font-size: 0.75rem;
+  font-weight: bold;
+  margin-right: 2px;
+}
+
+/* 押しやすいよう 32px 四方 */
+.bg-swatch {
+  position: relative;
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--color-text, #000);
+  padding: 0;
+  cursor: pointer;
+}
+
+.bg-swatch.active {
+  outline: 2px solid var(--color-text, #000);
+  outline-offset: 2px;
+}
+
+.bg-custom {
+  background: var(--color-bg, #fff);
+}
+
+.bg-custom input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+
 .pc-image-actions .markdown-hint {
+  flex-basis: 100%;
   margin: 0;
+  line-height: 1.4;
 }
 </style>
