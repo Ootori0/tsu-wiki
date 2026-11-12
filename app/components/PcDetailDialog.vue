@@ -26,7 +26,7 @@ const statOf = (k) => {
 
         <div class="detail-head">
           <div class="detail-image">
-            <PcImage :src="pc.image_url" :alt="pc.name" :icon-size="64" />
+            <PcImage :src="pc.image_url" :bg="pc.image_bg" :alt="pc.name" :icon-size="64" />
           </div>
           <div class="detail-names">
             <span v-for="part in pcRankParts(pc)" :key="part" class="detail-rank">{{ part }}</span>

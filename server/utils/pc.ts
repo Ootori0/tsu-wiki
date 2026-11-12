@@ -3,7 +3,7 @@ import { parseStats } from './pcItems'
 export function parsePcBody(body) {
   const {
     name, affiliation, office, grade, memo, items, money, stats,
-    isRepresentative, isOfficeRepresentative, showTitle, showOffice, showStats,
+    isRepresentative, isOfficeRepresentative, showTitle, showOffice, showStats, imageBg,
   } = body ?? {}
 
   if (!name) {
@@ -23,6 +23,9 @@ export function parsePcBody(body) {
     throw createError({ statusCode: 400, statusMessage: '所持金は整数で指定してください' })
   }
 
+  // 画像の背景色は #rrggbb か空(標準)だけ
+  const bg = typeof imageBg === 'string' && /^#[0-9a-fA-F]{6}$/.test(imageBg) ? imageBg.toLowerCase() : ''
+
   return {
     name,
     affiliation: affiliation ?? '',
@@ -38,6 +41,7 @@ export function parsePcBody(body) {
     showOffice: showOffice === false ? 0 : 1,
     showStats: showStats ? 1 : 0,
     money: moneyNum,
+    imageBg: bg,
   }
 }
 

@@ -31,10 +31,10 @@ export default defineEventHandler(async (event) => {
     .prepare(
       `UPDATE pcs
        SET name = ?, affiliation = ?, office = ?, grade = ?, no_grade = ?, memo = ?, items = ?, stats = ?, is_representative = ?, is_office_representative = ?,
-           show_title = ?, show_office = ?, show_stats = ?, updated_at = datetime('now')
+           show_title = ?, show_office = ?, show_stats = ?, image_bg = ?, updated_at = datetime('now')
        WHERE id = ?`
     )
-    .bind(pc.name, pc.affiliation, pc.office, pc.grade, pc.noGrade, pc.memo, pc.items, pc.stats, pc.isRepresentative, pc.isOfficeRepresentative, pc.showTitle, pc.showOffice, pc.showStats, id)
+    .bind(pc.name, pc.affiliation, pc.office, pc.grade, pc.noGrade, pc.memo, pc.items, pc.stats, pc.isRepresentative, pc.isOfficeRepresentative, pc.showTitle, pc.showOffice, pc.showStats, pc.imageBg, id)
     .run()
 
   // 魔法の所持者にPC名を出しているので魔法のキャッシュも破棄する

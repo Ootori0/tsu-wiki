@@ -86,7 +86,8 @@ CREATE TABLE pcs (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   created_by INTEGER NOT NULL,
   name TEXT NOT NULL,
-  image_url TEXT, -- R2設定後に使用
+  image_url TEXT, -- R2 の画像(/api/images/...)
+  image_bg TEXT NOT NULL DEFAULT '', -- 画像の背景色(#rrggbb。空なら標準の黄色)
   affiliation TEXT, -- affiliations.name
   office TEXT NOT NULL DEFAULT '', -- 事務所(自由記述)
   grade INTEGER NOT NULL DEFAULT 10 CHECK (grade BETWEEN 1 AND 10),

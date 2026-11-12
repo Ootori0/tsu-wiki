@@ -39,7 +39,7 @@ const tiers = computed(() =>
           @click="emit('select', pc)"
         >
           <div class="pc-thumb">
-            <PcImage :src="pc.image_url" :alt="pc.name" :icon-size="32" />
+            <PcImage :src="pc.image_url" :bg="pc.image_bg" :alt="pc.name" :icon-size="32" />
             <span v-if="pc.is_representative" class="rep-tag">代表</span>
           </div>
           <span class="tier-name">{{ pc.name }}</span>

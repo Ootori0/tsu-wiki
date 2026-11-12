@@ -259,6 +259,7 @@ const pcToForm = (pc) => ({
   showOffice: !!pc.show_office,
   showStats: !!pc.show_stats,
   stats: Object.fromEntries(STAT_KEYS.map((k) => [k, pc.stats?.[k] ?? ''])),
+  imageBg: pc.image_bg ?? '',
 })
 
 // PCの中のタブ(PCごとに覚える)
@@ -627,6 +628,17 @@ const confirmMoves = async (pc) => {
   }
 }
 
+// 画像の背景色の候補(空 = 標準の黄色)
+const IMAGE_BG_PRESETS = [
+  { value: '', label: '標準(黄)' },
+  { value: '#ffffff', label: '白' },
+  { value: '#000000', label: '黒' },
+  { value: '#d9d9d9', label: '灰' },
+  { value: '#f4b6c2', label: '桃' },
+  { value: '#a8d8ea', label: '水色' },
+  { value: '#b8e0a8', label: '緑' },
+]
+
 // --- PCの画像(R2): 選んだらすぐ縮小してアップロードする ---
 const imageInput = ref(null)
 const imageTargetId = ref(null)
@@ -903,7 +915,7 @@ const confirmPcDelete = async () => {
         <!-- PCの画像: 編集中だけ登録・変更・削除できる -->
         <div v-if="isEditing(item.id) || item.image_url" class="pc-image-row">
           <div class="pc-image-box">
-            <PcImage :src="item.image_url" :alt="item.name" :icon-size="40" />
+            <PcImage :src="item.image_url" :bg="isEditing(item.id) ? drafts[item.id]?.imageBg : item.image_bg" :alt="item.name" :icon-size="40" />
           </div>
           <div v-if="isEditing(item.id)" class="pc-image-actions">
             <button class="image-btn" :disabled="imageUploadingId === item.id" @click="pickImage(item.id)">
@@ -911,6 +923,24 @@ const confirmPcDelete = async () => {
             </button>
             <button v-if="item.image_url" class="delete-btn" :disabled="imageUploadingId === item.id" @click="confirmRemoveImage(item.id)">画像を外す</button>
             <p class="markdown-hint">選んだあと、正方形に切り抜く位置を決めます。決定するとすぐ保存されます</p>
+            <!-- 背景色: 透過した画像の後ろと、画像がないときに出る。ほかの項目と一緒に左下の「保存」で保存する -->
+            <div v-if="drafts[item.id]" class="image-bg-row">
+              <span class="image-bg-label">背景色</span>
+              <button
+                v-for="c in IMAGE_BG_PRESETS"
+                :key="c.value"
+                class="bg-swatch"
+                :class="{ active: drafts[item.id].imageBg === c.value }"
+                :style="{ backgroundColor: c.value || 'var(--color-accent, #ffd400)' }"
+                :aria-label="c.label"
+                :title="c.label"
+                @click="drafts[item.id].imageBg = c.value"
+              />
+              <label class="bg-swatch bg-custom" :class="{ active: drafts[item.id].imageBg && !IMAGE_BG_PRESETS.some((c) => c.value === drafts[item.id].imageBg) }" title="好きな色">
+                <v-icon icon="mdi-palette-outline" size="16" />
+                <input v-model="drafts[item.id].imageBg" type="color" aria-label="好きな色" />
+              </label>
+            </div>
           </div>
         </div>
 
@@ -3005,6 +3035,52 @@ const confirmPcDelete = async () => {
 .image-btn:disabled,
 .pc-image-actions .delete-btn:disabled {
   opacity: 0.5;
+}
+
+.image-bg-row {
+  flex-basis: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+.image-bg-label {
+  font-size: 0.75rem;
+  font-weight: bold;
+  margin-right: 2px;
+}
+
+/* 押しやすいよう 32px 四方 */
+.bg-swatch {
+  position: relative;
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--color-text, #000);
+  padding: 0;
+  cursor: pointer;
+}
+
+.bg-swatch.active {
+  outline: 2px solid var(--color-text, #000);
+  outline-offset: 2px;
+}
+
+.bg-custom {
+  background: var(--color-bg, #fff);
+}
+
+.bg-custom input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
 }
 
 .pc-image-actions .markdown-hint {
