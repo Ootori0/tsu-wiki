@@ -1,6 +1,7 @@
 import { getSessionUser } from '../../utils/session'
 import { isAdmin } from '../../utils/permission'
 import { invalidateCache } from '../../utils/cache'
+import { deleteImage } from '../../utils/pcImage'
 
 export default defineEventHandler(async (event) => {
   const db = event.context.cloudflare.env.tsu_wiki_db
@@ -29,6 +30,7 @@ export default defineEventHandler(async (event) => {
     db.prepare('DELETE FROM pc_items WHERE pc_id = ?').bind(id),
     db.prepare('DELETE FROM pcs WHERE id = ?').bind(id),
   ])
+  await deleteImage(event.context.cloudflare.env.tsu_wiki_images, existing.image_url)
 
   invalidateCache('pcs', 'casino:dealer', 'shop:items', 'magics')
 

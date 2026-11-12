@@ -627,6 +627,79 @@ const confirmMoves = async (pc) => {
   }
 }
 
+// --- PCの画像(R2): 選んだらすぐ縮小してアップロードする ---
+const imageInput = ref(null)
+const imageTargetId = ref(null)
+const imageUploadingId = ref(null)
+const imageRemoveTarget = ref(null)
+const showImageRemove = ref(false)
+const confirmRemoveImage = (pcId) => {
+  imageRemoveTarget.value = pcId
+  showImageRemove.value = true
+}
+const IMAGE_MAX_SIZE = 512 // 長い辺をこのピクセルまで縮める
+
+const pickImage = (pcId) => {
+  imageTargetId.value = pcId
+  imageInput.value?.click()
+}
+
+// 縦横を IMAGE_MAX_SIZE 以内に縮めて WebP(使えなければ JPEG)にする
+const shrinkImage = async (file) => {
+  const bitmap = await createImageBitmap(file)
+  const scale = Math.min(1, IMAGE_MAX_SIZE / Math.max(bitmap.width, bitmap.height))
+  const canvas = document.createElement('canvas')
+  canvas.width = Math.round(bitmap.width * scale)
+  canvas.height = Math.round(bitmap.height * scale)
+  canvas.getContext('2d').drawImage(bitmap, 0, 0, canvas.width, canvas.height)
+  bitmap.close?.()
+  const toBlob = (type) => new Promise((resolve) => canvas.toBlob(resolve, type, 0.85))
+  const webp = await toBlob('image/webp')
+  return webp?.type === 'image/webp' ? webp : await toBlob('image/jpeg')
+}
+
+const onImagePicked = async (e) => {
+  const file = e.target.files?.[0]
+  e.target.value = ''
+  const pcId = imageTargetId.value
+  if (!file || !pcId) return
+  if (!file.type.startsWith('image/')) {
+    show('画像ファイルを選んでください', 'error')
+    return
+  }
+  imageUploadingId.value = pcId
+  try {
+    const blob = await shrinkImage(file)
+    const body = new FormData()
+    body.append('image', blob, blob.type === 'image/webp' ? 'image.webp' : 'image.jpg')
+    const res = await $fetch(`/api/pcs/${pcId}/image`, { method: 'POST', body })
+    updatePc(pcId, (p) => ({ ...p, image_url: res.imageUrl }))
+    clearNuxtData('pcs-list')
+    show('画像を登録しました')
+  } catch (err) {
+    show(err?.data?.statusMessage ?? '画像を登録できませんでした', 'error')
+  } finally {
+    imageUploadingId.value = null
+  }
+}
+
+const removeImage = async () => {
+  const pcId = imageRemoveTarget.value
+  if (!pcId) return
+  imageUploadingId.value = pcId
+  try {
+    await $fetch(`/api/pcs/${pcId}/image`, { method: 'DELETE' })
+    updatePc(pcId, (p) => ({ ...p, image_url: null }))
+    clearNuxtData('pcs-list')
+    show('画像を外しました')
+  } catch (err) {
+    show(err?.data?.statusMessage ?? '画像を外せませんでした', 'error')
+  } finally {
+    imageUploadingId.value = null
+    imageRemoveTarget.value = null
+  }
+}
+
 // 画面左下の移動バー: 移動の予定があるPCをまとめて確定・取り消しする
 const movingPcs = computed(() => (fetchedPcs.value ?? []).filter((pc) => pendingMovesOf(pc).length))
 const movingCount = computed(() => movingPcs.value.reduce((n, pc) => n + pendingMovesOf(pc).length, 0))
@@ -830,6 +903,20 @@ const confirmPcDelete = async () => {
             編集中<small>{{ dirtyIds.includes(item.id) ? '変更は左下の「保存」で保存します' : '書き換えると左下に保存ボタンが出ます' }}</small>
           </span>
           <button class="edit-done-btn" @click="setEditing(item.id, false)">完了</button>
+        </div>
+
+        <!-- PCの画像: 編集中だけ登録・変更・削除できる -->
+        <div class="pc-image-row">
+          <div class="pc-image-box">
+            <PcImage :src="item.image_url" :alt="item.name" :icon-size="40" />
+          </div>
+          <div v-if="isEditing(item.id)" class="pc-image-actions">
+            <button class="image-btn" :disabled="imageUploadingId === item.id" @click="pickImage(item.id)">
+              {{ imageUploadingId === item.id ? 'アップロード中…' : item.image_url ? '画像を変更' : '画像を登録' }}
+            </button>
+            <button v-if="item.image_url" class="delete-btn" :disabled="imageUploadingId === item.id" @click="confirmRemoveImage(item.id)">画像を外す</button>
+            <p class="markdown-hint">選ぶとすぐ保存されます(512px以内に縮小)</p>
+          </div>
         </div>
 
         <!-- 閲覧モード -->
@@ -1080,6 +1167,15 @@ const confirmPcDelete = async () => {
         <button class="save-bar-btn primary" :disabled="movingPcId !== null" @click="confirmAllMoves">確定</button>
       </div>
     </Transition>
+
+    <!-- PCの画像の選択(見えない入力欄) -->
+    <input ref="imageInput" type="file" accept="image/*" hidden @change="onImagePicked" />
+    <ConfirmDialog
+      v-model="showImageRemove"
+      title="画像を外す"
+      message="このPCの画像を外します。よろしいですか?"
+      @confirm="removeImage"
+    />
 
     <!-- 所持品の追加・編集 -->
     <FormDialog
@@ -2867,5 +2963,47 @@ const confirmPcDelete = async () => {
 
 .item-cats > :deep(.accordion-item) > .detail-outer.open > .detail-inner {
   padding: 0 0 6px;
+}
+
+/* ---------- PCの画像 ---------- */
+.pc-image-row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3, 12px);
+  margin: 12px 0 4px;
+}
+
+.pc-image-box {
+  width: 96px;
+  flex-shrink: 0;
+  border: 1px solid var(--color-text, #000);
+}
+
+.pc-image-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.image-btn {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--color-text, #000);
+  background: var(--color-bg, #fff);
+  color: var(--color-text, #000);
+  padding: 6px 14px;
+  font-size: 0.85rem;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.image-btn:disabled,
+.pc-image-actions .delete-btn:disabled {
+  opacity: 0.5;
+}
+
+.pc-image-actions .markdown-hint {
+  margin: 0;
 }
 </style>
