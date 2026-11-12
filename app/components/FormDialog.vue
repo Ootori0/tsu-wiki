@@ -1,8 +1,9 @@
 <script setup>
 // 記入・編集用のポップアップ
 // ・PC: 画面中央のポップアップ。下端に「保存・キャンセル」(と #extra の削除など)
-// ・スマホ: 全画面で開き、上端の帯に「キャンセル | タイトル | 保存」を置く(一般的なスマホアプリの作成画面と同じ形)。
-//   キーボードが出ても保存が隠れない。削除など(#extra)は本文の末尾に置く
+// ・スマホ: 全画面で開き、「キャンセル・保存」は親指の届く下端に置く(上の角は片手で押しにくいため)。
+//   キーボードが出たら表示領域(visualViewport)に合わせて縮め、下端のボタンがキーボードに隠れないようにする。
+//   削除など(#extra)は本文の末尾に置く(保存と離して押し間違いを防ぐ)
 // 入力中のスクロールはブラウザ標準に任せる
 const open = defineModel({ type: Boolean, default: false })
 
@@ -20,18 +21,37 @@ const emit = defineEmits(['save'])
 const close = () => {
   open.value = false
 }
+
+// スマホでキーボードが出たときに、ポップアップを見えている範囲に収める
+const viewportStyle = ref({})
+const fitViewport = () => {
+  const vv = window.visualViewport
+  if (!vv) return
+  viewportStyle.value = { top: `${vv.offsetTop}px`, height: `${vv.height}px`, bottom: 'auto' }
+}
+const watchViewport = (on) => {
+  const vv = typeof window !== 'undefined' ? window.visualViewport : null
+  if (!vv) return
+  const method = on ? 'addEventListener' : 'removeEventListener'
+  vv[method]('resize', fitViewport)
+  vv[method]('scroll', fitViewport)
+  if (on) fitViewport()
+  else viewportStyle.value = {}
+}
+watch(open, (v) => watchViewport(v))
+onMounted(() => {
+  if (open.value) watchViewport(true)
+})
+onBeforeUnmount(() => watchViewport(false))
 </script>
 
 <template>
   <Teleport to="body">
     <Transition name="fade">
-      <div v-if="open" class="overlay" @click.self="close">
+      <div v-if="open" class="overlay" :style="viewportStyle" @click.self="close">
         <div class="dialog" role="dialog" :aria-label="title">
           <div class="dialog-head">
-            <button class="head-btn head-cancel" @click="close">{{ cancelLabel }}</button>
             <span class="dialog-title">{{ title }}</span>
-            <button v-if="!hideSave" class="head-btn head-save" :disabled="saveDisabled" @click="emit('save')">{{ saveLabel }}</button>
-            <span v-else class="head-btn head-spacer" aria-hidden="true">{{ cancelLabel }}</span>
             <button class="close-btn" aria-label="閉じる" @click="close">
               <v-icon icon="mdi-close" size="20" />
             </button>
@@ -46,7 +66,7 @@ const close = () => {
 
           <div class="dialog-actions">
             <button v-if="!hideSave" class="action-btn action-save" :disabled="saveDisabled" @click="emit('save')">{{ saveLabel }}</button>
-            <button class="action-btn" @click="close">{{ cancelLabel }}</button>
+            <button class="action-btn action-cancel" @click="close">{{ cancelLabel }}</button>
             <div v-if="$slots.extra" class="actions-extra">
               <slot name="extra" />
             </div>
@@ -107,11 +127,6 @@ const close = () => {
   cursor: pointer;
 }
 
-/* 上端のキャンセル・保存はスマホだけ */
-.head-btn {
-  display: none;
-}
-
 .dialog-body {
   flex: 1;
   min-height: 0;
@@ -160,8 +175,7 @@ const close = () => {
   font-weight: bold;
 }
 
-.action-btn:disabled,
-.head-btn:disabled {
+.action-btn:disabled {
   opacity: 0.4;
   cursor: not-allowed;
 }
@@ -172,7 +186,7 @@ const close = () => {
   gap: 8px;
 }
 
-/* ---------- スマホ: 全画面 + 上端に「キャンセル | タイトル | 保存」 ---------- */
+/* ---------- スマホ: 全画面 + 下端に「キャンセル | 保存」(親指で押せる位置) ---------- */
 @media (max-width: 600px) {
   .overlay {
     padding: 0;
@@ -182,18 +196,18 @@ const close = () => {
   .dialog {
     max-width: none;
     height: 100%;
+    max-height: none;
     border: none;
     box-shadow: none;
   }
 
   .dialog-head {
-    padding: 4px 6px;
-    min-height: 48px;
+    justify-content: center;
+    min-height: 44px;
+    padding: 4px 12px;
   }
 
   .dialog-title {
-    flex: 1;
-    text-align: center;
     font-size: 0.95rem;
     letter-spacing: 0.05em;
     white-space: nowrap;
@@ -201,30 +215,40 @@ const close = () => {
     text-overflow: ellipsis;
   }
 
-  .head-btn {
-    display: block;
-    flex-shrink: 0;
-    border: none;
-    background: none;
-    color: #000;
-    padding: 8px 10px;
-    font-size: 0.9rem;
-    cursor: pointer;
+  /* 上の角の×は押しにくいので出さない(閉じるのは下端のキャンセル) */
+  .close-btn {
+    display: none;
   }
 
-  /* 保存がないときにタイトルを真ん中に保つための空き */
-  .head-spacer {
-    visibility: hidden;
-  }
-
-  .head-save {
-    font-weight: bold;
-    background: #000;
-    color: var(--color-accent, #ffd400);
-  }
-
-  .close-btn,
+  /* 下端のボタン: 保存を右(親指側)に大きく、キャンセルは左に */
   .dialog-actions {
+    flex-wrap: nowrap;
+    gap: 10px;
+    padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+  }
+
+  .action-btn {
+    min-height: 48px;
+    font-size: 0.95rem;
+  }
+
+  .action-cancel {
+    order: 1;
+    flex: 1;
+  }
+
+  .action-save {
+    order: 2;
+    flex: 2;
+  }
+
+  /* 閉じるだけのポップアップは閉じるボタンを横いっぱいに */
+  .action-cancel:only-child,
+  .action-cancel:nth-last-child(2):first-child {
+    flex: 1;
+  }
+
+  .actions-extra {
     display: none;
   }
 

@@ -73,6 +73,9 @@ const statOf = (k) => {
           <MarkdownText :text="pc.memo" />
         </div>
 
+        <div class="dialog-foot">
+          <button class="foot-close" @click="pc = null">閉じる</button>
+        </div>
       </div>
     </div>
   </Transition>
@@ -266,5 +269,49 @@ const statOf = (k) => {
   margin: 6px 0 0;
   font-size: 0.75rem;
   opacity: 0.75;
+}
+
+/* ---------- スマホ: 下から出すシートにして、閉じるボタンを親指の届く下端に置く ---------- */
+.dialog-foot {
+  display: none;
+}
+
+@media (max-width: 600px) {
+  .overlay {
+    align-items: flex-end;
+    padding: 0;
+  }
+
+  .detail {
+    max-width: none;
+    max-height: 90dvh;
+    border-width: 2px 0 0;
+    box-shadow: none;
+  }
+
+  /* 上の角の×は押しにくいので出さない */
+  .close-btn {
+    display: none;
+  }
+
+  .dialog-foot {
+    display: block;
+    position: sticky;
+    bottom: 0;
+    padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+    background: var(--color-bg, #fff);
+    border-top: 2px solid #000;
+  }
+
+  .foot-close {
+    width: 100%;
+    min-height: 48px;
+    border: 1px solid var(--color-text, #000);
+    background: var(--color-bg, #fff);
+    color: var(--color-text, #000);
+    font-size: 0.95rem;
+    font-weight: bold;
+    cursor: pointer;
+  }
 }
 </style>
