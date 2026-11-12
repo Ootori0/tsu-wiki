@@ -674,7 +674,7 @@ const uploadCropped = async (blob) => {
   imageUploadingId.value = pcId
   try {
     const body = new FormData()
-    body.append('image', blob, blob.type === 'image/webp' ? 'image.webp' : 'image.jpg')
+    body.append('image', blob, blob.type === 'image/webp' ? 'image.webp' : 'image.png')
     const res = await $fetch(`/api/pcs/${pcId}/image`, { method: 'POST', body })
     updatePc(pcId, (p) => ({ ...p, image_url: res.imageUrl }))
     refreshPcs()
