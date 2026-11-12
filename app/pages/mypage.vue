@@ -637,39 +637,34 @@ const confirmRemoveImage = (pcId) => {
   imageRemoveTarget.value = pcId
   showImageRemove.value = true
 }
-const IMAGE_MAX_SIZE = 512 // 長い辺をこのピクセルまで縮める
 
 const pickImage = (pcId) => {
   imageTargetId.value = pcId
   imageInput.value?.click()
 }
 
-// 縦横を IMAGE_MAX_SIZE 以内に縮めて WebP(使えなければ JPEG)にする
-const shrinkImage = async (file) => {
-  const bitmap = await createImageBitmap(file)
-  const scale = Math.min(1, IMAGE_MAX_SIZE / Math.max(bitmap.width, bitmap.height))
-  const canvas = document.createElement('canvas')
-  canvas.width = Math.round(bitmap.width * scale)
-  canvas.height = Math.round(bitmap.height * scale)
-  canvas.getContext('2d').drawImage(bitmap, 0, 0, canvas.width, canvas.height)
-  bitmap.close?.()
-  const toBlob = (type) => new Promise((resolve) => canvas.toBlob(resolve, type, 0.85))
-  const webp = await toBlob('image/webp')
-  return webp?.type === 'image/webp' ? webp : await toBlob('image/jpeg')
-}
+// 選んだ画像は切り抜きのポップアップで正方形にしてからアップロードする
+const cropFile = ref(null)
+const cropOpen = ref(false)
 
-const onImagePicked = async (e) => {
+const onImagePicked = (e) => {
   const file = e.target.files?.[0]
   e.target.value = ''
-  const pcId = imageTargetId.value
-  if (!file || !pcId) return
+  if (!file || !imageTargetId.value) return
   if (!file.type.startsWith('image/')) {
     show('画像ファイルを選んでください', 'error')
     return
   }
+  cropFile.value = file
+  cropOpen.value = true
+}
+
+const uploadCropped = async (blob) => {
+  const pcId = imageTargetId.value
+  if (!blob || !pcId) return
+  cropOpen.value = false
   imageUploadingId.value = pcId
   try {
-    const blob = await shrinkImage(file)
     const body = new FormData()
     body.append('image', blob, blob.type === 'image/webp' ? 'image.webp' : 'image.jpg')
     const res = await $fetch(`/api/pcs/${pcId}/image`, { method: 'POST', body })
@@ -906,7 +901,7 @@ const confirmPcDelete = async () => {
         </div>
 
         <!-- PCの画像: 編集中だけ登録・変更・削除できる -->
-        <div class="pc-image-row">
+        <div v-if="isEditing(item.id) || item.image_url" class="pc-image-row">
           <div class="pc-image-box">
             <PcImage :src="item.image_url" :alt="item.name" :icon-size="40" />
           </div>
@@ -915,7 +910,7 @@ const confirmPcDelete = async () => {
               {{ imageUploadingId === item.id ? 'アップロード中…' : item.image_url ? '画像を変更' : '画像を登録' }}
             </button>
             <button v-if="item.image_url" class="delete-btn" :disabled="imageUploadingId === item.id" @click="confirmRemoveImage(item.id)">画像を外す</button>
-            <p class="markdown-hint">選ぶとすぐ保存されます(512px以内に縮小)</p>
+            <p class="markdown-hint">選んだあと、正方形に切り抜く位置を決めます。決定するとすぐ保存されます</p>
           </div>
         </div>
 
@@ -1170,6 +1165,7 @@ const confirmPcDelete = async () => {
 
     <!-- PCの画像の選択(見えない入力欄) -->
     <input ref="imageInput" type="file" accept="image/*" hidden @change="onImagePicked" />
+    <ImageCropDialog v-model="cropOpen" :file="cropFile" @crop="uploadCropped" />
     <ConfirmDialog
       v-model="showImageRemove"
       title="画像を外す"
@@ -2968,9 +2964,9 @@ const confirmPcDelete = async () => {
 /* ---------- PCの画像 ---------- */
 .pc-image-row {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: var(--space-3, 12px);
-  margin: 12px 0 4px;
+  margin: 12px 14px 0;
 }
 
 .pc-image-box {
@@ -2980,10 +2976,18 @@ const confirmPcDelete = async () => {
 }
 
 .pc-image-actions {
+  flex: 1;
+  min-width: 0;
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
+  flex-wrap: wrap;
+  align-items: center;
   gap: 6px;
+}
+
+.pc-image-actions .image-btn,
+.pc-image-actions .delete-btn {
+  padding: 6px 12px;
+  font-size: 0.8rem;
 }
 
 .image-btn {
@@ -3004,6 +3008,8 @@ const confirmPcDelete = async () => {
 }
 
 .pc-image-actions .markdown-hint {
+  flex-basis: 100%;
   margin: 0;
+  line-height: 1.4;
 }
 </style>
