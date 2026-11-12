@@ -353,13 +353,9 @@ const saveDrafts = async () => {
         updatePc(id, (p) => ({ ...p, ...res.pc, pcItems: p.pcItems }))
       }
     }
-    // 他のページの一覧は次に開いたときに読み込み直す
-    clearNuxtData('pcs-list')
-    // 魔法の所持者にPC名を出しているので、名前を変えたときだけ魔法の一覧を読み込み直す
-    if (renamedWithMagics) {
-      clearNuxtData('magics-list')
-      await refreshMagics()
-    }
+    // 保存した内容をサーバーから読み込み直す(他のページの一覧のキャッシュも破棄する)
+    // 魔法の所持者にPC名を出しているので、名前を変えたときは魔法の一覧も読み込み直す
+    await Promise.all([refreshPcs(), renamedWithMagics ? refreshMagics() : null])
     show('PCを保存しました')
   } catch (e) {
     show(e?.data?.statusMessage ?? '保存に失敗しました', 'error')
@@ -681,7 +677,7 @@ const uploadCropped = async (blob) => {
     body.append('image', blob, blob.type === 'image/webp' ? 'image.webp' : 'image.jpg')
     const res = await $fetch(`/api/pcs/${pcId}/image`, { method: 'POST', body })
     updatePc(pcId, (p) => ({ ...p, image_url: res.imageUrl }))
-    clearNuxtData('pcs-list')
+    refreshPcs()
     show('画像を登録しました')
   } catch (err) {
     show(err?.data?.statusMessage ?? '画像を登録できませんでした', 'error')
@@ -697,7 +693,7 @@ const removeImage = async () => {
   try {
     await $fetch(`/api/pcs/${pcId}/image`, { method: 'DELETE' })
     updatePc(pcId, (p) => ({ ...p, image_url: null }))
-    clearNuxtData('pcs-list')
+    refreshPcs()
     show('画像を外しました')
   } catch (err) {
     show(err?.data?.statusMessage ?? '画像を外せませんでした', 'error')
