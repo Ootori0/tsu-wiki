@@ -1,6 +1,13 @@
 {
 	"name": "tsu-wiki",
 	"compatibility_date": "2026-09-25",
+	// PCの画像
+	"r2_buckets": [
+		{
+			"binding": "tsu_wiki_images",
+			"bucket_name": "tsu-wiki-images"
+		}
+	],
 	"d1_databases": [
 		{
 			"binding": "tsu_wiki_db",
