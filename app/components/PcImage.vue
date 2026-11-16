@@ -3,7 +3,7 @@ defineProps({
   src: { type: String, default: '' },
   alt: { type: String, default: '' },
   iconSize: { type: [Number, String], default: 56 },
-  lost: { type: Boolean, default: false }, // ロストしたPCは白黒にして「LOST」の帯を重ねる
+  lost: { type: Boolean, default: false }, // ロストしたPCは白黒にする
   bg: { type: String, default: '' }, // 背景色(透過した画像の後ろと、画像がないとき)。空なら標準の黄色
 })
 </script>
@@ -12,7 +12,6 @@ defineProps({
   <div class="pc-image" :class="{ lost }" :style="bg ? { backgroundColor: bg } : null">
     <img v-if="src" :src="src" :alt="alt" />
     <v-icon v-else icon="mdi-account" :size="iconSize" class="pc-image-empty" />
-    <span v-if="lost" class="lost-band">LOST</span>
   </div>
 </template>
 
@@ -40,10 +39,9 @@ defineProps({
 
 .pc-image {
   position: relative;
-  container-type: inline-size; /* 帯の文字を画像の幅に合わせる */
 }
 
-/* ロスト: 白黒にして中央に帯 */
+/* ロスト: 白黒にする */
 .pc-image.lost {
   filter: grayscale(1);
 }
@@ -51,22 +49,6 @@ defineProps({
 .pc-image.lost img,
 .pc-image.lost .pc-image-empty {
   opacity: 0.55;
-}
-
-.lost-band {
-  position: absolute;
-  left: -10%;
-  right: -10%;
-  top: 50%;
-  transform: translateY(-50%) rotate(-12deg);
-  padding: 2px 0;
-  background: #000;
-  color: #fff;
-  font-weight: bold;
-  font-size: clamp(0.6rem, 18cqw, 1.4rem);
-  letter-spacing: 0.2em;
-  text-align: center;
-  line-height: 1.4;
 }
 
 .pc-image-empty {
