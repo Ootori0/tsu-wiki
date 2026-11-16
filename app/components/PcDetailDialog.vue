@@ -26,11 +26,11 @@ const statOf = (k) => {
 
         <div class="detail-head">
           <div class="detail-image">
-            <PcImage :src="pc.image_url" :bg="pc.image_bg" :alt="pc.name" :icon-size="64" />
+            <PcImage :src="pc.image_url" :bg="pc.image_bg" :lost="pc.is_lost" :alt="pc.name" :icon-size="64" />
           </div>
           <div class="detail-names">
             <span v-for="part in pcRankParts(pc)" :key="part" class="detail-rank">{{ part }}</span>
-            <h2 class="detail-name">{{ pc.name }}</h2>
+            <h2 class="detail-name">{{ pc.name }}<span v-if="pc.is_lost" class="lost-tag">ロスト</span></h2>
           </div>
         </div>
 
@@ -153,6 +153,17 @@ const statOf = (k) => {
   font-size: 0.75rem;
   opacity: 0.7;
   word-break: break-word;
+}
+
+.lost-tag {
+  margin-left: 8px;
+  padding: 0 6px;
+  font-size: 0.68rem;
+  font-weight: bold;
+  background: #666;
+  color: #fff;
+  vertical-align: middle;
+  letter-spacing: 0.05em;
 }
 
 .detail-name {
