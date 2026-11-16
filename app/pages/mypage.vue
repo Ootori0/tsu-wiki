@@ -1027,7 +1027,7 @@ const confirmPcDelete = async () => {
           </label>
           <label class="check-label">
             <input v-model="drafts[item.id].isLost" type="checkbox" />
-            ロストした(死亡・引退など。PCタブで白黒・「LOST」表示になります)
+            ロストした(死亡・引退など。PCタブで画像が白黒になります)
           </label>
 
           <label class="edit-label">メモ</label>
