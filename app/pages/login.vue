@@ -33,7 +33,7 @@ const login = async () => {
 
       <form class="login-form" @submit.prevent="login">
         <label class="login-label">ID</label>
-        <input v-model="name" type="text" class="login-input" autocomplete="username" />
+        <input v-model="name" type="text" class="login-input" autocomplete="username" autocapitalize="off" autocorrect="off" spellcheck="false" />
 
         <label class="login-label">パスワード</label>
         <input v-model="password" type="password" class="login-input" autocomplete="current-password" />

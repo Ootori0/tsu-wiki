@@ -141,6 +141,8 @@ const close = () => {
 }
 
 .balance-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
   font-size: 0.85rem;
   font-weight: bold;
 }
@@ -152,6 +154,8 @@ const close = () => {
 }
 
 .balance-value {
+  flex-shrink: 0;
+  white-space: nowrap;
   font-size: 1.3rem;
   font-weight: bold;
 }

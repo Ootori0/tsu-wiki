@@ -831,13 +831,13 @@ const confirmPcDelete = async () => {
         <div class="password-outer" :class="{ open: passwordAccordionOpen }">
           <div class="password-inner">
             <label class="field-label">現在のパスワード</label>
-            <input v-model="currentPassword" type="password" class="field-input" />
+            <input v-model="currentPassword" type="password" class="field-input" autocomplete="current-password" />
 
             <label class="field-label">新しいパスワード</label>
-            <input v-model="newPassword" type="password" class="field-input" />
+            <input v-model="newPassword" type="password" class="field-input" autocomplete="new-password" />
 
             <label class="field-label">新しいパスワード(確認)</label>
-            <input v-model="newPasswordConfirm" type="password" class="field-input" />
+            <input v-model="newPasswordConfirm" type="password" class="field-input" autocomplete="new-password" />
 
             <p v-if="passwordError" class="error-text">{{ passwordError }}</p>
             <p v-if="passwordSuccess" class="success-text">パスワードを変更しました</p>
@@ -2589,11 +2589,12 @@ const confirmPcDelete = async () => {
   opacity: 0.7;
 }
 
-.account-box .password-inner {
+/* 中の「パスワード変更」(入れ子のアコーディオン)には掛けない。閉じていても中身がはみ出すため */
+.account-box > .password-outer > .password-inner {
   padding: 0 14px;
 }
 
-.account-box .password-outer.open .password-inner {
+.account-box > .password-outer.open > .password-inner {
   padding-bottom: 14px;
 }
 

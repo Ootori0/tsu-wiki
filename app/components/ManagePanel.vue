@@ -501,7 +501,7 @@ const savePayouts = async () => {
 
       <div class="box">
         <h2 class="box-title">購入履歴(最新100件)</h2>
-        <button class="edit-btn" @click="refreshAllPurchases()">再読み込み</button>
+        <button class="edit-btn reload-btn" @click="refreshAllPurchases()">再読み込み</button>
         <div v-for="p in allPurchases ?? []" :key="p.id" class="list-row">
           <span class="item-meta">
             {{ formatDateTime(p.created_at) }}<br />
@@ -534,7 +534,6 @@ const savePayouts = async () => {
         </select>
         <div v-for="log in moneyLogs ?? []" :key="`${log.kind}-${log.id}`" class="log-row">
           <div class="log-top">
-            <span class="item-meta">{{ formatDateTime(log.created_at) }}</span>
             <span class="log-pc">{{ log.pc_name ?? '(削除済みPC)' }}</span>
             <span class="log-amount" :class="{ plus: log.amount > 0, minus: log.amount < 0 }">
               {{ log.amount > 0 ? '+' : '' }}{{ formatMoney(log.amount) }}
@@ -543,7 +542,7 @@ const savePayouts = async () => {
           </div>
           <div class="item-meta">
             <span class="log-kind">{{ MONEY_LOG_KIND_LABELS[log.kind] }}</span>
-            {{ describeMoneyLog(log) }}
+            {{ formatDateTime(log.created_at) }} / {{ describeMoneyLog(log) }}
             <template v-if="log.user_name">(操作: {{ log.user_name }})</template>
           </div>
         </div>
@@ -588,19 +587,21 @@ const savePayouts = async () => {
         <h2 class="box-title">チンチロの倍率</h2>
         <p class="item-meta">入力するのは掛金に対する所持金の増減(マイナスは負け)。カジノ画面では1を足した払い戻し倍率で表示されます。小数第2位まで指定できます。</p>
         <table class="payout-table">
-          <tr>
-            <th>役</th>
-            <th>確率</th>
-            <th>倍率</th>
-          </tr>
-          <tr v-for="h in CHINCHIRO_HANDS" :key="h.key">
-            <td>{{ h.label }}<br /><span class="item-meta">{{ h.desc }}</span></td>
-            <td class="item-meta">{{ (handProbability(h.key) * 100).toFixed(2) }}%</td>
-            <td>
-              <input v-model.number="payoutForm[h.key]" type="number" step="0.01" class="field-input payout-input" />
-              <span class="item-meta payout-display">表示: {{ formatMultiplier(payoutForm[h.key]) }}</span>
-            </td>
-          </tr>
+          <tbody>
+            <tr>
+              <th>役</th>
+              <th>確率</th>
+              <th>倍率</th>
+            </tr>
+            <tr v-for="h in CHINCHIRO_HANDS" :key="h.key">
+              <td>{{ h.label }}<br /><span class="item-meta">{{ h.desc }}</span></td>
+              <td class="item-meta">{{ (handProbability(h.key) * 100).toFixed(2) }}%</td>
+              <td>
+                <input v-model.number="payoutForm[h.key]" type="number" step="0.01" class="field-input payout-input" />
+                <span class="item-meta payout-display">表示: {{ formatMultiplier(payoutForm[h.key]) }}</span>
+              </td>
+            </tr>
+          </tbody>
         </table>
         <p class="item-meta expected">
           期待値: 掛金1に対して {{ expectedReturn(payoutForm) >= 0 ? '+' : '' }}{{ expectedReturn(payoutForm).toFixed(3) }}
@@ -624,7 +625,7 @@ const savePayouts = async () => {
         <label class="field-label">ID</label>
         <input v-model="userForm.name" class="field-input" />
         <label class="field-label">パスワード</label>
-        <input v-model="userForm.password" type="password" class="field-input" />
+        <input v-model="userForm.password" type="password" class="field-input" autocomplete="new-password" />
       </template>
       <label class="field-label">{{ editingUserId ? '権限' : '初期権限' }}</label>
       <div class="chip-list">
@@ -764,29 +765,12 @@ const savePayouts = async () => {
   margin-bottom: 16px;
 }
 
+/* 横スクロールだと隠れたタブに気づけないので、折り返して全タブを見せる */
 .tab-bar {
   display: flex;
+  flex-wrap: wrap;
   gap: 6px;
-  margin: 0 -16px 16px;
-  padding: 0 16px 4px;
-  overflow-x: auto;
-  scrollbar-width: none;
-  -webkit-overflow-scrolling: touch;
-}
-
-/* タブが多いので折り返さず横スクロールにする */
-.tab-bar::-webkit-scrollbar {
-  display: none;
-}
-
-/* マウス操作の端末では横スクロールできないので折り返して全タブを表示する */
-@media (hover: hover) and (pointer: fine) {
-  .tab-bar {
-    flex-wrap: wrap;
-    overflow-x: visible;
-    margin: 0 0 16px;
-    padding: 0;
-  }
+  margin: 0 0 16px;
 }
 
 .tab-btn {
@@ -993,12 +977,14 @@ const savePayouts = async () => {
 
 .log-top {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 8px;
 }
 
 .log-pc {
   flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
   font-weight: bold;
   font-size: 0.9rem;
 }
@@ -1014,6 +1000,10 @@ const savePayouts = async () => {
 
 .log-amount.minus {
   color: var(--color-error);
+}
+
+.reload-btn {
+  margin-bottom: 10px;
 }
 
 .log-kind {

@@ -51,8 +51,11 @@ const handleLogout = async () => {
   <div>
     <div class="top-bar" :class="{ 'drawer-open': drawer }">
       <!-- ハンバーガーボタン -->
-      <div
+      <button
+        type="button"
         class="hamburger-box"
+        :aria-label="drawer ? 'メニューを閉じる' : 'メニューを開く'"
+        :aria-expanded="drawer"
         :class="{ active: drawer }"
         @click="drawer = !drawer"
       >
@@ -72,7 +75,7 @@ const handleLogout = async () => {
             <line x1="30" y1="62" x2="70" y2="62" class="ham-line line-3" />
           </g>
         </svg>
-      </div>
+      </button>
 
       <!-- メニューを開いたとき、メニューの枠外の右上に出す -->
       <Transition name="money-btn">
@@ -153,6 +156,9 @@ const handleLogout = async () => {
 
 .hamburger-box {
   pointer-events: auto;
+  padding: 0;
+  border: none;
+  background: none;
   width: 52px;
   height: 52px;
   cursor: pointer;
