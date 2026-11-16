@@ -2,7 +2,7 @@
 // 記入・編集用のポップアップ
 // ・PC: 画面中央のポップアップ。下端に「保存・キャンセル」(と #extra の削除など)
 // ・スマホ: 全画面で開き、「キャンセル・保存」は親指の届く下端に置く(上の角は片手で押しにくいため)。
-//   キーボードが出たら表示領域(visualViewport)に合わせて縮め、下端のボタンがキーボードに隠れないようにする。
+//   入力中はキーボードの下に隠れる(キーボードの上に出ると入力欄が狭くなるため)。キーボードを閉じると押せる。
 //   削除など(#extra)は本文の末尾に置く(保存と離して押し間違いを防ぐ)
 // 入力中のスクロールはブラウザ標準に任せる
 const open = defineModel({ type: Boolean, default: false })
@@ -21,34 +21,12 @@ const emit = defineEmits(['save'])
 const close = () => {
   open.value = false
 }
-
-// スマホでキーボードが出たときに、ポップアップを見えている範囲に収める
-const viewportStyle = ref({})
-const fitViewport = () => {
-  const vv = window.visualViewport
-  if (!vv) return
-  viewportStyle.value = { top: `${vv.offsetTop}px`, height: `${vv.height}px`, bottom: 'auto' }
-}
-const watchViewport = (on) => {
-  const vv = typeof window !== 'undefined' ? window.visualViewport : null
-  if (!vv) return
-  const method = on ? 'addEventListener' : 'removeEventListener'
-  vv[method]('resize', fitViewport)
-  vv[method]('scroll', fitViewport)
-  if (on) fitViewport()
-  else viewportStyle.value = {}
-}
-watch(open, (v) => watchViewport(v))
-onMounted(() => {
-  if (open.value) watchViewport(true)
-})
-onBeforeUnmount(() => watchViewport(false))
 </script>
 
 <template>
   <Teleport to="body">
     <Transition name="fade">
-      <div v-if="open" class="overlay" :style="viewportStyle" @click.self="close">
+      <div v-if="open" class="overlay" @click.self="close">
         <div class="dialog" role="dialog" :aria-label="title">
           <div class="dialog-head">
             <span class="dialog-title">{{ title }}</span>
