@@ -258,6 +258,7 @@ const pcToForm = (pc) => ({
   showTitle: !!pc.show_title,
   showOffice: !!pc.show_office,
   showStats: !!pc.show_stats,
+  isLost: !!pc.is_lost,
   stats: Object.fromEntries(STAT_KEYS.map((k) => [k, pc.stats?.[k] ?? ''])),
   imageBg: pc.image_bg ?? '',
 })
@@ -865,6 +866,7 @@ const confirmPcDelete = async () => {
     <AccordionList :items="myPcItems" title-key="title" multiple :before-close="beforeClosePc" class="pc-list">
       <template #title="{ item }">
         <span>{{ item.title }}</span>
+        <span v-if="item.is_lost" class="lost-tag">ロスト</span>
         <span v-if="isEditing(item.id)" class="editing-mark">編集中</span>
         <span v-if="dirtyIds.includes(item.id)" class="dirty-mark">未保存</span>
       </template>
@@ -911,7 +913,7 @@ const confirmPcDelete = async () => {
         <!-- PCの画像: 編集中だけ登録・変更・削除できる -->
         <div v-if="isEditing(item.id) || item.image_url" class="pc-image-row">
           <div class="pc-image-box">
-            <PcImage :src="item.image_url" :bg="isEditing(item.id) ? drafts[item.id]?.imageBg : item.image_bg" :alt="item.name" :icon-size="40" />
+            <PcImage :src="item.image_url" :bg="isEditing(item.id) ? drafts[item.id]?.imageBg : item.image_bg" :lost="isEditing(item.id) ? drafts[item.id]?.isLost : item.is_lost" :alt="item.name" :icon-size="40" />
           </div>
           <div v-if="isEditing(item.id)" class="pc-image-actions">
             <button class="image-btn" :disabled="imageUploadingId === item.id" @click="pickImage(item.id)">
@@ -1022,6 +1024,10 @@ const confirmPcDelete = async () => {
           <label class="check-label">
             <input v-model="drafts[item.id].showStats" type="checkbox" />
             ステータスをPCタブで公開する
+          </label>
+          <label class="check-label">
+            <input v-model="drafts[item.id].isLost" type="checkbox" />
+            ロストした(死亡・引退など。PCタブで画像が白黒になります)
           </label>
 
           <label class="edit-label">メモ</label>
@@ -2035,6 +2041,17 @@ const confirmPcDelete = async () => {
   display: flex;
   justify-content: flex-end;
   padding: 10px 14px 0;
+}
+
+.lost-tag {
+  margin-left: 8px;
+  padding: 0 6px;
+  font-size: 0.68rem;
+  font-weight: bold;
+  background: #666;
+  color: #fff;
+  vertical-align: middle;
+  letter-spacing: 0.05em;
 }
 
 .editing-mark {

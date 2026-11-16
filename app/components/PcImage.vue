@@ -3,12 +3,13 @@ defineProps({
   src: { type: String, default: '' },
   alt: { type: String, default: '' },
   iconSize: { type: [Number, String], default: 56 },
+  lost: { type: Boolean, default: false }, // ロストしたPCは白黒にする
   bg: { type: String, default: '' }, // 背景色(透過した画像の後ろと、画像がないとき)。空なら標準の黄色
 })
 </script>
 
 <template>
-  <div class="pc-image" :style="bg ? { backgroundColor: bg } : null">
+  <div class="pc-image" :class="{ lost }" :style="bg ? { backgroundColor: bg } : null">
     <img v-if="src" :src="src" :alt="alt" />
     <v-icon v-else icon="mdi-account" :size="iconSize" class="pc-image-empty" />
   </div>
@@ -34,6 +35,20 @@ defineProps({
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+
+.pc-image {
+  position: relative;
+}
+
+/* ロスト: 白黒にする */
+.pc-image.lost {
+  filter: grayscale(1);
+}
+
+.pc-image.lost img,
+.pc-image.lost .pc-image-empty {
+  opacity: 0.55;
 }
 
 .pc-image-empty {
