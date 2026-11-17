@@ -17,6 +17,15 @@ watch(
 
 const isOrderChanged = ref(false)
 const searchQuery = ref('')
+// 質問か回答にキーワード(空白区切りですべて)を含む項目だけ表示する
+const shownItems = computed(() => {
+  const words = searchQuery.value.trim().toLowerCase().split(/\s+/).filter(Boolean)
+  if (!words.length) return localItems.value
+  return localItems.value.filter((i) => {
+    const text = `${i.question ?? ''}\n${i.answer ?? ''}`.toLowerCase()
+    return words.every((w) => text.includes(w))
+  })
+})
 
 const editingId = ref(null)
 const editForm = ref({ question: '', answer: '' })
@@ -156,19 +165,21 @@ const saveCreate = async () => {
   <div class="page">
     <h1 class="page-title">よくある質問,裁定</h1>
 
-    <!-- ページ内検索ボックス(外形のみ、フィルタ未実装) -->
+    <!-- 質問・回答をキーワードで絞り込む -->
     <div class="search-box">
       <input
         v-model="searchQuery"
-        type="text"
-        placeholder="キーワードで検索(未完成)"
+        type="search"
+        placeholder="キーワードで検索"
+        aria-label="キーワードで検索"
         class="search-input"
       />
     </div>
 
     <p v-if="localItems.length === 0" class="empty">まだ項目がありません</p>
+    <p v-else-if="shownItems.length === 0" class="empty">「{{ searchQuery.trim() }}」に合う項目はありません</p>
     <AccordionList
-      :items="localItems"
+      :items="shownItems"
       title-key="question"
       body-key="answer"
     >

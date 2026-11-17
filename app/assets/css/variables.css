@@ -173,3 +173,33 @@ input[type='radio']:disabled {
   padding: 14px 12px;
   margin: 0 0 8px;
 }
+
+/* ---------- タッチ操作: 小さいボタンも指で押せる高さにする ---------- */
+@media (pointer: coarse) {
+  .tab-btn,
+  .tag-chip,
+  button.chip,
+  .edit-btn,
+  .delete-btn,
+  .save-btn,
+  .cancel-btn,
+  .order-btn,
+  .copy-btn,
+  .money-edit-btn,
+  .image-btn,
+  .move-start,
+  .consume-open,
+  .add-btn,
+  .preset-btn,
+  .more-btn,
+  .settle-btn,
+  .save-bar-btn,
+  .view-btn,
+  .edit-start-btn,
+  .edit-done-btn,
+  .drawer-logout-btn,
+  .apply-order-btn-sm,
+  .cancel-order-btn-sm {
+    min-height: 40px;
+  }
+}

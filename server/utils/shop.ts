@@ -1,11 +1,13 @@
 import { parseSize, parsePerSlot, parseModifiers, parseCategory } from './pcItems'
 
 export const SHOPS = ['魔法店', '武器屋']
+// 魔法店の商品の分類(武器屋は分けない)
+export const MAGIC_SHOP_CATEGORIES = ['魔法', '装飾品', '医薬品', 'その他']
 
 export function parseShopItemBody(body) {
   const {
     shop, name, price, stock, description, sellers, discountEnabled, discountPrice, discountStock, discountSellers,
-    itemSize, itemPerSlot, itemCategory, itemModifiers, setSize,
+    itemSize, itemPerSlot, itemCategory, itemModifiers, setSize, shopCategory,
   } = body ?? {}
 
   if (!SHOPS.includes(shop)) {
@@ -43,8 +45,14 @@ export function parseShopItemBody(body) {
     discount = { price: dPrice, stock: dStock, sellers: parseSellers(discountSellers) }
   }
 
+  // 魔法店は分類を必ず持つ(不明なら「その他」)。武器屋は空
+  const category = shop === '魔法店'
+    ? (MAGIC_SHOP_CATEGORIES.includes(shopCategory) ? shopCategory : 'その他')
+    : ''
+
   return {
     shop,
+    shopCategory: category,
     name,
     price: priceNum,
     stock: stockNum,

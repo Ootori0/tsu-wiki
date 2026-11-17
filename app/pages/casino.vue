@@ -211,16 +211,18 @@ const play = async () => {
       <details class="payouts">
         <summary>配当表</summary>
         <table class="payout-table">
-          <tr v-for="h in CHINCHIRO_HANDS" :key="h.key">
-            <th>{{ h.label }}</th>
-            <td class="payout-desc">{{ h.desc }}</td>
-            <td
-              class="payout-mult"
-              :class="{ plus: payoutData?.payouts?.[h.key] > 0, minus: payoutData?.payouts?.[h.key] < 0 }"
-            >
-              {{ formatMultiplier(payoutData?.payouts?.[h.key]) }}
-            </td>
-          </tr>
+          <tbody>
+            <tr v-for="h in CHINCHIRO_HANDS" :key="h.key">
+              <th>{{ h.label }}</th>
+              <td class="payout-desc">{{ h.desc }}</td>
+              <td
+                class="payout-mult"
+                :class="{ plus: payoutData?.payouts?.[h.key] > 0, minus: payoutData?.payouts?.[h.key] < 0 }"
+              >
+                {{ formatMultiplier(payoutData?.payouts?.[h.key]) }}
+              </td>
+            </tr>
+          </tbody>
         </table>
         <p class="payout-note">倍率は掛金に対する払い戻しです(1倍で掛金がそのまま戻り、0倍で掛金を失います)。マイナスの倍率では掛金以上を失い、所持金がマイナスになることがあります。</p>
       </details>
