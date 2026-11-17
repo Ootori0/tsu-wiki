@@ -112,6 +112,7 @@ CREATE TABLE pcs (
 CREATE TABLE shop_items (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   shop TEXT NOT NULL CHECK (shop IN ('魔法店', '武器屋')),
+  shop_category TEXT NOT NULL DEFAULT '', -- 魔法店の分類(魔法・装飾品・医薬品・その他)。武器屋は空
   name TEXT NOT NULL,
   price INTEGER NOT NULL CHECK (price >= 0),
   stock INTEGER CHECK (stock IS NULL OR stock >= 0), -- NULL=無制限

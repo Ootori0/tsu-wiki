@@ -186,8 +186,19 @@ const { data: allPurchases, refresh: refreshAllPurchases } = await useFetch('/ap
 
 const { data: allPcs } = await useCachedFetch('/api/pcs', { key: 'pcs-list' })
 
+// 管理画面の商品一覧: 魔法店は分類の順に並べる
+const adminShopItems = (shop) => {
+  const list = (shopItems.value ?? []).filter((i) => i.shop === shop)
+  if (shop !== '魔法店') return list
+  const order = (i) => {
+    const n = MAGIC_SHOP_CATEGORIES.indexOf(i.shop_category)
+    return n === -1 ? MAGIC_SHOP_CATEGORIES.length : n
+  }
+  return [...list].sort((a, b) => order(a) - order(b))
+}
+
 const emptyItemForm = () => ({
-  shop: '魔法店', name: '', price: 0, stock: '', description: '', sellers: [],
+  shop: '魔法店', shopCategory: 'その他', name: '', price: 0, stock: '', description: '', sellers: [],
   // 割引販売(通常販売とは別の価格・在庫・販売者)
   discountEnabled: false, discountPrice: 0, discountStock: 0, discountSellers: [],
   // 買ったときに所持品へ入れる設定
@@ -230,6 +241,7 @@ const openItemEdit = (item) => {
   editingItemId.value = item.id
   itemForm.value = {
     shop: item.shop,
+    shopCategory: item.shop_category || 'その他',
     name: item.name,
     price: item.price,
     stock: item.stock ?? '',
@@ -473,7 +485,10 @@ const savePayouts = async () => {
     <div v-if="activeTab === '商品管理'" class="tab-content">
       <div v-for="shop in shops" :key="shop" class="box">
         <h2 class="box-title">{{ shop }}の商品</h2>
-        <AccordionList :items="(shopItems ?? []).filter((i) => i.shop === shop)" title-key="name">
+        <AccordionList :items="adminShopItems(shop)" title-key="name">
+          <template #title="{ item }">
+            <span v-if="item.shop === '魔法店'" class="category-tag">{{ item.shop_category || 'その他' }}</span>{{ item.name }}
+          </template>
           <template #detail="{ item }">
             <div class="detail">
               <p class="item-meta">
@@ -676,6 +691,21 @@ const savePayouts = async () => {
       <select v-model="itemForm.shop" class="field-input">
         <option v-for="s in shops" :key="s" :value="s">{{ s }}</option>
       </select>
+      <template v-if="itemForm.shop === '魔法店'">
+        <label class="field-label">分類</label>
+        <div class="category-choices" role="radiogroup" aria-label="分類">
+          <button
+            v-for="c in MAGIC_SHOP_CATEGORIES"
+            :key="c"
+            type="button"
+            role="radio"
+            :aria-checked="itemForm.shopCategory === c"
+            class="category-choice"
+            :class="{ active: itemForm.shopCategory === c }"
+            @click="itemForm.shopCategory = c"
+          >{{ c }}</button>
+        </div>
+      </template>
       <label class="field-label">商品名</label>
       <input v-model="itemForm.name" class="field-input" />
       <label class="field-label">価格({{ MONEY_UNIT }})</label>
@@ -1000,6 +1030,36 @@ const savePayouts = async () => {
 
 .log-amount.minus {
   color: var(--color-error);
+}
+
+.category-choices {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+
+.category-choice {
+  min-height: 40px;
+  border: 1px solid var(--color-text, #000);
+  background: var(--color-bg, #fff);
+  color: var(--color-text, #000);
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.category-choice.active {
+  background: var(--color-accent, #ffd400);
+  font-weight: bold;
+}
+
+.category-tag {
+  display: inline-block;
+  margin-right: 6px;
+  padding: 0 5px;
+  font-size: 0.68rem;
+  font-weight: bold;
+  border: 1px solid var(--color-text, #000);
+  vertical-align: middle;
 }
 
 .reload-btn {

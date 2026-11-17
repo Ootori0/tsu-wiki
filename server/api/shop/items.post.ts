@@ -19,12 +19,12 @@ export default defineEventHandler(async (event) => {
   await db.batch([
     db
       .prepare(
-        `INSERT INTO shop_items (shop, name, price, stock, description, discount_price, discount_stock,
+        `INSERT INTO shop_items (shop, shop_category, name, price, stock, description, discount_price, discount_stock,
            item_size, item_per_slot, item_category, item_modifiers, set_size)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
       .bind(
-        item.shop, item.name, item.price, item.stock, item.description, item.discount.price, item.discount.stock,
+        item.shop, item.shopCategory, item.name, item.price, item.stock, item.description, item.discount.price, item.discount.stock,
         item.asItem.size, item.asItem.perSlot, item.asItem.category, item.asItem.modifiers, item.setSize,
       ),
     ...sellerInsertStatements(db, '(SELECT MAX(id) FROM shop_items)', [], item.sellers),

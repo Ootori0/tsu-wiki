@@ -38,8 +38,17 @@ const SORTS = [
 ]
 const hideSoldOut = ref(false)
 
+// 魔法店の分類での絞り込み(空 = すべて)。武器屋に切り替えたら外す
+const activeCategory = ref('')
+watch(activeShop, () => {
+  activeCategory.value = ''
+})
+const categoryOf = (item) => item.shop_category || 'その他'
+const categoryCount = (c) => (items.value ?? []).filter((item) => item.shop === '魔法店' && categoryOf(item) === c).length
+
 const shopItems = computed(() => {
   let list = (items.value ?? []).filter((item) => item.shop === activeShop.value)
+  if (activeShop.value === '魔法店' && activeCategory.value) list = list.filter((item) => categoryOf(item) === activeCategory.value)
   const q = searchName.value.trim()
   if (q) list = list.filter((item) => item.name.includes(q))
   if (hideSoldOut.value) list = list.filter((item) => !soldOut(item))
@@ -147,6 +156,21 @@ watch(selectedPcId, () => {
       </button>
     </div>
 
+    <!-- 魔法店の分類 -->
+    <div v-if="activeShop === '魔法店'" class="category-bar" role="tablist" aria-label="分類">
+      <button
+        v-for="c in ['', ...MAGIC_SHOP_CATEGORIES]"
+        :key="c"
+        role="tab"
+        :aria-selected="activeCategory === c"
+        class="category-btn"
+        :class="{ active: activeCategory === c }"
+        @click="activeCategory = c"
+      >
+        {{ c || 'すべて' }}<span v-if="c" class="category-count">{{ categoryCount(c) }}</span>
+      </button>
+    </div>
+
     <!-- 探す -->
     <div class="finder">
       <input v-model="searchName" type="search" placeholder="商品名で検索" class="search-input" />
@@ -171,6 +195,7 @@ watch(selectedPcId, () => {
           <span class="item-title">
             <span class="item-name">{{ item.name }}</span>
             <span class="item-sub">
+              <span v-if="item.shop === '魔法店' && !activeCategory" class="kind-tag">{{ categoryOf(item) }}</span>
               <span v-if="setOf(item) > 1" class="set-tag">{{ setOf(item) }}個セット</span>
               <span v-if="soldOut(item)" class="soldout-tag">売り切れ</span>
               <span v-else-if="onDiscount(item)" class="discount-tag">割引 残り{{ item.discount_stock }}</span>
@@ -414,6 +439,45 @@ watch(selectedPcId, () => {
 }
 
 /* ---------- 探す ---------- */
+.kind-tag {
+  padding: 0 5px;
+  font-size: 0.68rem;
+  font-weight: bold;
+  border: 1px solid var(--color-text, #000);
+  background: var(--color-bg, #fff);
+}
+
+.category-bar {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.category-btn {
+  min-height: 40px;
+  padding: 4px 2px;
+  border: 1px solid var(--color-text, #000);
+  background: var(--color-bg, #fff);
+  color: var(--color-text, #000);
+  font-size: 0.8rem;
+  font-family: inherit;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.category-btn.active {
+  background: #000;
+  color: var(--color-accent, #ffd400);
+  font-weight: bold;
+}
+
+.category-count {
+  margin-left: 2px;
+  font-size: 0.68rem;
+  opacity: 0.7;
+}
+
 .finder {
   display: flex;
   flex-direction: column;
