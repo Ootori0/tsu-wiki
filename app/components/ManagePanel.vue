@@ -302,6 +302,7 @@ const LOG_CATEGORIES = [
   { value: 'casino', label: 'カジノ' },
   { value: 'casino_month', label: 'カジノ月計' },
   { value: 'dealer_month', label: 'ディーラー月計' },
+  { value: 'showdown', label: 'Showdown' },
   { value: 'ledger', label: '清算・切替' },
 ]
 const { data: moneyLogs, execute: loadMoneyLogs, pending: loadingLogs } = await useFetch('/api/admin/money-logs', {
@@ -336,6 +337,8 @@ const HISTORY_DELETE_NOTES = {
   dealer: 'プレイヤーとディーラーの両方の増減を取り消します。この勝負はその日のプレイ回数からも外れます。',
   casino_month: 'この月計にまとめた勝負すべてについて、プレイヤーとディーラーの両方の増減を取り消します。',
   dealer_month: 'この月計にまとめた勝負すべてについて、プレイヤーとディーラーの両方の増減を取り消します。',
+  showdown: 'プレイヤーとディーラーの両方の増減を取り消します(勝負中なら払った掛金と料金が戻ります)。この勝負はその日の回数からも外れます。',
+  showdown_dealer: 'プレイヤーとディーラーの両方の増減を取り消します。この勝負はその日の回数からも外れます。',
 }
 
 // --- カジノ履歴の圧縮(admin のみ) ---
@@ -409,6 +412,22 @@ const savePayouts = async () => {
     clearNuxtData('chinchiro-payouts')
     await refreshChinchiro()
   }, 'カジノ設定を保存しました', '保存に失敗しました')
+}
+
+// --- Showdown の設定 ---
+const { data: showdownData, refresh: refreshShowdown } = await useFetch('/api/casino/showdown/settings', {
+  key: 'admin-showdown-settings',
+  immediate: hasTab('カジノ設定'),
+})
+const showdownForm = ref(null)
+watch(showdownData, (d) => {
+  if (d) showdownForm.value = JSON.parse(JSON.stringify(d))
+}, { immediate: true })
+const saveShowdown = async () => {
+  await run(async () => {
+    await $fetch('/api/casino/showdown/settings', { method: 'PUT', body: showdownForm.value })
+    await refreshShowdown()
+  }, 'Showdown の設定を保存しました', '保存に失敗しました')
 }
 </script>
 
@@ -591,7 +610,7 @@ const savePayouts = async () => {
       </div>
 
       <div class="box">
-        <h2 class="box-title">ディーラー</h2>
+        <h2 class="box-title">チンチロのディーラー</h2>
         <p class="item-meta">プレイヤーの負け額の割合分を受け取り、勝ち額の割合分を支払います(所持金はマイナスになり得ます)。</p>
         <label class="field-label">ディーラーPC</label>
         <select v-model="dealerForm.pcId" class="field-input">
@@ -628,6 +647,49 @@ const savePayouts = async () => {
           (還元率 {{ ((1 + expectedReturn(payoutForm)) * 100).toFixed(1) }}%)
         </p>
         <button class="save-btn" @click="savePayouts">保存</button>
+      </div>
+
+      <div v-if="showdownForm" class="box">
+        <h2 class="box-title">Showdown</h2>
+        <p class="item-meta">勝ったときの払い戻し倍率(掛金込み)。嘘を見破ったときは宣言された役、宣言どおりのときは実際の役の倍率を使います。初期値は「毎回すぐ勝負する」遊び方で還元率が約97%です。</p>
+        <table class="payout-table">
+          <tbody>
+            <tr>
+              <th>役</th>
+              <th>確率</th>
+              <th>ダメージ</th>
+              <th>倍率</th>
+            </tr>
+            <tr v-for="h in SHOWDOWN_HANDS" :key="h.key">
+              <td>{{ h.label }}</td>
+              <td class="item-meta">{{ SHOWDOWN_HAND_PROBABILITY[h.key] }}%</td>
+              <td class="item-meta">×{{ h.damage }}</td>
+              <td><input v-model.number="showdownForm.payouts[h.key]" type="number" min="0" step="0.01" class="field-input payout-input" /></td>
+            </tr>
+          </tbody>
+        </table>
+        <label class="field-label">ディーラーが嘘をつく確率(%)</label>
+        <input v-model.number="showdownForm.bluffRate" type="number" min="0" max="100" class="field-input" />
+        <label class="field-label">Raise 1回の料金(掛金の%)</label>
+        <input v-model.number="showdownForm.raiseFee" type="number" min="0" max="100" class="field-input" />
+        <label class="field-label">Raise できる回数</label>
+        <input v-model.number="showdownForm.raiseMax" type="number" min="0" max="4" class="field-input" />
+        <label class="field-label">1日に遊べる回数(PCごと)</label>
+        <input v-model.number="showdownForm.dailyLimit" type="number" min="1" max="100" class="field-input" />
+        <label class="field-label">プレイヤーのダメージ(ダイス)</label>
+        <div class="dice-row">
+          <input v-model.number="showdownForm.diceCount" type="number" min="1" max="20" class="field-input" aria-label="ダイスの数" />
+          <span>d</span>
+          <input v-model.number="showdownForm.diceSides" type="number" min="2" max="100" class="field-input" aria-label="ダイスの面" />
+        </div>
+        <label class="field-label">ディーラーPC</label>
+        <select v-model="showdownForm.dealerPcId" class="field-input">
+          <option :value="null">なし</option>
+          <option v-for="pc in allPcs ?? []" :key="pc.id" :value="pc.id">{{ pc.name }}</option>
+        </select>
+        <label class="field-label">ディーラーの還元割合(%)</label>
+        <input v-model.number="showdownForm.dealerShare" type="number" min="0" max="100" class="field-input" />
+        <button class="save-btn" @click="saveShowdown">保存</button>
       </div>
     </div>
     <!-- アカウントの作成・編集 -->
@@ -1065,6 +1127,16 @@ const savePayouts = async () => {
   font-weight: bold;
   border: 1px solid var(--color-text, #000);
   vertical-align: middle;
+}
+
+.dice-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.dice-row .field-input {
+  flex: 1;
 }
 
 .reload-btn {

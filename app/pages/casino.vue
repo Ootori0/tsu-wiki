@@ -246,6 +246,8 @@ const play = async () => {
       </div>
       <p v-if="(games ?? []).length === 0" class="empty">まだ遊んでいません</p>
     </section>
+
+    <ShowdownTable v-if="(myPcs ?? []).length" />
   </div>
 </template>
 

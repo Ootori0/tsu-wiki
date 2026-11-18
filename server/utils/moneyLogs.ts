@@ -45,6 +45,19 @@ const BRANCHES = [
     categories: { '': null, casino: null },
   },
   {
+    // Showdown(勝負中のものは、払った掛金と Raise の料金の分だけ出る)
+    select: `SELECT 'showdown' AS kind, s.id, s.pc_id, s.net AS amount, COALESCE(s.hand, s.status) AS detail, s.bet AS sub, s.played_by AS user_id, s.created_at
+             FROM showdown_games s`,
+    pc: 's.pc_id', time: 's.created_at', id: 's.id',
+    categories: { '': null, casino: null, showdown: null },
+  },
+  {
+    select: `SELECT 'showdown_dealer' AS kind, s.id, s.dealer_pc_id AS pc_id, s.dealer_delta AS amount, COALESCE(s.hand, s.status) AS detail, p.name AS sub, s.played_by AS user_id, s.created_at
+             FROM showdown_games s LEFT JOIN pcs p ON p.id = s.pc_id`,
+    pc: 's.dealer_pc_id', all: 's.dealer_pc_id IS NOT NULL', time: 's.created_at', id: 's.id',
+    categories: { '': null, casino: null, showdown: null },
+  },
+  {
     select: `SELECT 'casino_month' AS kind, m.id, m.pc_id, m.net_total AS amount, m.month AS detail, m.plays || '/' || m.bet_total AS sub, NULL AS user_id, m.created_at
              FROM chinchiro_monthly m`,
     pc: 'm.pc_id', time: 'm.created_at', id: 'm.id',
