@@ -4,10 +4,12 @@ export const CACHE_TTL = 60_000
 
 const store = new Map<string, { expires: number, value: Promise<unknown> }>()
 
-export function cached<T>(key: string, loader: () => Promise<T>, ttl = CACHE_TTL): Promise<T> {
+// event を渡すと、直前に自分で書き込んだ人(event.context.freshRead)にはキャッシュを使わずDBから読む。
+// 他のインスタンスのキャッシュは消せないので、自分の操作の結果が別のインスタンスで古く見えるのを防ぐため
+export function cached<T>(event: any, key: string, loader: () => Promise<T>, ttl = CACHE_TTL): Promise<T> {
   const now = Date.now()
   const hit = store.get(key)
-  if (hit && hit.expires > now) return hit.value as Promise<T>
+  if (hit && hit.expires > now && !event?.context?.freshRead) return hit.value as Promise<T>
 
   // 同時に来たリクエストは同じ読み出しを共有する。失敗したらキャッシュしない
   const value = loader().catch((e) => {

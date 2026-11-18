@@ -39,8 +39,8 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 429, statusMessage: `今日のプレイ回数の上限(${DAILY_PLAY_LIMIT}回)に達しました` })
   }
 
-  const payouts = await loadPayouts(db)
-  const dealer = await loadDealer(db)
+  const payouts = await loadPayouts(event, db)
+  const dealer = await loadDealer(event, db)
   const { rolls, hand } = playChinchiro()
   const multiplier = payouts[hand]
   const net = Math.round(betNum * multiplier)

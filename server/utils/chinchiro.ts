@@ -75,8 +75,8 @@ export function playChinchiro() {
   return { rolls, hand: 'menashi' }
 }
 
-export async function loadPayouts(db) {
-  const { results } = await cached('casino:payouts', () =>
+export async function loadPayouts(event, db) {
+  const { results } = await cached(event, 'casino:payouts', () =>
     db.prepare('SELECT hand, multiplier FROM chinchiro_payouts').all()
   )
   const payouts = { ...DEFAULT_PAYOUTS }
@@ -87,8 +87,8 @@ export async function loadPayouts(db) {
 }
 
 // ディーラー設定: { pcId, pcName, share(%) }。未設定なら pcId は null
-export function loadDealer(db) {
-  return cached('casino:dealer', () => loadDealerFromDb(db))
+export function loadDealer(event, db) {
+  return cached(event, 'casino:dealer', () => loadDealerFromDb(db))
 }
 
 async function loadDealerFromDb(db) {

@@ -10,7 +10,7 @@ export default defineEventHandler(async (event) => {
   const admin = isManager(currentUser?.permissions)
 
   // 商品と販売者(通常・割引)をまとめてキャッシュする(商品の変更・購入・PCの変更で破棄)
-  const [{ results: items }, { results: sellers }, { results: discountSellers }] = await cached('shop:items', () => db.batch([
+  const [{ results: items }, { results: sellers }, { results: discountSellers }] = await cached(event, 'shop:items', () => db.batch([
     db.prepare('SELECT * FROM shop_items ORDER BY shop ASC, id DESC'),
     db.prepare(
       `SELECT s.item_id, s.pc_id, s.amount, pcs.name AS pc_name

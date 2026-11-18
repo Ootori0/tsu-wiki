@@ -70,6 +70,8 @@ const saveUser = async () => {
         method: 'PUT',
         body: { permissions: userForm.value.permissions },
       })
+      // 自分の権限を変えたときは、メニューなどに出す自分の権限も読み込み直す
+      if (id === user.value?.id) await fetchUser()
     } else {
       await $fetch('/api/admin/users', { method: 'POST', body: userForm.value })
     }
@@ -118,6 +120,8 @@ const createPermission = async (name) => {
       body: { name },
     })
     await refreshPermissions()
+    // 魔法ページ・マイページの権限の一覧も次に開いたときに読み込み直す
+    clearNuxtData('permissions-list')
   }, '権限を追加しました')
 }
 
@@ -126,6 +130,7 @@ const deletePermission = async (id) => {
   await run(async () => {
     await $fetch(`/api/admin/permissions/${id}`, { method: 'DELETE' })
     await refreshPermissions()
+    clearNuxtData('permissions-list')
   }, '権限を削除しました')
 }
 
@@ -314,7 +319,7 @@ watch([activeTab, logPcId, logCategory], () => {
 })
 
 // --- 履歴の削除(admin のみ) ---
-const { user } = useAuth()
+const { user, fetchUser } = useAuth()
 const canDeleteHistory = computed(() => !!user.value?.permissions?.includes('admin'))
 
 // 削除で変わり得るもの(所持金・在庫・履歴)を読み込み直す
