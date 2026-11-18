@@ -1,4 +1,5 @@
 import { requirePcOwner } from '../../../utils/pcAccess'
+import { loadMoneyLogs } from '../../../utils/moneyLogs'
 
 // 所持金の増減履歴(手動・店の購入/売上・カジノ)をまとめて新しい順に返す
 export default defineEventHandler(async (event) => {
@@ -6,39 +7,5 @@ export default defineEventHandler(async (event) => {
   const id = Number(getRouterParam(event, 'id'))
   await requirePcOwner(event, db, id)
 
-  const { results } = await db
-    .prepare(
-      `SELECT * FROM (
-         SELECT type AS kind, id, amount, reason AS detail, NULL AS sub, created_at
-         FROM money_logs WHERE pc_id = ?1
-         UNION ALL
-         SELECT 'purchase', id, -total, item_name || CASE WHEN set_size > 1 THEN '(' || set_size || '個セット)' ELSE '' END || CASE WHEN discount = 1 THEN '(割引)' ELSE '' END || CASE WHEN carry_in = 1 THEN '(持ち込み)' ELSE '' END, shop || ' ×' || quantity, created_at
-         FROM purchases WHERE pc_id = ?1
-         UNION ALL
-         SELECT 'sale', po.id, po.amount, pu.item_name || CASE WHEN pu.set_size > 1 THEN '(' || pu.set_size || '個セット)' ELSE '' END || CASE WHEN pu.discount = 1 THEN '(割引)' ELSE '' END || CASE WHEN pu.carry_in = 1 THEN '(持ち込み)' ELSE '' END, pu.shop || ' ×' || pu.quantity, po.created_at
-         FROM purchase_payouts po JOIN purchases pu ON pu.id = po.purchase_id
-         WHERE po.pc_id = ?1
-         UNION ALL
-         -- D1 は UNION を5つまでしか重ねられないので、カジノ関係は1つにまとめる
-         SELECT * FROM (
-           SELECT 'casino', id, net, hand, bet, created_at
-           FROM chinchiro_games WHERE pc_id = ?1
-           UNION ALL
-           SELECT 'dealer', g.id, g.dealer_delta, g.hand, pcs.name, g.created_at
-           FROM chinchiro_games g LEFT JOIN pcs ON pcs.id = g.pc_id
-           WHERE g.dealer_pc_id = ?1
-           UNION ALL
-           SELECT 'casino_month', id, net_total, month, plays || '/' || bet_total, created_at
-           FROM chinchiro_monthly WHERE pc_id = ?1
-           UNION ALL
-           SELECT 'dealer_month', m.id, m.dealer_delta_total, m.month || '/' || m.plays, pcs.name, m.created_at
-           FROM chinchiro_monthly m LEFT JOIN pcs ON pcs.id = m.pc_id
-           WHERE m.dealer_pc_id = ?1
-         )
-       ) ORDER BY created_at DESC, id DESC LIMIT 100`
-    )
-    .bind(id)
-    .all()
-
-  return results
+  return loadMoneyLogs(db, { pcId: id, limit: 100 })
 })

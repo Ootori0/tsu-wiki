@@ -108,6 +108,8 @@ CREATE TABLE pcs (
   FOREIGN KEY (created_by) REFERENCES users(id)
 );
 
+CREATE INDEX idx_pcs_created_by ON pcs(created_by);
+
 
 CREATE TABLE shop_items (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -145,7 +147,8 @@ CREATE TABLE purchases (
   created_at TEXT DEFAULT (datetime('now'))
 );
 
-CREATE INDEX idx_purchases_pc ON purchases(pc_id);
+CREATE INDEX idx_purchases_pc_time ON purchases(pc_id, created_at);
+CREATE INDEX idx_purchases_time ON purchases(created_at);
 
 CREATE TABLE shop_item_sellers (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -176,7 +179,9 @@ CREATE TABLE purchase_payouts (
   created_at TEXT DEFAULT (datetime('now'))
 );
 
-CREATE INDEX idx_purchase_payouts_pc ON purchase_payouts(pc_id);
+CREATE INDEX idx_purchase_payouts_pc_time ON purchase_payouts(pc_id, created_at);
+CREATE INDEX idx_purchase_payouts_time ON purchase_payouts(created_at);
+CREATE INDEX idx_purchase_payouts_purchase ON purchase_payouts(purchase_id);
 
 -- 店の購入時に所持金がマイナスにならないことを確かめるための一時テーブル(常に空)
 CREATE TABLE balance_checks (
@@ -204,7 +209,9 @@ CREATE TABLE chinchiro_games (
   created_at TEXT DEFAULT (datetime('now'))
 );
 
-CREATE INDEX idx_chinchiro_games_pc ON chinchiro_games(pc_id);
+CREATE INDEX idx_chinchiro_games_pc_time ON chinchiro_games(pc_id, created_at);
+CREATE INDEX idx_chinchiro_games_dealer_time ON chinchiro_games(dealer_pc_id, created_at);
+CREATE INDEX idx_chinchiro_games_time ON chinchiro_games(created_at);
 
 -- チンチロの古い勝負記録を、PC・ディーラー・月(日本時間)ごとにまとめた月計
 -- 管理者画面の「履歴の圧縮」で、7日より前の勝負を chinchiro_games からここへ移す
@@ -242,7 +249,8 @@ CREATE TABLE money_logs (
   created_at TEXT DEFAULT (datetime('now'))
 );
 
-CREATE INDEX idx_money_logs_pc ON money_logs(pc_id);
+CREATE INDEX idx_money_logs_pc_time ON money_logs(pc_id, created_at);
+CREATE INDEX idx_money_logs_time ON money_logs(created_at);
 
 -- ログイン失敗の記録(総当たり対策。古い記録はログイン時に削除する)
 CREATE TABLE login_attempts (

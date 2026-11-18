@@ -1,6 +1,6 @@
 import { getSessionUser } from '../../../utils/session'
 import { isAdmin } from '../../../utils/permission'
-import { DAILY_PLAY_LIMIT, countPlaysToday } from '../../../utils/chinchiro'
+import { DAILY_PLAY_LIMIT, countPlaysTodayStatement } from '../../../utils/chinchiro'
 
 export default defineEventHandler(async (event) => {
   const db = event.context.cloudflare.env.tsu_wiki_db
@@ -21,20 +21,26 @@ export default defineEventHandler(async (event) => {
   }
 
   // 自分が遊んだゲームと、ディーラーとして関わったゲーム
-  const { results } = await db
-    .prepare(
-      `SELECT g.*, pcs.name AS player_name,
-              CASE WHEN g.pc_id = ? THEN 'player' ELSE 'dealer' END AS role
-       FROM chinchiro_games g LEFT JOIN pcs ON pcs.id = g.pc_id
-       WHERE g.pc_id = ? OR g.dealer_pc_id = ?
-       ORDER BY g.id DESC LIMIT 20`
-    )
-    .bind(pcId, pcId, pcId)
-    .all()
+  // (OR でまとめるとインデックスが効かず全件読むので、それぞれ新しい順に20件読んでから合わせる)
+  const LIMIT = 20
+  const select = (role, col) =>
+    db
+      .prepare(
+        `SELECT g.*, pcs.name AS player_name, '${role}' AS role
+         FROM chinchiro_games g LEFT JOIN pcs ON pcs.id = g.pc_id
+         WHERE g.${col} = ? ORDER BY g.created_at DESC, g.id DESC LIMIT ?`
+      )
+      .bind(pcId, LIMIT)
+  const [{ results: played }, { results: dealt }, { results: [{ c: playsToday }] }] = await db.batch([
+    select('player', 'pc_id'),
+    select('dealer', 'dealer_pc_id'),
+    countPlaysTodayStatement(db, pcId),
+  ])
+  const results = [...played, ...dealt].sort((a, b) => b.id - a.id).slice(0, LIMIT)
 
   return {
     games: results.map((r) => ({ ...r, rolls: JSON.parse(r.rolls) })),
-    playsToday: await countPlaysToday(db, pcId),
+    playsToday,
     dailyLimit: DAILY_PLAY_LIMIT,
   }
 })
