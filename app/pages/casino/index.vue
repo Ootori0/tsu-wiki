@@ -2,7 +2,7 @@
 definePageMeta({ middleware: 'auth' })
 
 const { user, myPcs, refreshMyPcs, selectedPcId, selectedPc } = await useMyPcs()
-// Showdown(裏ページ)は公開前のため、一時的に admin だけに見せる(サーバー側でも admin 以外は断る)
+// Showdown(裏ページ)は公開前のため、一時的に admin だけに入口を見せる(ページとサーバー側でも admin 以外は断る)
 const canSeeShowdown = computed(() => !!user.value?.permissions?.includes('admin'))
 
 const { data: payoutData } = await useCachedFetch('/api/casino/chinchiro/payouts', {
@@ -230,6 +230,15 @@ const play = async () => {
       </details>
     </section>
 
+    <!-- 裏ページ(Showdown)への入口 -->
+    <NuxtLink v-if="canSeeShowdown" to="/casino/showdown" class="back-door">
+      <span class="back-door-text">
+        <strong>Showdown</strong>
+        <small>ディーラーとのカード勝負</small>
+      </span>
+      <v-icon icon="mdi-arrow-right" size="20" class="back-door-arrow" />
+    </NuxtLink>
+
     <section v-if="selectedPc" class="history">
       <h2 class="history-title">{{ selectedPc.name }}の戦績(最新20件)</h2>
       <div v-for="g in games ?? []" :key="g.id" class="history-row">
@@ -249,7 +258,6 @@ const play = async () => {
       <p v-if="(games ?? []).length === 0" class="empty">まだ遊んでいません</p>
     </section>
 
-    <ShowdownTable v-if="canSeeShowdown && (myPcs ?? []).length" />
   </div>
 </template>
 
@@ -524,6 +532,53 @@ const play = async () => {
   margin: 6px 0 0;
   font-size: 0.7rem;
   opacity: 0.6;
+}
+
+.back-door {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 24px;
+  padding: 14px;
+  border: 2px solid #000;
+  background: #111;
+  color: var(--color-accent, #ffd400);
+  text-decoration: none;
+  box-shadow: 4px 4px 0 var(--color-accent, #ffd400);
+  transition: transform 0.08s ease, box-shadow 0.08s ease;
+}
+
+.back-door:active {
+  transform: translate(4px, 4px);
+  box-shadow: 0 0 0 var(--color-accent, #ffd400);
+}
+
+.back-door-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.back-door-text strong {
+  font-size: 1.05rem;
+  letter-spacing: 0.08em;
+}
+
+.back-door-text small {
+  font-size: 0.75rem;
+  color: #fff;
+  opacity: 0.75;
+}
+
+.back-door-arrow {
+  transition: transform 0.2s ease;
+}
+
+@media (hover: hover) {
+  .back-door:hover .back-door-arrow {
+    transform: translateX(4px);
+  }
 }
 
 .history {
