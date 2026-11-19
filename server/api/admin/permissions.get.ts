@@ -11,6 +11,6 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 403, statusMessage: 'admin権限が必要です' })
   }
 
-  const { results } = await cached('permissions', () => db.prepare('SELECT * FROM permissions ORDER BY name ASC').all())
+  const { results } = await cached(event, 'permissions', () => db.prepare('SELECT * FROM permissions ORDER BY name ASC').all())
   return results
 })

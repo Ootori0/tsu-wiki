@@ -46,6 +46,22 @@ const monthly = {
   ],
 }
 
+// Showdown の勝負(プレイヤーとディーラーの両方の増減を取り消す。勝負中なら払った掛金が戻る)
+const showdown = {
+  table: 'showdown_games',
+  statements: (db, id) => [
+    db.prepare(
+      `UPDATE pcs SET money = money - (SELECT net FROM showdown_games WHERE id = ?1)
+       WHERE id = (SELECT pc_id FROM showdown_games WHERE id = ?1)`
+    ).bind(id),
+    db.prepare(
+      `UPDATE pcs SET money = money - (SELECT dealer_delta FROM showdown_games WHERE id = ?1)
+       WHERE id = (SELECT dealer_pc_id FROM showdown_games WHERE id = ?1)`
+    ).bind(id),
+    db.prepare('DELETE FROM showdown_games WHERE id = ?').bind(id),
+  ],
+}
+
 export const HISTORY_TARGETS = {
   manual: moneyLog,
   settle: moneyLog,
@@ -108,6 +124,8 @@ export const HISTORY_TARGETS = {
   dealer: game,
   casino_month: monthly,
   dealer_month: monthly,
+  showdown,
+  showdown_dealer: showdown,
 }
 
 // そのPCの所持金履歴に出ているものをすべて、1件ずつ消したときと同じ扱いで消す
@@ -199,5 +217,22 @@ export function deleteAllHistoryOfPc(db, pcId) {
        WHERE id IN (SELECT dealer_pc_id FROM chinchiro_monthly WHERE pc_id = ?1 OR dealer_pc_id = ?1)`
     ).bind(pcId),
     db.prepare('DELETE FROM chinchiro_monthly WHERE pc_id = ?1 OR dealer_pc_id = ?1').bind(pcId),
+
+    // Showdown(プレイヤーとして遊んだ勝負・ディーラーとして関わった勝負)
+    db.prepare(
+      `UPDATE pcs SET money = money - (
+         SELECT COALESCE(SUM(net), 0) FROM showdown_games
+         WHERE pc_id = pcs.id AND (pc_id = ?1 OR dealer_pc_id = ?1)
+       )
+       WHERE id IN (SELECT pc_id FROM showdown_games WHERE pc_id = ?1 OR dealer_pc_id = ?1)`
+    ).bind(pcId),
+    db.prepare(
+      `UPDATE pcs SET money = money - (
+         SELECT COALESCE(SUM(dealer_delta), 0) FROM showdown_games
+         WHERE dealer_pc_id = pcs.id AND (pc_id = ?1 OR dealer_pc_id = ?1)
+       )
+       WHERE id IN (SELECT dealer_pc_id FROM showdown_games WHERE pc_id = ?1 OR dealer_pc_id = ?1)`
+    ).bind(pcId),
+    db.prepare('DELETE FROM showdown_games WHERE pc_id = ?1 OR dealer_pc_id = ?1').bind(pcId),
   ]
 }

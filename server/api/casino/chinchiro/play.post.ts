@@ -35,12 +35,13 @@ export default defineEventHandler(async (event) => {
   if (!isLedger && pc.money < betNum) {
     throw createError({ statusCode: 409, statusMessage: '所持金が掛金に足りません' })
   }
-  if ((await countPlaysToday(db, pc.id)) >= DAILY_PLAY_LIMIT) {
+  const playsBefore = await countPlaysToday(db, pc.id)
+  if (playsBefore >= DAILY_PLAY_LIMIT) {
     throw createError({ statusCode: 429, statusMessage: `今日のプレイ回数の上限(${DAILY_PLAY_LIMIT}回)に達しました` })
   }
 
-  const payouts = await loadPayouts(db)
-  const dealer = await loadDealer(db)
+  const payouts = await loadPayouts(event, db)
+  const dealer = await loadDealer(event, db)
   const { rolls, hand } = playChinchiro()
   const multiplier = payouts[hand]
   const net = Math.round(betNum * multiplier)
@@ -96,7 +97,8 @@ export default defineEventHandler(async (event) => {
     multiplier,
     net,
     money: updated.money,
-    playsToday: await countPlaysToday(db, pc.id),
+    // 遊ぶ前の回数に今回の1回を足す(数え直さない。上限はバッチの中で確かめ済み)
+    playsToday: playsBefore + 1,
     dailyLimit: DAILY_PLAY_LIMIT,
   }
 })

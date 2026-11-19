@@ -36,11 +36,15 @@ export function todayStartUtc() {
   return new Date(jstMidnight - 9 * 60 * 60 * 1000).toISOString().slice(0, 19).replace('T', ' ')
 }
 
-export async function countPlaysToday(db, pcId) {
-  const row = await db
+// 今日のプレイ回数(インデックス (pc_id, created_at) で今日の分だけ数える)
+export function countPlaysTodayStatement(db, pcId) {
+  return db
     .prepare('SELECT COUNT(*) AS c FROM chinchiro_games WHERE pc_id = ? AND created_at >= ?')
     .bind(pcId, todayStartUtc())
-    .first()
+}
+
+export async function countPlaysToday(db, pcId) {
+  const row = await countPlaysTodayStatement(db, pcId).first()
   return row?.c ?? 0
 }
 
@@ -75,8 +79,8 @@ export function playChinchiro() {
   return { rolls, hand: 'menashi' }
 }
 
-export async function loadPayouts(db) {
-  const { results } = await cached('casino:payouts', () =>
+export async function loadPayouts(event, db) {
+  const { results } = await cached(event, 'casino:payouts', () =>
     db.prepare('SELECT hand, multiplier FROM chinchiro_payouts').all()
   )
   const payouts = { ...DEFAULT_PAYOUTS }
@@ -87,8 +91,8 @@ export async function loadPayouts(db) {
 }
 
 // ディーラー設定: { pcId, pcName, share(%) }。未設定なら pcId は null
-export function loadDealer(db) {
-  return cached('casino:dealer', () => loadDealerFromDb(db))
+export function loadDealer(event, db) {
+  return cached(event, 'casino:dealer', () => loadDealerFromDb(db))
 }
 
 async function loadDealerFromDb(db) {

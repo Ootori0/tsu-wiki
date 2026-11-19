@@ -108,6 +108,8 @@ CREATE TABLE pcs (
   FOREIGN KEY (created_by) REFERENCES users(id)
 );
 
+CREATE INDEX idx_pcs_created_by ON pcs(created_by);
+
 
 CREATE TABLE shop_items (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -145,7 +147,8 @@ CREATE TABLE purchases (
   created_at TEXT DEFAULT (datetime('now'))
 );
 
-CREATE INDEX idx_purchases_pc ON purchases(pc_id);
+CREATE INDEX idx_purchases_pc_time ON purchases(pc_id, created_at);
+CREATE INDEX idx_purchases_time ON purchases(created_at);
 
 CREATE TABLE shop_item_sellers (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -176,7 +179,9 @@ CREATE TABLE purchase_payouts (
   created_at TEXT DEFAULT (datetime('now'))
 );
 
-CREATE INDEX idx_purchase_payouts_pc ON purchase_payouts(pc_id);
+CREATE INDEX idx_purchase_payouts_pc_time ON purchase_payouts(pc_id, created_at);
+CREATE INDEX idx_purchase_payouts_time ON purchase_payouts(created_at);
+CREATE INDEX idx_purchase_payouts_purchase ON purchase_payouts(purchase_id);
 
 -- 店の購入時に所持金がマイナスにならないことを確かめるための一時テーブル(常に空)
 CREATE TABLE balance_checks (
@@ -204,7 +209,9 @@ CREATE TABLE chinchiro_games (
   created_at TEXT DEFAULT (datetime('now'))
 );
 
-CREATE INDEX idx_chinchiro_games_pc ON chinchiro_games(pc_id);
+CREATE INDEX idx_chinchiro_games_pc_time ON chinchiro_games(pc_id, created_at);
+CREATE INDEX idx_chinchiro_games_dealer_time ON chinchiro_games(dealer_pc_id, created_at);
+CREATE INDEX idx_chinchiro_games_time ON chinchiro_games(created_at);
 
 -- チンチロの古い勝負記録を、PC・ディーラー・月(日本時間)ごとにまとめた月計
 -- 管理者画面の「履歴の圧縮」で、7日より前の勝負を chinchiro_games からここへ移す
@@ -242,7 +249,8 @@ CREATE TABLE money_logs (
   created_at TEXT DEFAULT (datetime('now'))
 );
 
-CREATE INDEX idx_money_logs_pc ON money_logs(pc_id);
+CREATE INDEX idx_money_logs_pc_time ON money_logs(pc_id, created_at);
+CREATE INDEX idx_money_logs_time ON money_logs(created_at);
 
 -- ログイン失敗の記録(総当たり対策。古い記録はログイン時に削除する)
 CREATE TABLE login_attempts (
@@ -273,3 +281,30 @@ CREATE TABLE pc_items (
 );
 
 CREATE INDEX idx_pc_items_pc ON pc_items(pc_id);
+
+-- カジノの「Showdown」(魔術《Showdown》を元にした、ディーラーとのカード勝負)
+-- 設定(配当・嘘の確率・Raise の料金と回数・1日の回数・プレイヤーのダイス・ディーラー)は casino_settings に showdown_ で始まるキーで置く
+CREATE TABLE showdown_games (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  pc_id INTEGER NOT NULL,
+  bet INTEGER NOT NULL,
+  raises INTEGER NOT NULL DEFAULT 0, -- 公開札を破った回数
+  raise_fee_total INTEGER NOT NULL DEFAULT 0, -- Raise で払った合計
+  cards TEXT NOT NULL, -- JSON 7枠(左4枠が公開札、右3枠が手札。破れた枠は null)
+  declared TEXT NOT NULL, -- ディーラーが宣言している役
+  status TEXT NOT NULL DEFAULT 'playing' CHECK (status IN ('playing', 'win', 'lose', 'push', 'fold')),
+  hand TEXT, -- 勝負したときの実際の役
+  result TEXT, -- JSON 勝負の詳細(最終の札・役に使った札・ダメージ・ダイス・嘘だったか)
+  payout INTEGER NOT NULL DEFAULT 0, -- 戻った金額(掛金込み)
+  net INTEGER NOT NULL DEFAULT 0, -- 所持金の増減(勝負中は 掛金とRaiseの料金の分のマイナス)
+  dealer_pc_id INTEGER, -- 終わったときのディーラー
+  dealer_delta INTEGER NOT NULL DEFAULT 0, -- ディーラーの所持金の増減
+  played_by INTEGER NOT NULL,
+  created_at TEXT DEFAULT (datetime('now')),
+  finished_at TEXT
+);
+CREATE INDEX idx_showdown_games_pc_time ON showdown_games(pc_id, created_at);
+CREATE INDEX idx_showdown_games_dealer_time ON showdown_games(dealer_pc_id, created_at);
+CREATE INDEX idx_showdown_games_time ON showdown_games(created_at);
+-- 1つのPCが同時に進められる勝負は1つだけ
+CREATE UNIQUE INDEX idx_showdown_games_playing ON showdown_games(pc_id) WHERE status = 'playing';

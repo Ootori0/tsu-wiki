@@ -10,6 +10,6 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 401, statusMessage: 'ログインが必要です' })
   }
 
-  const { results } = await cached('permissions', () => db.prepare('SELECT * FROM permissions ORDER BY name ASC').all())
+  const { results } = await cached(event, 'permissions', () => db.prepare('SELECT * FROM permissions ORDER BY name ASC').all())
   return results
 })

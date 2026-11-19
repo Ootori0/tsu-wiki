@@ -7,6 +7,8 @@ export const MONEY_LOG_KIND_LABELS = {
   dealer: 'ディーラー',
   casino_month: 'カジノ月計',
   dealer_month: 'ディーラー月計',
+  showdown: 'Showdown',
+  showdown_dealer: 'ディーラー',
   settle: '清算',
   mode: '切替',
 }
@@ -29,8 +31,17 @@ export function describeMoneyLog(log) {
       const [month, plays] = String(log.detail).split('/')
       return `チンチロ ${log.sub ?? '(削除済みPC)'}の${monthLabel(month)}の${plays}回分`
     }
+    case 'showdown': return `Showdown ${showdownResultLabel(log.detail)}(掛金${formatMoney(log.sub)})`
+    case 'showdown_dealer': return `Showdown ${log.sub ?? '(削除済みPC)'}の${showdownResultLabel(log.detail)}`
     default: return log.detail
   }
+}
+
+// Showdown の履歴の表示: 勝負した役、または「降りた」「勝負中」
+function showdownResultLabel(detail) {
+  if (detail === 'fold') return '降りた'
+  if (detail === 'playing') return '勝負中'
+  return SHOWDOWN_HANDS.find((h) => h.key === detail)?.label ?? detail
 }
 
 // 'YYYY-MM' → 'YYYY年M月'

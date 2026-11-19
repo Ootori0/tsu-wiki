@@ -12,7 +12,7 @@ export default defineEventHandler(async (event) => {
   const type = query.type
 
   // 全件をキャッシュし、区分・閲覧権限での絞り込みはリクエストごとに行う
-  const all = await cached('magics', async () => {
+  const all = await cached(event, 'magics', async () => {
     const { results } = await db.prepare(`${MAGIC_SELECT} ORDER BY magics.id DESC`).all()
     return results.map((r) => ({
       ...r,

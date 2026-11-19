@@ -4,7 +4,7 @@ import { cached } from '../utils/cache'
 export default defineEventHandler(async (event) => {
   const db = event.context.cloudflare.env.tsu_wiki_db
 
-  const { results } = await cached('pcs', () =>
+  const { results } = await cached(event, 'pcs', () =>
     db.prepare('SELECT * FROM pcs ORDER BY affiliation ASC, no_grade ASC, grade ASC, name ASC').all()
   )
 
