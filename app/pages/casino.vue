@@ -1,7 +1,9 @@
 <script setup>
 definePageMeta({ middleware: 'auth' })
 
-const { myPcs, refreshMyPcs, selectedPcId, selectedPc } = await useMyPcs()
+const { user, myPcs, refreshMyPcs, selectedPcId, selectedPc } = await useMyPcs()
+// Showdown(裏ページ)は公開前のため、一時的に admin だけに見せる(サーバー側でも admin 以外は断る)
+const canSeeShowdown = computed(() => !!user.value?.permissions?.includes('admin'))
 
 const { data: payoutData } = await useCachedFetch('/api/casino/chinchiro/payouts', {
   key: 'chinchiro-payouts',
@@ -247,7 +249,7 @@ const play = async () => {
       <p v-if="(games ?? []).length === 0" class="empty">まだ遊んでいません</p>
     </section>
 
-    <ShowdownTable v-if="(myPcs ?? []).length" />
+    <ShowdownTable v-if="canSeeShowdown && (myPcs ?? []).length" />
   </div>
 </template>
 
