@@ -42,6 +42,7 @@ const locked = computed(() => busy.value || animating.value)
 const errorMessage = ref('')
 const raiseMode = ref(false)
 const logBox = ref(null)
+const tableEl = ref(null)
 
 let reduceMotion = false
 onMounted(() => {
@@ -294,6 +295,9 @@ const run = async (fn) => {
 }
 
 const start = () => run(() => {
+  // 卓を画面の上に合わせ、卓から操作ボタンまでを1画面で見られるようにする
+  const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+  tableEl.value?.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' })
   finished.value = null
   raiseMode.value = false
   logs.value = []
@@ -329,7 +333,7 @@ const RESULT_LABELS = { win: 'あなたの勝ち', lose: 'ディーラーの勝�
     <p v-if="settings?.dealerPcName" class="dealer-info">ディーラー: <strong>{{ settings.dealerPcName }}</strong></p>
 
     <!-- 卓 -->
-    <div class="table">
+    <div ref="tableEl" class="table">
       <div class="declare">
         <Transition name="declare" mode="out-in">
           <div v-if="declared" :key="declared" class="declare-inner">
@@ -440,11 +444,6 @@ const RESULT_LABELS = { win: 'あなたの勝ち', lose: 'ディーラーの勝�
       </div>
     </div>
 
-    <!-- ログ -->
-    <div v-if="logs.length" ref="logBox" class="log" aria-live="polite">
-      <p v-for="l in logs" :key="l.id" class="log-line" :class="l.cls.split(' ').filter(Boolean).map((c) => `l-${c}`)">{{ l.text }}</p>
-    </div>
-
     <!-- 結果 -->
     <Transition name="result">
       <div v-if="finished && !animating" class="result" :class="finished.status">
@@ -463,26 +462,26 @@ const RESULT_LABELS = { win: 'あなたの勝ち', lose: 'ディーラーの勝�
     <!-- 操作 -->
     <Transition name="fade" mode="out-in">
       <div v-if="game && !finished" key="actions" class="actions">
-        <p class="turn-note">あなたのターン(どの行動も MP {{ dice(settings?.playerAttackCost) }} を使う攻撃です)</p>
-        <button class="play-btn" :disabled="locked" @click="act('call')">
-          Call<small>勝負する</small>
-        </button>
-        <div class="sub-actions">
+        <p class="turn-note">
+          <span>{{ raiseMode ? '攻撃する公開札を選んでください' : `あなたのターン(どの行動も MP ${dice(settings?.playerAttackCost)})` }}</span>
+          <button class="resign-btn" :disabled="locked" @click="showResign = true">投了する</button>
+        </p>
+        <div class="main-actions">
+          <button class="sub-btn call-btn" :disabled="locked" @click="act('call')">
+            Call<small>勝負する</small>
+          </button>
           <button
             class="sub-btn"
             :class="{ active: raiseMode }"
             :disabled="locked || !slots.slice(0, PUBLIC).some((s) => s.card)"
             @click="raiseMode = !raiseMode"
           >
-            Raise
-            <small>{{ raiseMode ? '攻撃する札を選んでください' : '公開札を攻撃(13ごとに1枚破れる)' }}</small>
+            Raise<small>{{ raiseMode ? 'やめる' : '公開札を攻撃' }}</small>
           </button>
           <button class="sub-btn" :disabled="locked" @click="act('check')">
-            Check
-            <small>ディーラーに通常攻撃({{ dice(settings?.playerDice) }})</small>
+            Check<small>通常攻撃 {{ dice(settings?.playerDice) }}</small>
           </button>
         </div>
-        <button class="resign-btn" :disabled="locked" @click="showResign = true">投了する</button>
       </div>
 
       <div v-else-if="selectedPc && !game && !animating" key="start" class="start">
@@ -491,6 +490,11 @@ const RESULT_LABELS = { win: 'あなたの勝ち', lose: 'ディーラーの勝�
         <button class="play-btn" :disabled="!canStart" @click="start">{{ finished ? 'もう一度勝負する' : '勝負を始める' }}</button>
       </div>
     </Transition>
+
+    <!-- ログ -->
+    <div v-if="logs.length" ref="logBox" class="log" aria-live="polite">
+      <p v-for="l in logs" :key="l.id" class="log-line" :class="l.cls.split(' ').filter(Boolean).map((c) => `l-${c}`)">{{ l.text }}</p>
+    </div>
 
     <ConfirmDialog
       v-model="showResign"
@@ -659,6 +663,7 @@ const RESULT_LABELS = { win: 'あなたの勝ち', lose: 'ディーラーの勝�
 
 /* ---------- 卓 ---------- */
 .table {
+  scroll-margin-top: 72px;
   padding: 12px 10px 14px;
   background: radial-gradient(ellipse at center, #14532d 0%, #0d3b1e 70%);
   border: 2px solid #000;
@@ -1169,16 +1174,28 @@ const RESULT_LABELS = { win: 'あなたの勝ち', lose: 'ディーラーの勝�
 }
 
 .turn-note {
-  margin: 0 0 4px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0 0 6px;
   font-size: 0.75rem;
+}
+
+.turn-note > span {
   opacity: 0.75;
 }
 
-.sub-actions {
+.main-actions {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, 1fr);
   gap: 8px;
-  margin-top: 10px;
+}
+
+.call-btn {
+  background: var(--color-accent, #ffd400);
+  color: #000;
+  box-shadow: 3px 3px 0 #000;
 }
 
 .sub-btn {
@@ -1222,9 +1239,9 @@ const RESULT_LABELS = { win: 'あなたの勝ち', lose: 'ディーラーの勝�
 }
 
 .resign-btn {
-  display: block;
-  margin: 10px 0 0 auto;
+  flex-shrink: 0;
   min-height: 40px;
+  padding: 0 4px;
   border: none;
   background: none;
   color: var(--color-error, #c62828);
@@ -1389,6 +1406,59 @@ const RESULT_LABELS = { win: 'あなたの勝ち', lose: 'ディーラーの勝�
   text-align: center;
   font-size: 0.8rem;
   opacity: 0.6;
+}
+
+/* スマホ: 卓・ダイス・MP・操作が1画面に収まるように詰める */
+@media (max-width: 600px) {
+  .table {
+    padding: 8px 8px 10px;
+  }
+
+  .declare {
+    min-height: 52px;
+    margin-bottom: 6px;
+  }
+
+  .declare-hand {
+    font-size: 1.15rem;
+  }
+
+  .cards {
+    gap: 8px;
+  }
+
+  .card-row {
+    gap: 8px;
+  }
+
+  .slot {
+    width: 46px;
+    height: 64px;
+  }
+
+  .card-num {
+    font-size: 1.1rem;
+  }
+
+  .card-suit {
+    font-size: 1rem;
+  }
+
+  .stage {
+    grid-template-rows: 16px minmax(36px, auto) 24px;
+    min-height: 92px;
+    margin-top: 8px;
+    padding: 4px 6px;
+  }
+
+  .mp-board {
+    gap: 4px;
+    margin-top: 8px;
+  }
+
+  .actions {
+    margin-top: 8px;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -181,6 +181,7 @@ function mitigation(defLevel, atkLevel) {
 function createRun(state, settings) {
   const s = { ...state, cards: [...state.cards] }
   const events = []
+  // MP が0を下回っても、その攻撃(行動)は最後まで処理し、行動の区切りで終わりを確かめる
   const ended = () => s.playerMp < 0 || s.dealerMp < 0
   const push = (e) => events.push(e)
   const buff = () => (s.cards.some(Boolean) ? handBuff(s.declared) : handBuff('high'))
@@ -205,7 +206,6 @@ function createRun(state, settings) {
     pay('dealer', Math.max(0, total(roll(7, 4)) - 4), '札配り')
     s.cards = fillEmpty(Array(SLOTS).fill(null)).cards
     push({ t: 'flop', public: s.cards.slice(0, PUBLIC_SLOTS) })
-    if (ended()) return
     declare('flop')
   }
 
@@ -261,7 +261,6 @@ function createRun(state, settings) {
   const playerCheck = () => {
     push({ t: 'action', who: 'player', action: 'check' })
     attackCost('player')
-    if (ended()) return
     const atk = playerAttack('通常攻撃')
     if (atk) dealerTakes(atk, '通常攻撃')
   }
@@ -269,7 +268,6 @@ function createRun(state, settings) {
   const playerRaise = (slot) => {
     push({ t: 'action', who: 'player', action: 'raise', slot })
     attackCost('player')
-    if (ended()) return
     const atk = playerAttack('Raise')
     if (!atk) return
     // 札は回避できない。ダメージ13ごとに1枚破れる(選んだ札から、残っている公開札へ順に)
@@ -286,7 +284,6 @@ function createRun(state, settings) {
   const showdown = () => {
     push({ t: 'action', who: 'player', action: 'call' })
     attackCost('player')
-    if (ended()) return
     push({ t: 'reveal', hidden: s.cards.slice(PUBLIC_SLOTS) })
     // 嘘かどうかは、空札を引き直す前の札で確かめる
     const check = bestHand(s.cards)
@@ -299,7 +296,6 @@ function createRun(state, settings) {
       const r = fillEmpty(s.cards)
       s.cards = r.cards
       push({ t: 'redraw', slots: r.filled, cards: Object.fromEntries(r.filled.map((i) => [i, s.cards[i]])) })
-      if (ended()) return
     }
     const final = bestHand(s.cards)
     push({ t: 'final', hand: final.key, cards: final.roleCards })
@@ -318,13 +314,11 @@ function createRun(state, settings) {
         push({ t: 'roll', who: 'dealer', skill: '回避', kind: '勝負', ...d })
         dealerTakes(atk, '勝負', { levels: [sd.level, d.level] })
       }
-      if (!ended()) {
-        if (!sd.level) {
-          push({ t: 'miss', who: 'dealer', kind: '反撃' })
-        } else {
-          const dice = roll(b.mult, 13)
-          playerTakes(total(dice), sd.level, '反撃', dice)
-        }
+      if (!sd.level) {
+        push({ t: 'miss', who: 'dealer', kind: '反撃' })
+      } else {
+        const dice = roll(b.mult, 13)
+        playerTakes(total(dice), sd.level, '反撃', dice)
       }
     }
     if (ended()) return
@@ -342,15 +336,14 @@ function createRun(state, settings) {
       return
     }
     const hand = bestHand(s.cards)
-    // 破る意味のある札: 役に使っていない札のうち一番弱いもの
+    // 破る意味のある札: 役に使っていない公開札のうち一番弱いもの(ディーラーは伏せ札を破れない)
     const candidates = s.cards
       .map((c, i) => ({ c, i }))
-      .filter(({ c }) => c && c !== 'JK' && !hand.roleCards.includes(c))
+      .filter(({ c, i }) => i < PUBLIC_SLOTS && c && c !== 'JK' && !hand.roleCards.includes(c))
       .sort((a, b) => Number(a.c.slice(1)) - Number(b.c.slice(1)))
     if (candidates.length && randInt(100) < settings.dealerRaiseRate) {
       push({ t: 'action', who: 'dealer', action: 'raise' })
       attackCost('dealer')
-      if (ended()) return
       const slot = candidates[0].i
       s.cards[slot] = null
       push({ t: 'tear', by: 'dealer', slots: [slot] })
@@ -358,7 +351,6 @@ function createRun(state, settings) {
     } else {
       push({ t: 'action', who: 'dealer', action: 'check' })
       attackCost('dealer')
-      if (ended()) return
       const b = buff()
       const r = skillRoll(settings.skill, { straight: b.straight })
       push({ t: 'roll', who: 'dealer', skill: '攻撃', kind: '通常攻撃', ...r })
