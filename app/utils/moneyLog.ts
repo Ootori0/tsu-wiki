@@ -29,7 +29,7 @@ export function describeMoneyLog(log) {
     }
     case 'dealer_month': {
       const [month, plays] = String(log.detail).split('/')
-      return `チンチロ ${log.sub ?? '(削除済みPC)'}の${monthLabel(month)}の${plays}回分`
+      return `チンチロ ディーラーとして${monthLabel(month)}の${plays}回分(${log.sub}人)`
     }
     case 'showdown': return Number(log.sub) > 0 ? `Showdown ${showdownResultLabel(log.detail)}(掛金${formatMoney(log.sub)})` : `Showdown ${showdownResultLabel(log.detail)}`
     case 'showdown_dealer': return `Showdown ${log.sub ?? '(削除済みPC)'}の${showdownResultLabel(log.detail)}`

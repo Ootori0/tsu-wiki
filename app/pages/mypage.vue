@@ -992,7 +992,7 @@ const confirmPcDelete = async () => {
           <div class="check-grid">
             <label class="check-label">
               <input v-model="drafts[item.id].isRepresentative" type="checkbox" />
-              協会の代表
+              協会の会長
             </label>
             <label class="check-label">
               <input v-model="drafts[item.id].isOfficeRepresentative" type="checkbox" />
@@ -1492,7 +1492,7 @@ const confirmPcDelete = async () => {
 
       <label class="check-label">
         <input v-model="pcForm.isRepresentative" type="checkbox" />
-        協会の代表
+        協会の会長
       </label>
 
       <label class="check-label">

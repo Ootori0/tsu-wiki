@@ -3,7 +3,7 @@
 //       purchase …… 購入(販売者への支払いも取り消し、在庫を戻す。割引で買ったものは割引の在庫へ。持ち込みは在庫を戻さない)
 //       sale ……… 販売者への支払い1件
 //       casino/dealer … チンチロの勝負(プレイヤーとディーラーの両方の増減を取り消す)
-//       casino_month/dealer_month … 圧縮したチンチロの月計(同上)
+//       casino_month … 圧縮したチンチロの月計(同上) / dealer_month … ディーラー・月ごとにまとめた月計(同上)
 const moneyLog = {
   table: 'money_logs',
   statements: (db, id) => [
@@ -44,6 +44,27 @@ const monthly = {
     ).bind(id),
     db.prepare('DELETE FROM chinchiro_monthly WHERE id = ?').bind(id),
   ],
+}
+
+// ディーラー月計(ディーラー・月ごとにまとめて出しているので、同じディーラー・同じ月の月計をすべて取り消す。
+// id はまとめた月計のうちの1つ。プレイヤーとディーラーの両方の増減を取り消す)
+const dealerMonthly = {
+  table: 'chinchiro_monthly',
+  statements: (db, id) => {
+    const group = `SELECT g.id FROM chinchiro_monthly g, chinchiro_monthly t
+                   WHERE t.id = ?1 AND g.dealer_pc_id = t.dealer_pc_id AND g.month = t.month`
+    return [
+      db.prepare(
+        `UPDATE pcs SET money = money - (SELECT COALESCE(SUM(net_total), 0) FROM chinchiro_monthly WHERE pc_id = pcs.id AND id IN (${group}))
+         WHERE id IN (SELECT pc_id FROM chinchiro_monthly WHERE id IN (${group}))`
+      ).bind(id),
+      db.prepare(
+        `UPDATE pcs SET money = money - (SELECT COALESCE(SUM(dealer_delta_total), 0) FROM chinchiro_monthly WHERE dealer_pc_id = pcs.id AND id IN (${group}))
+         WHERE id = (SELECT dealer_pc_id FROM chinchiro_monthly WHERE id = ?1)`
+      ).bind(id),
+      db.prepare(`DELETE FROM chinchiro_monthly WHERE id IN (${group})`).bind(id),
+    ]
+  },
 }
 
 // Showdown の勝負(プレイヤーとディーラーの両方の増減を取り消す。勝負中なら払った掛金が戻る)
@@ -123,7 +144,7 @@ export const HISTORY_TARGETS = {
   casino: game,
   dealer: game,
   casino_month: monthly,
-  dealer_month: monthly,
+  dealer_month: dealerMonthly,
   showdown,
   showdown_dealer: showdown,
 }
