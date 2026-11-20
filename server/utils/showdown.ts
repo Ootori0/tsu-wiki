@@ -3,7 +3,7 @@ import { todayStartUtc, dealerDeltaOf } from './chinchiro'
 import { FULL_DECK, HAND_KEYS, bestHand, handRank } from '../../shared/utils/showdownCards'
 
 // カジノの「Showdown」(魔術《Showdown》を元にした、ディーラーとのカード勝負)
-// 1. 掛金を払うと、ディーラーが53枚から7枚を引く(左4枚が公開札、右3枚が手札)。ディーラーは役を宣言する(嘘のこともある)
+// 1. 掛金を払うと、ディーラーが53枚から7枚を引く(4枚が公開札、3枚が伏せ札)。ディーラーは役を宣言する(嘘のこともある)
 // 2. プレイヤーは Raise(料金を払って公開札を1枚破る)/ Check(降りて掛金の半分を受け取る)/ Call(勝負)を選ぶ
 // 3. 勝負では空札を引き直し、7枚から一番強い5枚で実際の役を決める
 //    - 実際の役が宣言より弱い(嘘): プレイヤーの勝ち。宣言した役の倍率で払い戻す
@@ -124,15 +124,27 @@ export function declareHand(cards, bluffRate) {
 }
 
 // 勝負: 空札を引き直して決着をつける
+// 嘘かどうかは、破れた枠を引き直す前の札で確かめる(魔術《Showdown》と同じ順)
+// 宣言どおりなら、破れた枠を引き直した7枚で役とダメージを決める
 export function resolveShowdown(game, settings) {
-  const cards = fillEmpty(game.cards)
-  const hand = bestHand(cards)
-  const declaredRank = handRank(game.declared)
-  const bluff = hand.rank < declaredRank
-  const detail = { cards, handCards: hand.roleCards, hand: hand.key, declared: game.declared, bluff, sum: hand.sum, dealerDamage: hand.damage }
+  const check = bestHand(game.cards)
+  const bluff = check.rank < handRank(game.declared)
+  const base = {
+    declared: game.declared,
+    bluff,
+    checkHand: check.key, // 引き直す前の役(嘘の判定に使った役)
+    checkCards: check.roleCards,
+  }
 
   if (bluff) {
-    return { status: 'win', payout: Math.floor(game.bet * settings.payouts[game.declared]), hand: hand.key, detail }
+    const detail = { ...base, cards: game.cards, hand: check.key, handCards: check.roleCards, handValues: check.roleValues }
+    return { status: 'win', payout: Math.floor(game.bet * settings.payouts[game.declared]), hand: check.key, detail }
+  }
+
+  const cards = fillEmpty(game.cards)
+  const hand = bestHand(cards)
+  const detail = {
+    ...base, cards, hand: hand.key, handCards: hand.roleCards, handValues: hand.roleValues, sum: hand.sum, dealerDamage: hand.damage,
   }
   const dice = rollDice(settings.diceCount, settings.diceSides)
   const playerDamage = dice.reduce((a, b) => a + b, 0)
@@ -154,7 +166,7 @@ export function countShowdownToday(db, pcId) {
     .bind(pcId, todayStartUtc())
 }
 
-// 画面に返す形(勝負中は手札を伏せる)
+// 画面に返す形(勝負中は伏せ札を見せない)
 export function publicGame(row) {
   if (!row) return null
   const cards = JSON.parse(row.cards)

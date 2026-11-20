@@ -73,21 +73,17 @@ function evalFive(cards, wild) {
   return { rank: 0, used: [], joker: null, sum: sum(nums) }
 }
 
-// 5枚のうち、役に使った札(ワンペアなら2枚)。Joker を使っていれば Joker も含む
+// 5枚のうち、役に使った札(ワンペアなら2枚)と、それぞれの数字(Joker は表した数字)。
+// 同じ数字の札が並ぶように、役の数字の順(used の順)に並べて返す
 function roleCardsOf(five, r) {
-  const need = [...r.used]
-  if (r.joker !== null) need.splice(need.indexOf(r.joker), 1)
+  const rest = [...five]
   const out = []
-  for (const c of five) {
-    if (c === JOKER) {
-      if (r.joker !== null) out.push(c)
-      continue
-    }
-    const i = need.indexOf(numOf(c))
-    if (i !== -1) {
-      need.splice(i, 1)
-      out.push(c)
-    }
+  for (const n of r.used) {
+    let i = rest.findIndex((c) => c !== JOKER && numOf(c) === n)
+    if (i === -1) i = rest.indexOf(JOKER)
+    if (i === -1) continue
+    out.push({ card: rest[i], value: n })
+    rest.splice(i, 1)
   }
   return out
 }
@@ -113,13 +109,15 @@ export function bestHand(cards) {
     const r = evalFive(plain, five.length - plain.length)
     const sum = r.used.reduce((a, b) => a + b, 0)
     if (!best || r.rank > best.rank || (r.rank === best.rank && sum > best.sum)) {
-      best = { rank: r.rank, sum, cards: five, roleCards: roleCardsOf(five, r) }
+      best = { rank: r.rank, sum, cards: five, role: roleCardsOf(five, r) }
     }
   }
-  if (!best) best = { rank: 0, sum: 0, cards: [], roleCards: [] }
+  if (!best) best = { rank: 0, sum: 0, cards: [], role: [] }
   const hand = SHOWDOWN_HANDS[best.rank]
   return {
-    key: hand.key, label: hand.label, rank: best.rank, cards: best.cards, roleCards: best.roleCards,
+    key: hand.key, label: hand.label, rank: best.rank, cards: best.cards,
+    roleCards: best.role.map((x) => x.card), // 役に使った札
+    roleValues: best.role.map((x) => x.value), // その数字(ダメージの計算に使う)
     sum: best.sum, damage: Math.round(best.sum * hand.damage),
   }
 }

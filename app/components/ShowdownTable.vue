@@ -11,6 +11,11 @@ const { data: state, refresh: refreshState } = await useFetch('/api/casino/showd
 })
 
 const PUBLIC = 4
+// 卓の段: 上が伏せ札(枠 4〜6)、下が公開札(枠 0〜3)
+const ROWS = [
+  { label: '伏せ札', slots: [4, 5, 6] },
+  { label: '公開札', slots: [0, 1, 2, 3] },
+]
 const settings = computed(() => state.value?.settings ?? null)
 const game = computed(() => state.value?.game ?? null)
 // 終わった直後の勝負(結果を見せる。次の勝負を始めるまで残す)
@@ -25,11 +30,15 @@ const raisesLeft = computed(() => Math.max(0, (settings.value?.raiseMax ?? 0) - 
 
 // --- 卓の表示 ---
 // card: 札 / up: 表向き / dealt: 卓に置かれている / torn: 破れた枠 / tearing: 破れている途中 / used: 役に使った札
-const emptySlot = () => ({ card: null, up: false, dealt: false, torn: false, tearing: false, used: false })
+const emptySlot = () => ({ card: null, up: false, dealt: false, torn: false, tearing: false, used: false, checked: false })
 const slots = ref(Array.from({ length: 7 }, emptySlot))
 const declaredShown = ref(null)
 const animating = ref(false)
-const diceShown = ref(null)
+const clearProgress = () => {
+  verdict.value = null
+  calc.value = null
+  diceShown.value = null
+}
 
 // 動きを減らす設定の人には待ち時間なしで表示する
 let reduceMotion = false
@@ -66,7 +75,7 @@ watch(game, (g) => {
 }, { immediate: true })
 watch(selectedPcId, () => {
   finished.value = null
-  diceShown.value = null
+  clearProgress()
 })
 
 // --- 掛金(チンチロと同じく100万円単位) ---
@@ -104,7 +113,7 @@ const run = async (fn) => {
 // 配る: 前の札を片付け、7枚を1枚ずつ置いてから公開札を順にめくる
 const start = () => run(async () => {
   raiseMode.value = false
-  diceShown.value = null
+  clearProgress()
   if (finished.value || slots.value.some((s) => s.dealt)) {
     finished.value = null
     slots.value = slots.value.map((s) => ({ ...s, dealt: false, used: false }))
@@ -114,7 +123,8 @@ const start = () => run(async () => {
   const res = await $fetch('/api/casino/showdown/start', { method: 'POST', body: { pcId: selectedPcId.value, bet: effectiveBet.value } })
   const g = res.game
   slots.value = Array.from({ length: 7 }, (_, i) => ({ ...emptySlot(), card: i < PUBLIC ? g.publicCards[i] : null }))
-  for (let i = 0; i < 7; i++) {
+  // 上の段の伏せ札から、下の段の公開札へと順に置く
+  for (const i of [4, 5, 6, 0, 1, 2, 3]) {
     slots.value[i].dealt = true
     await wait(110)
   }
@@ -140,12 +150,35 @@ const raise = (i) => run(async () => {
   declaredShown.value = res.game.declared
 })
 
-// 勝負・降りる: 手札を1枚ずつ開き、勝負なら破れた枠を引き直してから結果を出す
+// 勝負の途中経過の表示
+const verdict = ref(null) // 嘘の判定: { bluff, declared, actual }
+const calc = ref(null) // ディーラーのダメージの計算: { terms: 加えた数字, mult, sum, damage, done }
+const diceShown = ref(null) // プレイヤーのダイス(まだ止まっていない分は null)
+const rollingDie = ref(-1) // 転がっているダイスの番号
+
+// 役に使った札を光らせる順: ペアの役(ワンペア・ツーペア)は2枚ずつ、それ以外は1枚ずつ
+const roleGroups = (handKey, cards, values) => {
+  const groups = []
+  const byTwo = handKey === 'one_pair' || handKey === 'two_pair'
+  for (let k = 0; k < cards.length; k += byTwo ? 2 : 1) {
+    groups.push({ cards: cards.slice(k, k + (byTwo ? 2 : 1)), values: values.slice(k, k + (byTwo ? 2 : 1)) })
+  }
+  return groups
+}
+const highlight = (cards, cls) => {
+  slots.value = slots.value.map((s) => ({ ...s, [cls]: s[cls] || (!!s.card && cards.includes(s.card)) }))
+}
+
+// 勝負・降りる
+// 1. 伏せ札を1枚ずつ開く(降りたらここで終わり)
+// 2. 破れた枠を引き直す前の札で、宣言が嘘かどうかを見せる(嘘ならここで終わり)
+// 3. 破れた枠に札を引き直し、役に使った札を順に光らせながらダメージの計算を組み立てる
+// 4. プレイヤーのダイスを1つずつ転がして止める
 const finish = (action) => run(async () => {
   raiseMode.value = false
   const res = await $fetch('/api/casino/showdown/action', { method: 'POST', body: { gameId: game.value.id, action } })
   const g = res.game
-  const role = g.result?.handCards ?? []
+  const r = g.result ?? {}
 
   for (let j = 0; j < 3; j++) {
     const i = PUBLIC + j
@@ -154,27 +187,52 @@ const finish = (action) => run(async () => {
     slots.value[i].up = true
     await wait(380)
   }
+
   if (action === 'call') {
-    // 破れた枠に新しい札が来る
-    for (let i = 0; i < PUBLIC; i++) {
-      if (slots.value[i].card) continue
-      slots.value[i] = { ...emptySlot(), card: g.publicCards[i] }
-      await wait(40)
-      slots.value[i].dealt = true
-      await wait(220)
-      slots.value[i].up = true
-      await wait(300)
-    }
+    // 2. 嘘の判定(引き直す前の役)
     await wait(250)
-    slots.value = slots.value.map((s) => ({ ...s, used: !!s.card && role.includes(s.card) }))
-    // ダイスを転がしてから止める
-    if (g.result?.dice) {
-      const sides = settings.value?.diceSides ?? 10
-      for (let k = 0; k < 8; k++) {
-        diceShown.value = g.result.dice.map(() => 1 + Math.floor(Math.random() * sides))
-        await wait(70)
+    highlight(r.checkCards ?? [], 'checked')
+    verdict.value = { bluff: r.bluff, declared: r.declared, actual: r.checkHand }
+    await wait(900)
+
+    if (!r.bluff) {
+      slots.value = slots.value.map((s) => ({ ...s, checked: false }))
+      // 3. 破れた枠に新しい札が来る
+      for (let i = 0; i < PUBLIC; i++) {
+        if (slots.value[i].card) continue
+        slots.value[i] = { ...emptySlot(), card: g.publicCards[i] }
+        await wait(40)
+        slots.value[i].dealt = true
+        await wait(220)
+        slots.value[i].up = true
+        await wait(300)
       }
-      diceShown.value = g.result.dice
+      await wait(250)
+      const mult = SHOWDOWN_HANDS.find((h) => h.key === r.hand)?.damage ?? 0
+      calc.value = { hand: r.hand, terms: [], mult, sum: r.sum, damage: r.dealerDamage, done: false }
+      for (const grp of roleGroups(r.hand, r.handCards ?? [], r.handValues ?? [])) {
+        highlight(grp.cards, 'used')
+        calc.value.terms.push(...grp.values)
+        await wait(450)
+      }
+      calc.value.done = true
+      await wait(500)
+
+      // 4. ダイスを1つずつ転がして止める
+      if (r.dice) {
+        const sides = settings.value?.diceSides ?? 10
+        diceShown.value = r.dice.map(() => null)
+        for (let k = 0; k < r.dice.length; k++) {
+          rollingDie.value = k
+          for (let f = 0; f < 7; f++) {
+            diceShown.value[k] = 1 + Math.floor(Math.random() * sides)
+            await wait(60)
+          }
+          diceShown.value[k] = r.dice[k]
+          rollingDie.value = -1
+          await wait(280)
+        }
+      }
     }
     await wait(350)
   }
@@ -211,59 +269,92 @@ const resultLabel = (g) => RESULT_LABELS[g.status] ?? ''
         </Transition>
       </div>
 
+      <!-- 上の段が伏せ札、下の段が公開札 -->
       <div class="cards">
-        <div v-for="group in [{ label: '公開札', from: 0, to: PUBLIC }, { label: '手札', from: PUBLIC, to: 7 }]" :key="group.label" class="card-group">
-          <span class="group-label">{{ group.label }}</span>
+        <div v-for="row in ROWS" :key="row.label" class="card-group">
+          <span class="group-label">{{ row.label }}</span>
           <div class="card-row">
             <div
-              v-for="i in group.to - group.from"
-              :key="group.from + i"
+              v-for="i in row.slots"
+              :key="i"
               class="slot"
               :class="{
-                dealt: slots[group.from + i - 1].dealt,
-                tearing: slots[group.from + i - 1].tearing,
-                torn: slots[group.from + i - 1].torn,
-                target: raiseMode && group.from === 0 && slots[i - 1].card,
-                used: slots[group.from + i - 1].used,
+                dealt: slots[i].dealt,
+                tearing: slots[i].tearing,
+                torn: slots[i].torn,
+                target: raiseMode && i < PUBLIC && slots[i].card,
+                used: slots[i].used,
+                checked: slots[i].checked,
               }"
             >
-              <span v-if="slots[group.from + i - 1].torn" class="torn-mark">破れ</span>
+              <span v-if="slots[i].torn" class="torn-mark">破れ</span>
               <span v-else class="deal">
-              <button
-                class="card3d"
-                :class="{ up: slots[group.from + i - 1].up }"
-                :disabled="!(raiseMode && group.from === 0 && slots[i - 1].card) || locked"
-                :aria-label="slots[group.from + i - 1].up && slots[group.from + i - 1].card
-                  ? `${cardFace(slots[group.from + i - 1].card).suit}${cardFace(slots[group.from + i - 1].card).label}`
-                  : '伏せた札'"
-                @click="onCardClick(group.from + i - 1)"
-              >
-                <span
-                  class="face front"
-                  :class="{ red: cardFace(slots[group.from + i - 1].card)?.red, joker: cardFace(slots[group.from + i - 1].card)?.joker }"
+                <button
+                  class="card3d"
+                  :class="{ up: slots[i].up }"
+                  :disabled="!(raiseMode && i < PUBLIC && slots[i].card) || locked"
+                  :aria-label="slots[i].up && slots[i].card ? `${cardFace(slots[i].card).suit}${cardFace(slots[i].card).label}` : '伏せ札'"
+                  @click="onCardClick(i)"
                 >
-                  <template v-if="slots[group.from + i - 1].card">
-                    <span class="card-num">{{ cardFace(slots[group.from + i - 1].card).label }}</span>
-                    <span class="card-suit">{{ cardFace(slots[group.from + i - 1].card).suit }}</span>
-                  </template>
-                </span>
-                <span class="face back" />
-              </button>
+                  <span class="face front" :class="{ red: cardFace(slots[i].card)?.red, joker: cardFace(slots[i].card)?.joker }">
+                    <template v-if="slots[i].card">
+                      <span class="card-num">{{ cardFace(slots[i].card).label }}</span>
+                      <span class="card-suit">{{ cardFace(slots[i].card).suit }}</span>
+                    </template>
+                  </span>
+                  <span class="face back" />
+                </button>
               </span>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- 勝負のダイス -->
-      <Transition name="fade">
-        <p v-if="diceShown" class="dice-line">
-          あなたのダメージ <strong>{{ diceShown.reduce((a, b) => a + b, 0) }}</strong>
-          <span class="dice-faces">
-            <span v-for="(d, k) in diceShown" :key="k" class="die">{{ d }}</span>
-          </span>
-        </p>
-      </Transition>
+      <!-- 勝負の途中経過: 嘘の判定 → ディーラーのダメージの計算 → プレイヤーのダイス -->
+      <div v-if="verdict || calc || diceShown" class="progress">
+        <Transition name="pop">
+          <p v-if="verdict" class="verdict" :class="{ bluff: verdict.bluff }">
+            <template v-if="verdict.bluff">
+              嘘! 実際は<strong>{{ handLabelOf(verdict.actual) }}</strong>でした
+            </template>
+            <template v-else>
+              宣言どおり(<strong>{{ handLabelOf(verdict.actual) }}</strong>)
+            </template>
+          </p>
+        </Transition>
+        <Transition name="pop">
+          <p v-if="calc" class="calc">
+            <span class="calc-label">ディーラーのダメージ({{ handLabelOf(calc.hand) }})</span>
+            <span class="calc-expr">
+              <template v-if="calc.terms.length">
+                <TransitionGroup name="term">
+                  <span v-for="(t, k) in calc.terms" :key="k" class="term">{{ k ? ' + ' : '' }}{{ t }}</span>
+                </TransitionGroup>
+              </template>
+              <template v-else-if="calc.done">役に使う札なし</template>
+              <Transition name="pop">
+                <span v-if="calc.done" class="calc-total">
+                  <template v-if="calc.terms.length"> = {{ calc.sum }}</template> × {{ calc.mult }} = <strong>{{ calc.damage }}</strong>
+                </span>
+              </Transition>
+            </span>
+          </p>
+        </Transition>
+        <Transition name="pop">
+          <p v-if="diceShown" class="dice-line">
+            <span class="calc-label">あなたのダメージ({{ diceShown.length }}d{{ settings?.diceSides }})</span>
+            <span class="dice-faces">
+              <span
+                v-for="(d, k) in diceShown"
+                :key="k"
+                class="die"
+                :class="{ rolling: rollingDie === k, waiting: d === null }"
+              >{{ d ?? '?' }}</span>
+              <span class="dice-total">= <strong>{{ diceShown.reduce((a, b) => a + (b ?? 0), 0) }}</strong></span>
+            </span>
+          </p>
+        </Transition>
+      </div>
     </div>
 
     <!-- 結果 -->
@@ -332,13 +423,13 @@ const resultLabel = (g) => RESULT_LABELS[g.status] ?? ''
     <details class="payouts">
       <summary>ルールと配当</summary>
       <ol class="rule-list">
-        <li>掛金を払うと、ディーラーが53枚(Joker 1枚入り)から7枚を引きます。左4枚が公開札、右3枚が伏せた手札です。</li>
+        <li>掛金を払うと、ディーラーが53枚(Joker 1枚入り)から7枚を引きます。4枚が公開札、3枚が伏せ札です。</li>
         <li>ディーラーは役を1つ宣言します。宣言は嘘のこともあります。</li>
         <li><strong>Raise</strong>: 料金(掛金の{{ settings?.raiseFee }}%)を払って公開札を1枚破ります({{ settings?.raiseMax }}回まで)。破られるとディーラーは宣言をし直します。</li>
         <li><strong>Check</strong>: 勝負せずに降ります。掛金の半分が戻ります。</li>
-        <li><strong>Call</strong>: 手札を開き、破れた札を引き直して、7枚のうち一番強い5枚で役を決めます。
+        <li><strong>Call</strong>: 伏せ札を開き、まず破れた枠を引き直す前の札で宣言が嘘かどうかを確かめます。そのあと破れた枠を引き直し、7枚のうち一番強い5枚で役を決めます。
           <ul>
-            <li>実際の役が宣言より弱ければ(嘘)、あなたの勝ち。<strong>宣言された役</strong>の倍率で払い戻します。</li>
+            <li>引き直す前の役が宣言より弱ければ(嘘)、あなたの勝ち。<strong>宣言された役</strong>の倍率で払い戻します。</li>
             <li>宣言どおりなら、ディーラーのダメージ(役に使った札の数字の合計×ダメージ倍率)と、あなたのダメージ({{ settings?.diceCount }}d{{ settings?.diceSides }})を比べます。あなたの方が大きければ<strong>実際の役</strong>の倍率で払い戻し、同じなら掛金が戻ります。</li>
           </ul>
         </li>
@@ -457,15 +548,16 @@ const resultLabel = (g) => RESULT_LABELS[g.status] ?? ''
 
 .cards {
   display: flex;
-  gap: 10px;
-  justify-content: center;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
 }
 
 .card-group {
   display: flex;
   flex-direction: column;
+  align-items: center;
   gap: 4px;
-  min-width: 0;
 }
 
 .group-label {
@@ -475,15 +567,15 @@ const resultLabel = (g) => RESULT_LABELS[g.status] ?? ''
 
 .card-row {
   display: flex;
-  gap: 4px;
+  gap: 10px;
 }
 
 /* ---------- 札 ---------- */
-/* 枠(札が置かれていないときは点線の場所だけ見せる)。スマホ幅で7枚が1行に並ぶ大きさ */
+/* 枠(札が置かれていないときは点線の場所だけ見せる) */
 .slot {
   position: relative;
-  width: 40px;
-  height: 58px;
+  width: 52px;
+  height: 74px;
   border-radius: 4px;
   outline: 1px dashed rgba(255, 255, 255, 0.4);
   outline-offset: -1px;
@@ -554,7 +646,7 @@ const resultLabel = (g) => RESULT_LABELS[g.status] ?? ''
 }
 
 .front.joker .card-num {
-  font-size: 0.55rem;
+  font-size: 0.65rem;
   letter-spacing: 0.02em;
 }
 
@@ -564,11 +656,11 @@ const resultLabel = (g) => RESULT_LABELS[g.status] ?? ''
 }
 
 .card-num {
-  font-size: 1rem;
+  font-size: 1.25rem;
 }
 
 .card-suit {
-  font-size: 0.95rem;
+  font-size: 1.15rem;
 }
 
 /* Raise で選べる札は、浮き沈みして知らせる */
@@ -633,30 +725,102 @@ const resultLabel = (g) => RESULT_LABELS[g.status] ?? ''
   to { opacity: 1; }
 }
 
-/* ---------- ダイス ---------- */
-.dice-line {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  margin: 12px 0 0;
-  font-size: 0.8rem;
+/* 嘘の判定に使った札(引き直す前の役) */
+.slot.checked .face {
+  box-shadow: 0 0 0 3px #fff, 0 0 10px #fff;
 }
 
-.dice-line strong {
-  font-size: 1.1rem;
-  min-width: 1.6em;
+/* ---------- 勝負の途中経過 ---------- */
+.progress {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.verdict {
+  margin: 0;
+  padding: 6px 10px;
   text-align: center;
+  font-size: 0.9rem;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+}
+
+.verdict.bluff {
+  background: var(--color-accent, #ffd400);
+  color: #000;
+  border-color: #000;
+  font-weight: bold;
+}
+
+.calc,
+.dice-line {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+.calc-label {
+  font-size: 0.7rem;
+  color: var(--color-accent, #ffd400);
+}
+
+.calc-expr {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  font-variant-numeric: tabular-nums;
+}
+
+.term {
+  white-space: pre;
+}
+
+.calc-total strong,
+.dice-total strong {
+  font-size: 1.15rem;
+}
+
+.calc-total {
+  white-space: pre;
 }
 
 .dice-faces {
   display: flex;
-  gap: 4px;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.dice-total {
+  margin-left: 4px;
+}
+
+/* 足した数字が下から入る */
+.term-enter-active {
+  transition: transform 0.25s ease, opacity 0.25s ease;
+}
+
+.term-enter-from {
+  transform: translateY(6px);
+  opacity: 0;
+}
+
+.pop-enter-active {
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.2s ease;
+}
+
+.pop-enter-from {
+  transform: scale(0.85);
+  opacity: 0;
 }
 
 .die {
-  min-width: 26px;
-  height: 26px;
+  min-width: 28px;
+  height: 28px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -665,7 +829,24 @@ const resultLabel = (g) => RESULT_LABELS[g.status] ?? ''
   background: #fff;
   color: #000;
   font-weight: bold;
-  font-size: 0.8rem;
+  font-size: 0.85rem;
+}
+
+/* まだ振っていないダイス */
+.die.waiting {
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+/* 転がっているダイスは揺れる */
+.die.rolling {
+  animation: shake 0.12s linear infinite;
+}
+
+@keyframes shake {
+  0%, 100% { rotate: -8deg; }
+  50% { rotate: 8deg; }
 }
 
 /* ---------- 結果: 下から弾んで出る ---------- */
@@ -993,11 +1174,14 @@ const resultLabel = (g) => RESULT_LABELS[g.status] ?? ''
   .declare-enter-active,
   .declare-leave-active,
   .result-enter-active,
+  .pop-enter-active,
+  .term-enter-active,
   .row-enter-active {
     transition: none !important;
   }
 
   .slot .deal,
+  .die,
   .torn-mark {
     animation: none !important;
   }
