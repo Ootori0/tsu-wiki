@@ -337,7 +337,7 @@ const HISTORY_DELETE_NOTES = {
   dealer: 'プレイヤーとディーラーの両方の増減を取り消します。この勝負はその日のプレイ回数からも外れます。',
   casino_month: 'この月計にまとめた勝負すべてについて、プレイヤーとディーラーの両方の増減を取り消します。',
   dealer_month: 'この月計にまとめた勝負すべてについて、プレイヤーとディーラーの両方の増減を取り消します。',
-  showdown: 'プレイヤーとディーラーの両方の増減を取り消します(勝負中なら払った掛金と料金が戻ります)。この勝負はその日の回数からも外れます。',
+  showdown: 'プレイヤーとディーラーの両方の増減を取り消します(勝負中のものは所持金が変わっていないので、記録が消えるだけです)。この勝負はその日の回数からも外れます。',
   showdown_dealer: 'プレイヤーとディーラーの両方の増減を取り消します。この勝負はその日の回数からも外れます。',
 }
 
@@ -651,37 +651,33 @@ const saveShowdown = async () => {
 
       <div v-if="showdownForm" class="box">
         <h2 class="box-title">Showdown</h2>
-        <p class="item-meta">勝ったときの払い戻し倍率(掛金込み)。嘘を見破ったときは宣言された役、宣言どおりのときは実際の役の倍率を使います。初期値は「毎回すぐ勝負する」遊び方で還元率が約97%です。</p>
-        <table class="payout-table">
-          <tbody>
-            <tr>
-              <th>役</th>
-              <th>確率</th>
-              <th>ダメージ</th>
-              <th>倍率</th>
-            </tr>
-            <tr v-for="h in SHOWDOWN_HANDS" :key="h.key">
-              <td>{{ h.label }}</td>
-              <td class="item-meta">{{ SHOWDOWN_HAND_PROBABILITY[h.key] }}%</td>
-              <td class="item-meta">×{{ h.damage }}</td>
-              <td><input v-model.number="showdownForm.payouts[h.key]" type="number" min="0" step="0.01" class="field-input payout-input" /></td>
-            </tr>
-          </tbody>
-        </table>
+        <p class="item-meta">ディーラーと MP を削り合い、どちらかの MP が0を下回ったら (プレイヤーの MP − ディーラーの MP) × レート を精算します。</p>
+        <label class="field-label">技能値(攻撃・回避・《Showdown》。全員共通)</label>
+        <input v-model.number="showdownForm.skill" type="number" min="1" max="99" class="field-input" />
+        <label class="field-label">最初の MP(プレイヤー / ディーラー)</label>
+        <div class="dice-row">
+          <input v-model.number="showdownForm.playerMp" type="number" min="1" class="field-input" aria-label="プレイヤーの MP" />
+          <span>/</span>
+          <input v-model.number="showdownForm.dealerMp" type="number" min="1" class="field-input" aria-label="ディーラーの MP" />
+        </div>
+        <template v-for="d in [{ key: 'playerDice', label: 'プレイヤーの攻撃のダメージ' }, { key: 'dealerDice', label: 'ディーラーの通常攻撃のダメージ(これに役のバフが加わる)' }, { key: 'attackCost', label: '攻撃に使う MP' }]" :key="d.key">
+          <label class="field-label">{{ d.label }}</label>
+          <div class="dice-row">
+            <input v-model.number="showdownForm[d.key].count" type="number" min="1" max="30" class="field-input" aria-label="ダイスの数" />
+            <span>d</span>
+            <input v-model.number="showdownForm[d.key].sides" type="number" min="2" max="100" class="field-input" aria-label="ダイスの面" />
+          </div>
+        </template>
+        <label class="field-label">レート(1MPあたり、{{ MONEY_UNIT }})</label>
+        <input v-model.number="showdownForm.rate" type="number" min="0" class="field-input" />
         <label class="field-label">ディーラーが嘘をつく確率(%)</label>
         <input v-model.number="showdownForm.bluffRate" type="number" min="0" max="100" class="field-input" />
-        <label class="field-label">Raise 1回の料金(掛金の%)</label>
-        <input v-model.number="showdownForm.raiseFee" type="number" min="0" max="100" class="field-input" />
-        <label class="field-label">Raise できる回数</label>
-        <input v-model.number="showdownForm.raiseMax" type="number" min="0" max="4" class="field-input" />
+        <label class="field-label">ディーラーが Raise(自分の札を破る)を選ぶ確率(%)</label>
+        <input v-model.number="showdownForm.dealerRaiseRate" type="number" min="0" max="100" class="field-input" />
+        <label class="field-label">ディーラーがターン終了時に破れた札を引き直す確率(%)</label>
+        <input v-model.number="showdownForm.riverRate" type="number" min="0" max="100" class="field-input" />
         <label class="field-label">1日に遊べる回数(PCごと)</label>
         <input v-model.number="showdownForm.dailyLimit" type="number" min="1" max="100" class="field-input" />
-        <label class="field-label">プレイヤーのダメージ(ダイス)</label>
-        <div class="dice-row">
-          <input v-model.number="showdownForm.diceCount" type="number" min="1" max="20" class="field-input" aria-label="ダイスの数" />
-          <span>d</span>
-          <input v-model.number="showdownForm.diceSides" type="number" min="2" max="100" class="field-input" aria-label="ダイスの面" />
-        </div>
         <label class="field-label">ディーラーPC</label>
         <select v-model="showdownForm.dealerPcId" class="field-input">
           <option :value="null">なし</option>

@@ -31,17 +31,16 @@ export function describeMoneyLog(log) {
       const [month, plays] = String(log.detail).split('/')
       return `チンチロ ${log.sub ?? '(削除済みPC)'}の${monthLabel(month)}の${plays}回分`
     }
-    case 'showdown': return `Showdown ${showdownResultLabel(log.detail)}(掛金${formatMoney(log.sub)})`
+    case 'showdown': return Number(log.sub) > 0 ? `Showdown ${showdownResultLabel(log.detail)}(掛金${formatMoney(log.sub)})` : `Showdown ${showdownResultLabel(log.detail)}`
     case 'showdown_dealer': return `Showdown ${log.sub ?? '(削除済みPC)'}の${showdownResultLabel(log.detail)}`
     default: return log.detail
   }
 }
 
-// Showdown の履歴の表示: 勝負した役、または「降りた」「勝負中」
+// Showdown の履歴の表示: 結果(MP の削り合いの勝負)、または以前の形の勝負の役
+const SHOWDOWN_RESULT_LABELS = { win: '勝ち', lose: '負け', push: '引き分け', fold: '投了', playing: '勝負中' }
 function showdownResultLabel(detail) {
-  if (detail === 'fold') return '降りた'
-  if (detail === 'playing') return '勝負中'
-  return SHOWDOWN_HANDS.find((h) => h.key === detail)?.label ?? detail
+  return SHOWDOWN_RESULT_LABELS[detail] ?? SHOWDOWN_HANDS.find((h) => h.key === detail)?.label ?? detail
 }
 
 // 'YYYY-MM' → 'YYYY年M月'
