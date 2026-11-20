@@ -384,31 +384,38 @@ const RESULT_LABELS = { win: 'あなたの勝ち', lose: 'ディーラーの勝�
         </div>
       </div>
 
-      <!-- ダイス -->
-      <div v-if="stage" class="stage" aria-live="polite">
-        <template v-if="stage.type === 'check'">
+      <!-- ダイス(行を固定して、振る前後で位置が動かないようにする) -->
+      <div class="stage" aria-live="polite">
+        <template v-if="stage?.type === 'check'">
           <span class="stage-label">{{ WHO[stage.who] }}の{{ stage.skill }}</span>
-          <span class="d100" :class="{ rolling: !stage.done }">{{ stage.value ?? '--' }}</span>
-          <span class="stage-target">/ {{ stage.target }}</span>
-          <Transition name="pop">
-            <span v-if="stage.done" class="level" :class="`level${stage.level}`">
-              {{ LEVEL_LABELS[stage.level] }}<small v-if="stage.upgraded">(ストレートで昇格)</small>
-            </span>
-          </Transition>
+          <span class="stage-dice">
+            <span class="d100" :class="{ rolling: !stage.done }">{{ stage.value ?? '--' }}</span>
+            <span class="stage-target">/ {{ stage.target }}</span>
+          </span>
+          <span class="stage-result">
+            <Transition name="pop">
+              <span v-if="stage.done" class="level" :class="`level${stage.level}`">
+                {{ LEVEL_LABELS[stage.level] }}<small v-if="stage.upgraded">(ストレートで昇格)</small>
+              </span>
+            </Transition>
+          </span>
         </template>
-        <template v-else-if="stage.type === 'damage'">
+        <template v-else-if="stage?.type === 'damage'">
           <span class="stage-label">{{ stage.label }}</span>
-          <span class="dice-faces">
+          <span class="stage-dice dice-faces">
             <span v-for="(d, k) in stage.dice" :key="k" class="die" :class="{ rolling: d.rolling, waiting: d.v === null, bonus: typeof d.v === 'string' }">{{ d.v ?? '?' }}</span>
           </span>
-          <Transition name="pop">
-            <span v-if="stage.done" class="dmg-total">
-              = {{ stage.total }}<template v-if="stage.note"> / {{ stage.note }}</template>
-              <template v-if="stage.damage !== null"> → <strong>{{ stage.damage }}</strong></template>
-            </span>
-          </Transition>
+          <span class="stage-result">
+            <Transition name="pop">
+              <span v-if="stage.done" class="dmg-total">
+                = {{ stage.total }}<template v-if="stage.note"> / {{ stage.note }}</template>
+                <template v-if="stage.damage !== null"> → <strong>{{ stage.damage }}</strong></template>
+              </span>
+            </Transition>
+          </span>
         </template>
-        <span v-else class="stage-label">{{ stage.text }}</span>
+        <span v-else-if="stage" class="stage-label stage-text">{{ stage.text }}</span>
+        <span v-else class="stage-label stage-text stage-idle">ダイス</span>
       </div>
 
       <Transition name="pop">
@@ -916,12 +923,12 @@ const RESULT_LABELS = { win: 'あなたの勝ち', lose: 'ディーラーの勝�
 
 /* ---------- ダイス(卓の下の段) ---------- */
 .stage {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-rows: 18px minmax(40px, auto) 26px;
+  justify-items: center;
   align-items: center;
-  justify-content: center;
-  gap: 6px 8px;
-  min-height: 44px;
+  row-gap: 4px;
+  min-height: 108px;
   margin-top: 12px;
   padding: 6px 8px;
   background: rgba(0, 0, 0, 0.35);
@@ -930,14 +937,35 @@ const RESULT_LABELS = { win: 'あなたの勝ち', lose: 'ディーラーの勝�
 }
 
 .stage-label {
-  flex-basis: 100%;
   text-align: center;
   font-size: 0.72rem;
   color: var(--color-accent, #ffd400);
 }
 
+.stage-text {
+  grid-row: 1 / -1;
+  font-size: 0.8rem;
+}
+
+.stage-idle {
+  opacity: 0.4;
+}
+
+.stage-dice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.stage-result {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 26px;
+}
+
 .d100 {
-  min-width: 2.4em;
+  width: 3.2em;
   padding: 2px 6px;
   border: 2px solid #000;
   border-radius: 6px;
