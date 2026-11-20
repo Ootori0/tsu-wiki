@@ -24,7 +24,10 @@ export default defineEventHandler(async (event) => {
 
   const settings = await loadShowdownSettings(event, db)
   const cards = JSON.parse(row.cards)
-  const state = { cards, declared: row.declared, playerMp: row.player_mp, dealerMp: row.dealer_mp }
+  // このゲームでのプレイヤーの行動の傾向(ディーラーの宣言に使う)
+  const pastActions = JSON.parse(row.log ?? '[]').filter((e) => e.t === 'action' && e.who === 'player')
+  const history = { calls: pastActions.filter((e) => e.action === 'call').length + (action === 'call' ? 1 : 0), actions: pastActions.length + 1 }
+  const state = { cards, declared: row.declared, playerMp: row.player_mp, dealerMp: row.dealer_mp, history }
 
   let next = state
   let events = []

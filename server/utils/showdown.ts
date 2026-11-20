@@ -127,11 +127,29 @@ function fillEmpty(cards, slots = null) {
   return { cards: next, filled }
 }
 
-// ディーラーの宣言: bluffRate% の確率で、実際より1〜3段強い役を名乗る(それ以外は実際の役)
-function declareHand(cards, bluffRate) {
+// 公開札から見て、その役があり得るか(伏せ札の枠をランダムに埋めて、その役以上が一度でも出るか)
+function plausible(cards, rank, tries = 200) {
+  const known = cards.map((c, i) => (i < PUBLIC_SLOTS ? c : null))
+  for (let k = 0; k < tries; k++) {
+    if (bestHand(fillEmpty(known).cards).rank >= rank) return true
+  }
+  return false
+}
+
+// ディーラーの宣言
+// - 嘘は勝負(Call)されると大きく損をするので、このゲームでプレイヤーが Call を選んだ割合が高いほど嘘を減らす
+//   嘘をつく確率 = bluffRate% × (1 - Call の割合)。Call の割合は (Call の回数 + 1) / (行動の回数 + 2) で見積もる
+// - 名乗るのは実際より1段上が多く(60%)、2段上(30%)、3段上(10%)の順。公開札から見てあり得ない役は名乗らない
+// - それ以外は実際の役をそのまま宣言する(宣言より強い役は「宣言どおり」扱いで、反撃は宣言した役の倍率になるため)
+function declareHand(cards, bluffRate, history = { calls: 0, actions: 0 }) {
   const actual = bestHand(cards).rank
-  if (actual < HAND_KEYS.length - 1 && randInt(100) < bluffRate) {
-    return HAND_KEYS[Math.min(HAND_KEYS.length - 1, actual + 1 + randInt(3))]
+  const callRatio = (history.calls + 1) / (history.actions + 2)
+  if (actual < HAND_KEYS.length - 1 && randInt(10000) < bluffRate * 100 * (1 - callRatio)) {
+    const r = randInt(10)
+    const step = r < 6 ? 1 : r < 9 ? 2 : 3
+    for (let claim = Math.min(HAND_KEYS.length - 1, actual + step); claim > actual; claim--) {
+      if (plausible(cards, claim)) return HAND_KEYS[claim]
+    }
   }
   return HAND_KEYS[actual]
 }
@@ -173,7 +191,7 @@ function createRun(state, settings) {
   const attackCost = (who) => pay(who, total(roll(settings.attackCost.count, settings.attackCost.sides)), '攻撃')
 
   const declare = (reason) => {
-    s.declared = declareHand(s.cards, settings.bluffRate)
+    s.declared = declareHand(s.cards, settings.bluffRate, s.history ?? undefined)
     push({ t: 'declare', hand: s.declared, reason })
   }
 
