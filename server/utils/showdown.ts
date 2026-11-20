@@ -5,7 +5,7 @@ import { FULL_DECK, HAND_KEYS, bestHand, handRank, handBuff } from '../../shared
 // カジノの「Showdown」(魔術《Showdown》を元にした、ディーラーとの MP の削り合い)
 //
 // 流れ: 札配り(ディーラー) → 宣言 → プレイヤーの行動 → ディーラーの行動 → プレイヤーの行動 …
-// - プレイヤーの行動(どれも攻撃なので MP 3d6 を使う)
+// - プレイヤーの行動(どれも攻撃なので MP 4d6 を使う)
 //   Call:  勝負(Showdown)。終わったら場の札を捨て、ディーラーが札を配り直す
 //   Raise: 公開札を攻撃する。ダメージ13ごとに札が1枚破れ、ディーラーは宣言し直す
 //   Check: ディーラーに通常攻撃する
@@ -29,7 +29,7 @@ export const DEFAULT_SETTINGS = {
   dealerMp: 80,
   playerDice: { count: 6, sides: 10 }, // プレイヤーの攻撃のダメージ
   dealerDice: { count: 2, sides: 10 }, // ディーラーの通常攻撃のダメージ(これに役のバフが加わる)
-  playerAttackCost: { count: 3, sides: 6 }, // プレイヤーの攻撃(Call・Raise・Check)に使う MP
+  playerAttackCost: { count: 4, sides: 6 }, // プレイヤーの攻撃(Call・Raise・Check)に使う MP
   dealerAttackCost: { count: 1, sides: 6 }, // ディーラーの攻撃(Raise・Check)に使う MP
   rate: 10, // 精算のレート(1MPあたりの万円)
   bluffRate: 30, // ディーラーが実際より強い役を宣言する確率(%)
