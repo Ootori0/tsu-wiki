@@ -40,7 +40,7 @@ const tiers = computed(() =>
         >
           <div class="pc-thumb">
             <PcImage :src="pc.image_url" :bg="pc.image_bg" :lost="pc.is_lost" :alt="pc.name" :icon-size="32" />
-            <span v-if="pc.is_representative" class="rep-tag">代表</span>
+            <span v-if="pc.is_representative" class="rep-tag">会長</span>
           </div>
           <span class="tier-name">{{ pc.name }}</span>
         </button>

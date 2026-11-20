@@ -64,9 +64,16 @@ const BRANCHES = [
     categories: { '': null, casino: null, casino_month: null },
   },
   {
-    select: `SELECT 'dealer_month' AS kind, m.id, m.dealer_pc_id AS pc_id, m.dealer_delta_total AS amount, m.month || '/' || m.plays AS detail, p.name AS sub, NULL AS user_id, m.created_at
-             FROM chinchiro_monthly m LEFT JOIN pcs p ON p.id = m.pc_id`,
-    pc: 'm.dealer_pc_id', all: 'm.dealer_pc_id != 0', time: 'm.created_at', id: 'm.id',
+    // ディーラー月計はプレイヤーごとではなく、ディーラー・月ごとにまとめる(id はまとめた月計のうち一番小さいもの)
+    // detail: 月/回数、sub: 相手にしたプレイヤーの人数
+    select: `SELECT 'dealer_month' AS kind, m.id, m.dealer_pc_id AS pc_id, m.amount, m.month || '/' || m.plays AS detail, m.players AS sub, NULL AS user_id, m.created_at
+             FROM (
+               SELECT MIN(id) AS id, dealer_pc_id, month, SUM(plays) AS plays, SUM(dealer_delta_total) AS amount,
+                      COUNT(DISTINCT pc_id) AS players, MAX(created_at) AS created_at
+               FROM chinchiro_monthly WHERE dealer_pc_id != 0
+               GROUP BY dealer_pc_id, month
+             ) m`,
+    pc: 'm.dealer_pc_id', time: 'm.created_at', id: 'm.id',
     categories: { '': null, casino: null, dealer_month: null },
   },
 ]

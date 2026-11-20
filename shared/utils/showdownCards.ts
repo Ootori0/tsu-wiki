@@ -6,19 +6,33 @@ export const SUITS = ['S', 'H', 'D', 'C']
 export const JOKER = 'JK'
 export const FULL_DECK = [...SUITS.flatMap((s) => Array.from({ length: 13 }, (_, i) => `${s}${i + 2}`)), JOKER]
 
-// 役(弱い順)。damage: 役に使う札の数字の合計にかかるダメージ倍率(魔術《Showdown》の表のとおり)
+// 役(弱い順)。mult: 倍率(勝負の攻撃は 倍率d13。場に札がある間のバフにも使う)。effect: 場に札がある間の特殊効果の説明
 export const SHOWDOWN_HANDS = [
-  { key: 'high', label: 'ハイカード', damage: 0 },
-  { key: 'one_pair', label: 'ワンペア', damage: 1 },
-  { key: 'two_pair', label: 'ツーペア', damage: 1 },
-  { key: 'three', label: 'スリーカード', damage: 1.5 },
-  { key: 'straight', label: 'ストレート', damage: 1.5 },
-  { key: 'flush', label: 'フラッシュ', damage: 2 },
-  { key: 'full_house', label: 'フルハウス', damage: 3 },
-  { key: 'four', label: 'フォーカード', damage: 5 },
-  { key: 'straight_flush', label: 'ストレートフラッシュ', damage: 6 },
-  { key: 'five', label: 'ファイブカード', damage: 7 },
+  { key: 'high', label: 'ハイカード', mult: 0, effect: '' },
+  { key: 'one_pair', label: 'ワンペア', mult: 2, effect: '' },
+  { key: 'two_pair', label: 'ツーペア', mult: 4, effect: '' },
+  { key: 'three', label: 'スリーカード', mult: 6, effect: '' },
+  { key: 'straight', label: 'ストレート', mult: 7, effect: 'ディーラーのハード成功がイクストリームになる' },
+  { key: 'flush', label: 'フラッシュ', mult: 7, effect: '攻撃が全体攻撃になる(1対1では効果なし)' },
+  { key: 'full_house', label: 'フルハウス', mult: 8, effect: '装甲13' },
+  { key: 'four', label: 'フォーカード', mult: 9, effect: 'ディーラーの攻撃を回避できない' },
+  { key: 'straight_flush', label: 'ストレートフラッシュ', mult: 10, effect: 'ストレートとフラッシュの効果' },
+  { key: 'five', label: 'ファイブカード', mult: 13, effect: 'すべての効果に加え、装甲53' },
 ]
+
+// 宣言した役による、場に札がある間のディーラーの強化
+// dodgeBonus: 回避の軽減率に足す割合 / straight: ハード成功がイクストリームになる / armor: 装甲 / unavoidable: 攻撃を回避されない
+export function handBuff(key) {
+  const h = SHOWDOWN_HANDS.find((x) => x.key === key) ?? SHOWDOWN_HANDS[0]
+  return {
+    mult: h.mult,
+    dodgeBonus: h.mult * 0.07,
+    straight: ['straight', 'straight_flush', 'five'].includes(key),
+    armor: key === 'five' ? 53 : key === 'full_house' ? 13 : 0,
+    unavoidable: ['four', 'five'].includes(key),
+  }
+}
+
 export const HAND_KEYS = SHOWDOWN_HANDS.map((h) => h.key)
 // 7枚を引いたときに一番強い役がそれになる確率(%)。20万回の試行で求めた目安
 export const SHOWDOWN_HAND_PROBABILITY = {
@@ -73,21 +87,17 @@ function evalFive(cards, wild) {
   return { rank: 0, used: [], joker: null, sum: sum(nums) }
 }
 
-// 5枚のうち、役に使った札(ワンペアなら2枚)。Joker を使っていれば Joker も含む
+// 5枚のうち、役に使った札(ワンペアなら2枚)と、それぞれの数字(Joker は表した数字)。
+// 同じ数字の札が並ぶように、役の数字の順(used の順)に並べて返す
 function roleCardsOf(five, r) {
-  const need = [...r.used]
-  if (r.joker !== null) need.splice(need.indexOf(r.joker), 1)
+  const rest = [...five]
   const out = []
-  for (const c of five) {
-    if (c === JOKER) {
-      if (r.joker !== null) out.push(c)
-      continue
-    }
-    const i = need.indexOf(numOf(c))
-    if (i !== -1) {
-      need.splice(i, 1)
-      out.push(c)
-    }
+  for (const n of r.used) {
+    let i = rest.findIndex((c) => c !== JOKER && numOf(c) === n)
+    if (i === -1) i = rest.indexOf(JOKER)
+    if (i === -1) continue
+    out.push({ card: rest[i], value: n })
+    rest.splice(i, 1)
   }
   return out
 }
@@ -103,7 +113,7 @@ const combinations = (arr, k) => {
 }
 
 // 7枚(空札は除く)から一番強い5枚の役を返す。同じ役なら、役に使う札の数字の合計(=ダメージの元)が大きい方
-// 返り値: { key, label, rank, cards: 選んだ5枚, sum: 役に使った札の数字の合計, damage: 合計 × ダメージ倍率 }
+// 返り値: { key, label, rank, cards: 選んだ5枚, roleCards: 役に使った札, roleValues: その数字, sum: 数字の合計 }
 export function bestHand(cards) {
   const present = cards.filter(Boolean)
   const k = Math.min(5, present.length)
@@ -113,14 +123,16 @@ export function bestHand(cards) {
     const r = evalFive(plain, five.length - plain.length)
     const sum = r.used.reduce((a, b) => a + b, 0)
     if (!best || r.rank > best.rank || (r.rank === best.rank && sum > best.sum)) {
-      best = { rank: r.rank, sum, cards: five, roleCards: roleCardsOf(five, r) }
+      best = { rank: r.rank, sum, cards: five, role: roleCardsOf(five, r) }
     }
   }
-  if (!best) best = { rank: 0, sum: 0, cards: [], roleCards: [] }
+  if (!best) best = { rank: 0, sum: 0, cards: [], role: [] }
   const hand = SHOWDOWN_HANDS[best.rank]
   return {
-    key: hand.key, label: hand.label, rank: best.rank, cards: best.cards, roleCards: best.roleCards,
-    sum: best.sum, damage: Math.round(best.sum * hand.damage),
+    key: hand.key, label: hand.label, rank: best.rank, cards: best.cards,
+    roleCards: best.role.map((x) => x.card), // 役に使った札
+    roleValues: best.role.map((x) => x.value), // その数字(ダメージの計算に使う)
+    sum: best.sum,
   }
 }
 

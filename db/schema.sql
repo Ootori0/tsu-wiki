@@ -301,7 +301,10 @@ CREATE TABLE showdown_games (
   dealer_delta INTEGER NOT NULL DEFAULT 0, -- ディーラーの所持金の増減
   played_by INTEGER NOT NULL,
   created_at TEXT DEFAULT (datetime('now')),
-  finished_at TEXT
+  finished_at TEXT,
+  player_mp INTEGER, -- MP とターンで戦う形にしてからの勝負: プレイヤーの MP
+  dealer_mp INTEGER, -- ディーラーの MP
+  log TEXT -- JSON 起きたことの記録
 );
 CREATE INDEX idx_showdown_games_pc_time ON showdown_games(pc_id, created_at);
 CREATE INDEX idx_showdown_games_dealer_time ON showdown_games(dealer_pc_id, created_at);
