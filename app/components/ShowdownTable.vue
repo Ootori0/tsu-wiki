@@ -328,7 +328,7 @@ const RESULT_LABELS = { win: 'あなたの勝ち', lose: 'ディーラーの勝�
   <section class="game showdown">
     <h2 class="game-title">Showdown</h2>
     <p class="game-rule">
-      ディーラーと MP を削り合います。どちらかの MP が0を下回ったら終わり、MP の差 × {{ formatMoney(settings?.rate ?? 0) }}を精算します。
+      ディーラーと MP を削り合います。どちらかの MP が0以下になったら終わり、MP の差 × {{ formatMoney(settings?.rate ?? 0) }}を精算します。
     </p>
     <p v-if="settings?.dealerPcName" class="dealer-info">ディーラー: <strong>{{ settings.dealerPcName }}</strong></p>
 
@@ -508,9 +508,9 @@ const RESULT_LABELS = { win: 'あなたの勝ち', lose: 'ディーラーの勝�
     <details class="payouts">
       <summary>ルール</summary>
       <ol class="rule-list">
-        <li>あなたとディーラーは、それぞれ MP {{ settings?.playerMp }} / {{ settings?.dealerMp }} から始めます。ダメージは MP を減らします。どちらかの MP が0を下回ったら終わり、(あなたの MP − ディーラーの MP)× {{ formatMoney(settings?.rate ?? 0) }}を受け取ります(マイナスなら支払います)。</li>
+        <li>あなたとディーラーは、それぞれ MP {{ settings?.playerMp }} / {{ settings?.dealerMp }} から始めます。ダメージは MP を減らします。どちらかの MP が0以下になったら終わり、(あなたの MP − ディーラーの MP)× {{ formatMoney(settings?.rate ?? 0) }}を受け取ります(マイナスなら支払います)。</li>
         <li><strong>札配り</strong>: ディーラーは MP 7d4-4 を使って53枚(Joker 入り)から7枚を引き、役を宣言します(嘘のこともあります)。4枚が公開札、3枚が伏せ札です。</li>
-        <li>場に札がある間、ディーラーは宣言した役の倍率に応じて、回避の軽減率 +倍率×7%、攻撃のダメージ +(倍率d13)÷2 と、役の特殊効果を得ます。</li>
+        <li>場に札がある間、ディーラーは宣言した役の倍率に応じて、回避の軽減率 +倍率×5%、攻撃のダメージ +(倍率d13)÷2 と、役の特殊効果を得ます。</li>
         <li><strong>あなたのターン</strong>(どれも MP {{ dice(settings?.playerAttackCost) }} を使う攻撃):
           <ul>
             <li><strong>Call</strong>: 勝負。伏せ札を開き、破れた枠を引き直す前の札で嘘かを確かめます。嘘ならディーラーはあなたの攻撃({{ dice(settings?.playerDice) }})を回避せずに受けます。宣言どおりなら《Showdown》の成功強度で軽減され、さらにディーラーの回避でも軽減されたうえで、宣言した役の 倍率d13 で反撃されます。勝負のあとは場の札を捨て、ディーラーが配り直します。</li>
@@ -552,8 +552,8 @@ const RESULT_LABELS = { win: 'あなたの勝ち', lose: 'ディーラーの勝�
 
 <style scoped>
 .game {
-  border: 2px solid #000;
-  box-shadow: 4px 4px 0 #000;
+  border: 2px solid var(--color-edge, #000);
+  box-shadow: 4px 4px 0 var(--color-shadow, #000);
   background: var(--color-bg, #fff);
   color: var(--color-text, #000);
   padding: 14px;
@@ -598,8 +598,8 @@ const RESULT_LABELS = { win: 'あなたの勝ち', lose: 'ディーラーの勝�
 
 .mp-bar {
   height: 12px;
-  border: 1px solid #000;
-  background: #eee;
+  border: 1px solid var(--color-edge, #000);
+  background: var(--color-track, #eee);
   overflow: hidden;
 }
 
@@ -666,7 +666,7 @@ const RESULT_LABELS = { win: 'あなたの勝ち', lose: 'ディーラーの勝�
   scroll-margin-top: 72px;
   padding: 12px 10px 14px;
   background: radial-gradient(ellipse at center, #14532d 0%, #0d3b1e 70%);
-  border: 2px solid #000;
+  border: 2px solid var(--color-edge, #000);
   color: #fff;
 }
 
@@ -1071,7 +1071,7 @@ const RESULT_LABELS = { win: 'あなたの勝ち', lose: 'ディーラーの勝�
   overflow-y: auto;
   margin-top: 10px;
   padding: 6px 8px;
-  border: 1px solid #000;
+  border: 1px solid var(--color-edge, #000);
   background: #111;
   color: #ddd;
   font-size: 0.75rem;
@@ -1121,7 +1121,7 @@ const RESULT_LABELS = { win: 'あなたの勝ち', lose: 'ディーラーの勝�
 .result {
   margin-top: 12px;
   padding: 10px;
-  border: 2px solid #000;
+  border: 2px solid var(--color-edge, #000);
   background: #eee;
   color: #000;
   text-align: center;
@@ -1133,7 +1133,7 @@ const RESULT_LABELS = { win: 'あなたの勝ち', lose: 'ディーラーの勝�
 
 .result.lose,
 .result.fold {
-  background: #000;
+  background: var(--color-shadow, #000);
   color: #fff;
 }
 
@@ -1192,10 +1192,10 @@ const RESULT_LABELS = { win: 'あなたの勝ち', lose: 'ディーラーの勝�
   gap: 8px;
 }
 
-.call-btn {
+.sub-btn.call-btn {
   background: var(--color-accent, #ffd400);
   color: #000;
-  box-shadow: 3px 3px 0 #000;
+  box-shadow: 3px 3px 0 var(--color-shadow, #000);
 }
 
 .sub-btn {
@@ -1205,7 +1205,7 @@ const RESULT_LABELS = { win: 'あなたの勝ち', lose: 'ディーラーの勝�
   gap: 2px;
   min-height: 52px;
   padding: 6px;
-  border: 2px solid #000;
+  border: 2px solid var(--color-edge, #000);
   background: var(--color-bg, #fff);
   color: var(--color-text, #000);
   font-family: inherit;
@@ -1273,7 +1273,7 @@ const RESULT_LABELS = { win: 'あなたの勝ち', lose: 'ディーラーの勝�
 .play-btn {
   width: 100%;
   margin-top: 8px;
-  border: 2px solid #000;
+  border: 2px solid var(--color-edge, #000);
   background: var(--color-accent, #ffd400);
   color: #000;
   padding: 10px;
@@ -1282,7 +1282,7 @@ const RESULT_LABELS = { win: 'あなたの勝ち', lose: 'ディーラーの勝�
   letter-spacing: 0.1em;
   cursor: pointer;
   font-family: inherit;
-  box-shadow: 3px 3px 0 #000;
+  box-shadow: 3px 3px 0 var(--color-shadow, #000);
   transition: transform 0.08s ease, box-shadow 0.08s ease, opacity 0.2s ease;
 }
 
@@ -1360,6 +1360,7 @@ const RESULT_LABELS = { win: 'あなたの勝ち', lose: 'ディーラーの勝�
 }
 
 .history-title {
+  color: var(--color-text, #000);
   font-size: 0.95rem;
   margin: 0 0 6px;
   padding-bottom: 4px;
