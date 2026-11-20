@@ -33,7 +33,7 @@ export const DEFAULT_SETTINGS = {
   dealerAttackCost: { count: 1, sides: 6 }, // ディーラーの攻撃(Raise・Check)に使う MP
   rate: 10, // 精算のレート(1MPあたりの万円)
   bluffRate: 30, // ディーラーが実際より強い役を宣言する確率(%)
-  dealerRaiseRate: 40, // ディーラーが Raise(自分の札を破る)を選ぶ確率(%)。破る意味のある札がないときは Check
+  dealerRaiseRate: 53, // ディーラーが Raise(自分の札を破る)を選ぶ確率(%)。破る意味のある札がないときは Check。ほぼ最適なプレイヤーの期待値が約 +30万円になるように調整
   riverRate: 100, // ディーラーがターン終了時に破れた札を引き直す確率(%)
   dailyLimit: 8, // PCごとの1日の回数(日本時間0時に戻る)
   dealerPcId: null,
