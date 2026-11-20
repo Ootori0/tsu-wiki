@@ -651,7 +651,7 @@ const saveShowdown = async () => {
 
       <div v-if="showdownForm" class="box">
         <h2 class="box-title">Showdown</h2>
-        <p class="item-meta">ディーラーと MP を削り合い、どちらかの MP が0を下回ったら (プレイヤーの MP − ディーラーの MP) × レート を精算します。</p>
+        <p class="item-meta">ディーラーと MP を削り合い、どちらかの MP が0以下になったら (プレイヤーの MP − ディーラーの MP) × レート を精算します。</p>
         <label class="field-label">技能値(攻撃・回避・《Showdown》。全員共通)</label>
         <input v-model.number="showdownForm.skill" type="number" min="1" max="99" class="field-input" />
         <label class="field-label">最初の MP(プレイヤー / ディーラー)</label>

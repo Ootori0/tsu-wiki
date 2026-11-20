@@ -26,7 +26,7 @@ export function handBuff(key) {
   const h = SHOWDOWN_HANDS.find((x) => x.key === key) ?? SHOWDOWN_HANDS[0]
   return {
     mult: h.mult,
-    dodgeBonus: h.mult * 0.07,
+    dodgeBonus: h.mult * 0.05,
     straight: ['straight', 'straight_flush', 'five'].includes(key),
     armor: key === 'five' ? 53 : key === 'full_house' ? 13 : 0,
     unavoidable: ['four', 'five'].includes(key),

@@ -13,11 +13,11 @@ import { FULL_DECK, HAND_KEYS, bestHand, handRank, handBuff } from '../../shared
 //   Raise: 自分の札のうち破ったほうがよい札を破り、宣言し直す
 //   Check: プレイヤーに通常攻撃する
 //   ターン終了時に破れた札を引き直す(1枚につき MP 1d8)= The River
-// - どちらかの MP が0を下回ったら終わり。(プレイヤーのMP - ディーラーのMP) × レート を精算する
+// - どちらかの MP が0以下になったら終わり。(プレイヤーのMP - ディーラーのMP) × レート を精算する
 //
 // 判定は d100 と技能値(全員共通)を比べ、失敗/通常/ハード/イクストリームの成功強度を出す
 // 回避の軽減率: 回避側の成功強度が 1段階上以上 100% / 同じ 80% / 1段階下 50% / 2段階下 20% / 3段階以下 0%
-// 場に札がある間、ディーラーは宣言した役の倍率に応じて 回避の軽減率 +倍率×7%、攻撃のダメージ +(倍率d13)/2 を得る
+// 場に札がある間、ディーラーは宣言した役の倍率に応じて 回避の軽減率 +倍率×5%、攻撃のダメージ +(倍率d13)/2 を得る
 
 export const PUBLIC_SLOTS = 4
 export const SLOTS = 7
@@ -181,8 +181,8 @@ function mitigation(defLevel, atkLevel) {
 function createRun(state, settings) {
   const s = { ...state, cards: [...state.cards] }
   const events = []
-  // MP が0を下回っても、その攻撃(行動)は最後まで処理し、行動の区切りで終わりを確かめる
-  const ended = () => s.playerMp < 0 || s.dealerMp < 0
+  // MP が0以下になっても、その攻撃(行動)は最後まで処理し、行動の区切りで終わりを確かめる
+  const ended = () => s.playerMp <= 0 || s.dealerMp <= 0
   const push = (e) => events.push(e)
   const buff = () => (s.cards.some(Boolean) ? handBuff(s.declared) : handBuff('high'))
 
