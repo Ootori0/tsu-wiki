@@ -207,16 +207,18 @@ function createRun(state, settings) {
   }
 
   // ディーラーが攻撃を受ける(回避の判定とバフ・装甲)
-  const dealerTakes = (atk, kind, { defenseLevel = null } = {}) => {
+  // levels: 軽減に使う成功強度の並び。勝負では《Showdown》の成功強度で軽減したあと、回避でさらに軽減する(重ねがけ)
+  const dealerTakes = (atk, kind, { levels = null } = {}) => {
     const b = buff()
-    let level = defenseLevel
-    if (level === null) {
+    let list = levels
+    if (list === null) {
       const d = skillRoll(settings.skill, { straight: b.straight })
       push({ t: 'roll', who: 'dealer', skill: '回避', kind, ...d })
-      level = d.level
+      list = [d.level]
     }
-    const reduce = Math.min(1, mitigation(level, atk.level) + b.dodgeBonus)
-    hit('dealer', atk.raw, reduce, b.armor, { kind, dice: atk.dice })
+    const rates = list.map((lv) => Math.min(1, mitigation(lv, atk.level) + b.dodgeBonus))
+    const reduce = 1 - rates.reduce((left, r) => left * (1 - r), 1)
+    hit('dealer', atk.raw, reduce, b.armor, { kind, dice: atk.dice, reduces: rates.map((r) => Math.round(r * 100)) })
   }
 
   // プレイヤーが攻撃を受ける(フォーカードの効果があれば回避できない)
@@ -284,14 +286,14 @@ function createRun(state, settings) {
       // 嘘が見破られた: 役の効果とダメージはなく、ディーラーは回避せずに受ける
       if (atk) hit('dealer', atk.raw, 0, 0, { kind: '勝負', dice: atk.dice })
     } else {
-      // 宣言どおり: 《Showdown》の成功強度で軽減(回避もできるので、回避と良いほうを使う)し、宣言した役の 倍率d13 で反撃する
+      // 宣言どおり: 《Showdown》の成功強度で軽減し、さらに回避で軽減(重ねがけ)してから、宣言した役の 倍率d13 で反撃する
       const b = buff()
       const sd = skillRoll(settings.skill, { straight: b.straight })
       push({ t: 'roll', who: 'dealer', skill: '《Showdown》', kind: '勝負', ...sd })
       if (atk) {
         const d = skillRoll(settings.skill, { straight: b.straight })
         push({ t: 'roll', who: 'dealer', skill: '回避', kind: '勝負', ...d })
-        dealerTakes(atk, '勝負', { defenseLevel: Math.max(sd.level, d.level) })
+        dealerTakes(atk, '勝負', { levels: [sd.level, d.level] })
       }
       if (!ended()) {
         if (!sd.level) {

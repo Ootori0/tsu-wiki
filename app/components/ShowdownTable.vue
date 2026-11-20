@@ -158,7 +158,8 @@ const play = async (e) => {
       setMp(e.target, e.mp)
       float(e.target, `-${e.damage}`, 'damage')
       const parts = [`${e.dice?.join('+') ?? ''} = ${e.raw}`]
-      if (e.reduce) parts.push(`軽減${e.reduce}%`)
+      if (e.reduces?.length > 1) parts.push(`軽減${e.reduces.map((r) => `${r}%`).join('→')}`)
+      else if (e.reduce) parts.push(`軽減${e.reduce}%`)
       if (e.armor) parts.push(`装甲${e.armor}`)
       log(`${WHO[e.target]}に ${e.damage} ダメージ(${parts.join(' / ')})`, `hit ${e.target}`)
       await wait(600)
@@ -440,7 +441,7 @@ const RESULT_LABELS = { win: 'あなたの勝ち', lose: 'ディーラーの勝�
         <li>場に札がある間、ディーラーは宣言した役の倍率に応じて、回避の軽減率 +倍率×7%、攻撃のダメージ +(倍率d13)÷2 と、役の特殊効果を得ます。</li>
         <li><strong>あなたのターン</strong>(どれも MP {{ dice(settings?.attackCost) }} を使う攻撃):
           <ul>
-            <li><strong>Call</strong>: 勝負。伏せ札を開き、破れた枠を引き直す前の札で嘘かを確かめます。嘘ならディーラーはあなたの攻撃({{ dice(settings?.playerDice) }})を回避せずに受けます。宣言どおりなら《Showdown》の成功強度で軽減され、宣言した役の 倍率d13 で反撃されます。勝負のあとは場の札を捨て、ディーラーが配り直します。</li>
+            <li><strong>Call</strong>: 勝負。伏せ札を開き、破れた枠を引き直す前の札で嘘かを確かめます。嘘ならディーラーはあなたの攻撃({{ dice(settings?.playerDice) }})を回避せずに受けます。宣言どおりなら《Showdown》の成功強度で軽減され、さらにディーラーの回避でも軽減されたうえで、宣言した役の 倍率d13 で反撃されます。勝負のあとは場の札を捨て、ディーラーが配り直します。</li>
             <li><strong>Raise</strong>: 公開札を攻撃します({{ dice(settings?.playerDice) }})。札は回避できず、ダメージ13ごとに1枚破れます。</li>
             <li><strong>Check</strong>: ディーラーに通常攻撃({{ dice(settings?.playerDice) }})します。</li>
           </ul>
