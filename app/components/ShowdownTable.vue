@@ -31,6 +31,9 @@ const slots = ref(Array.from({ length: 7 }, emptySlot))
 const declared = ref(null)
 const mp = ref({ player: null, dealer: null })
 const floats = ref([]) // MP の横に浮かぶ数字 { id, who, text, cls }
+// ダイスの表示(卓の下): 判定の d100 か、ダメージのダイス
+// { type: 'check', who, skill, value, target, level, upgraded, done } / { type: 'damage', label, dice: [{ v, rolling }], total, note, done }
+const stage = ref(null)
 const verdict = ref(null)
 const logs = ref([]) // { id, text, cls }
 const animating = ref(false)
@@ -146,28 +149,39 @@ const play = async (e) => {
       log(`${WHO[e.who]}: ${(e.who === 'player' ? ACTION_LABELS : DEALER_ACTION_LABELS)[e.action]}`, `action ${e.who}`)
       await wait(300)
       break
-    case 'roll':
+    case 'roll': {
+      // d100 を転がしてから止め、成功強度を出す
+      stage.value = { type: 'check', who: e.who, skill: e.skill, value: null, target: settings.value?.skill ?? 85, level: null, upgraded: false, done: false }
+      for (let f = 0; f < 9; f++) {
+        stage.value.value = 1 + Math.floor(Math.random() * 100)
+        await wait(55)
+      }
+      stage.value = { ...stage.value, value: e.value, level: e.level, upgraded: e.upgraded, done: true }
       log(`${WHO[e.who]}の${e.skill}: ${e.value} / ${settings.value?.skill ?? 85} → ${LEVEL_LABELS[e.level]}${e.upgraded ? '(ストレートの効果でイクストリーム)' : ''}`, `roll level${e.level}`)
-      await wait(450)
+      await wait(800)
       break
+    }
     case 'miss':
+      stage.value = { type: 'text', text: `${WHO[e.who]}の${e.kind}は外れた` }
       log(`${WHO[e.who]}の${e.kind}は外れた`, 'miss')
-      await wait(300)
+      await wait(600)
       break
     case 'hit': {
+      const parts = []
+      if (e.reduces?.length > 1) parts.push(`軽減 ${e.reduces.map((r) => `${r}%`).join(' → ')}`)
+      else if (e.reduce) parts.push(`軽減 ${e.reduce}%`)
+      if (e.armor) parts.push(`装甲 ${e.armor}`)
+      await rollDamage(`${WHO[e.target]}へのダメージ(${e.kind})`, e.dice ?? [], e.kind === '反撃' ? 13 : 10, e.raw, parts.join(' / '), e.damage)
       setMp(e.target, e.mp)
       float(e.target, `-${e.damage}`, 'damage')
-      const parts = [`${e.dice?.join('+') ?? ''} = ${e.raw}`]
-      if (e.reduces?.length > 1) parts.push(`軽減${e.reduces.map((r) => `${r}%`).join('→')}`)
-      else if (e.reduce) parts.push(`軽減${e.reduce}%`)
-      if (e.armor) parts.push(`装甲${e.armor}`)
-      log(`${WHO[e.target]}に ${e.damage} ダメージ(${parts.join(' / ')})`, `hit ${e.target}`)
-      await wait(600)
+      log(`${WHO[e.target]}に ${e.damage} ダメージ(${(e.dice ?? []).join('+')} = ${e.raw}${parts.length ? ` / ${parts.join(' / ')}` : ''})`, `hit ${e.target}`)
+      await wait(700)
       break
     }
     case 'card_hit':
+      await rollDamage('札へのダメージ(Raise)', e.dice, 10, e.raw, e.broken.length ? `${e.broken.length}枚破れる` : '13に届かず破れない', null)
       log(`札に ${e.raw} ダメージ(${e.dice.join('+')})→ ${e.broken.length ? `${e.broken.length}枚破れる` : '13に届かず破れない'}`)
-      await wait(350)
+      await wait(600)
       break
     case 'tear':
       for (const i of e.slots) slots.value[i].tearing = true
@@ -240,6 +254,25 @@ const play = async (e) => {
   }
 }
 
+// ダメージのダイスを1つずつ転がして止め、合計と軽減後のダメージを出す
+// dice: 出た目の並び(役のバフは '+6' のような文字で入っている)
+const rollDamage = async (label, dice, sides, total, note, damage) => {
+  stage.value = { type: 'damage', label, dice: dice.map((v) => ({ v: typeof v === 'number' ? null : v, rolling: false })), total: null, note: '', damage: null, done: false }
+  for (let k = 0; k < dice.length; k++) {
+    if (typeof dice[k] !== 'number') continue
+    stage.value.dice[k].rolling = true
+    for (let f = 0; f < 5; f++) {
+      stage.value.dice[k].v = 1 + Math.floor(Math.random() * sides)
+      await wait(45)
+    }
+    stage.value.dice[k] = { v: dice[k], rolling: false }
+    await wait(90)
+  }
+  await wait(150)
+  stage.value = { ...stage.value, total, note, damage, done: true }
+  await wait(250)
+}
+
 // 操作を送り、返ってきた events を再生してから、所持金と状態を読み込み直す
 const run = async (fn) => {
   busy.value = true
@@ -264,6 +297,7 @@ const start = () => run(() => {
   finished.value = null
   raiseMode.value = false
   logs.value = []
+  stage.value = null
   mp.value = { player: settings.value?.playerMp ?? null, dealer: settings.value?.dealerMp ?? null }
   return $fetch('/api/casino/showdown/start', { method: 'POST', body: { pcId: selectedPcId.value } })
 })
@@ -293,20 +327,6 @@ const RESULT_LABELS = { win: 'あなたの勝ち', lose: 'ディーラーの勝�
       ディーラーと MP を削り合います。どちらかの MP が0を下回ったら終わり、MP の差 × {{ formatMoney(settings?.rate ?? 0) }}を精算します。
     </p>
     <p v-if="settings?.dealerPcName" class="dealer-info">ディーラー: <strong>{{ settings.dealerPcName }}</strong></p>
-
-    <!-- MP -->
-    <div v-if="mp.player !== null" class="mp-board">
-      <div v-for="who in ['dealer', 'player']" :key="who" class="mp-row">
-        <span class="mp-name">{{ who === 'player' ? 'あなた' : 'ディーラー' }}</span>
-        <div class="mp-bar" :class="{ low: mpPercent(who) < 25 }">
-          <div class="mp-fill" :class="who" :style="{ width: `${mpPercent(who)}%` }" />
-        </div>
-        <span class="mp-value">{{ mp[who] }}</span>
-        <span class="floats">
-          <span v-for="f in floats.filter((x) => x.who === who)" :key="f.id" class="float" :class="f.cls">{{ f.text }}</span>
-        </span>
-      </div>
-    </div>
 
     <!-- 卓 -->
     <div class="table">
@@ -364,12 +384,53 @@ const RESULT_LABELS = { win: 'あなたの勝ち', lose: 'ディーラーの勝�
         </div>
       </div>
 
+      <!-- ダイス -->
+      <div v-if="stage" class="stage" aria-live="polite">
+        <template v-if="stage.type === 'check'">
+          <span class="stage-label">{{ WHO[stage.who] }}の{{ stage.skill }}</span>
+          <span class="d100" :class="{ rolling: !stage.done }">{{ stage.value ?? '--' }}</span>
+          <span class="stage-target">/ {{ stage.target }}</span>
+          <Transition name="pop">
+            <span v-if="stage.done" class="level" :class="`level${stage.level}`">
+              {{ LEVEL_LABELS[stage.level] }}<small v-if="stage.upgraded">(ストレートで昇格)</small>
+            </span>
+          </Transition>
+        </template>
+        <template v-else-if="stage.type === 'damage'">
+          <span class="stage-label">{{ stage.label }}</span>
+          <span class="dice-faces">
+            <span v-for="(d, k) in stage.dice" :key="k" class="die" :class="{ rolling: d.rolling, waiting: d.v === null, bonus: typeof d.v === 'string' }">{{ d.v ?? '?' }}</span>
+          </span>
+          <Transition name="pop">
+            <span v-if="stage.done" class="dmg-total">
+              = {{ stage.total }}<template v-if="stage.note"> / {{ stage.note }}</template>
+              <template v-if="stage.damage !== null"> → <strong>{{ stage.damage }}</strong></template>
+            </span>
+          </Transition>
+        </template>
+        <span v-else class="stage-label">{{ stage.text }}</span>
+      </div>
+
       <Transition name="pop">
         <p v-if="verdict" class="verdict" :class="{ bluff: verdict.bluff }">
           <template v-if="verdict.bluff">嘘! 実際は<strong>{{ handLabelOf(verdict.actual) }}</strong></template>
           <template v-else>宣言どおり(<strong>{{ handLabelOf(verdict.actual) }}</strong>)</template>
         </p>
       </Transition>
+    </div>
+
+    <!-- MP(盤面の下) -->
+    <div v-if="mp.player !== null" class="mp-board">
+      <div v-for="who in ['dealer', 'player']" :key="who" class="mp-row">
+        <span class="mp-name">{{ who === 'player' ? 'あなた' : 'ディーラー' }}</span>
+        <div class="mp-bar" :class="{ low: mpPercent(who) < 25 }">
+          <div class="mp-fill" :class="who" :style="{ width: `${mpPercent(who)}%` }" />
+        </div>
+        <span class="mp-value">{{ mp[who] }}</span>
+        <span class="floats">
+          <span v-for="f in floats.filter((x) => x.who === who)" :key="f.id" class="float" :class="f.cls">{{ f.text }}</span>
+        </span>
+      </div>
     </div>
 
     <!-- ログ -->
@@ -508,7 +569,7 @@ const RESULT_LABELS = { win: 'あなたの勝ち', lose: 'ディーラーの勝�
   display: flex;
   flex-direction: column;
   gap: 6px;
-  margin-bottom: 10px;
+  margin-top: 12px;
 }
 
 .mp-row {
@@ -851,6 +912,124 @@ const RESULT_LABELS = { win: 'あなたの勝ち', lose: 'ディーラーの勝�
 .pop-enter-from {
   transform: scale(0.85);
   opacity: 0;
+}
+
+/* ---------- ダイス(卓の下の段) ---------- */
+.stage {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 6px 8px;
+  min-height: 44px;
+  margin-top: 12px;
+  padding: 6px 8px;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  font-size: 0.8rem;
+}
+
+.stage-label {
+  flex-basis: 100%;
+  text-align: center;
+  font-size: 0.72rem;
+  color: var(--color-accent, #ffd400);
+}
+
+.d100 {
+  min-width: 2.4em;
+  padding: 2px 6px;
+  border: 2px solid #000;
+  border-radius: 6px;
+  background: #fff;
+  color: #000;
+  font-size: 1.3rem;
+  font-weight: bold;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.d100.rolling,
+.die.rolling {
+  animation: shake 0.12s linear infinite;
+}
+
+.stage-target {
+  opacity: 0.8;
+}
+
+.level {
+  padding: 2px 8px;
+  font-weight: bold;
+  border: 1px solid #000;
+}
+
+.level small {
+  font-size: 0.65rem;
+  font-weight: normal;
+}
+
+.level0 {
+  background: #555;
+  color: #fff;
+}
+
+.level1 {
+  background: #fff;
+  color: #000;
+}
+
+.level2 {
+  background: #64b5f6;
+  color: #000;
+}
+
+.level3 {
+  background: var(--color-accent, #ffd400);
+  color: #000;
+}
+
+.dice-faces {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px;
+}
+
+.die {
+  min-width: 26px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #000;
+  border-radius: 4px;
+  background: #fff;
+  color: #000;
+  font-weight: bold;
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.die.waiting {
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+.die.bonus {
+  padding: 0 4px;
+  background: var(--color-accent, #ffd400);
+}
+
+.dmg-total strong {
+  font-size: 1.15rem;
+  color: #ff8a80;
+}
+
+@keyframes shake {
+  0%, 100% { rotate: -8deg; }
+  50% { rotate: 8deg; }
 }
 
 /* ---------- ログ ---------- */
@@ -1202,6 +1381,8 @@ const RESULT_LABELS = { win: 'あなたの勝ち', lose: 'ディーラーの勝�
   .torn-mark,
   .mp-bar,
   .float,
+  .d100,
+  .die,
   .log-line {
     animation: none !important;
   }
