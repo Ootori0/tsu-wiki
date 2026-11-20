@@ -660,7 +660,7 @@ const saveShowdown = async () => {
           <span>/</span>
           <input v-model.number="showdownForm.dealerMp" type="number" min="1" class="field-input" aria-label="ディーラーの MP" />
         </div>
-        <template v-for="d in [{ key: 'playerDice', label: 'プレイヤーの攻撃のダメージ' }, { key: 'dealerDice', label: 'ディーラーの通常攻撃のダメージ(これに役のバフが加わる)' }, { key: 'attackCost', label: '攻撃に使う MP' }]" :key="d.key">
+        <template v-for="d in [{ key: 'playerDice', label: 'プレイヤーの攻撃のダメージ' }, { key: 'dealerDice', label: 'ディーラーの通常攻撃のダメージ(これに役のバフが加わる)' }, { key: 'playerAttackCost', label: 'プレイヤーの攻撃に使う MP' }, { key: 'dealerAttackCost', label: 'ディーラーの攻撃に使う MP' }]" :key="d.key">
           <label class="field-label">{{ d.label }}</label>
           <div class="dice-row">
             <input v-model.number="showdownForm[d.key].count" type="number" min="1" max="30" class="field-input" aria-label="ダイスの数" />

@@ -5,11 +5,11 @@ import { FULL_DECK, HAND_KEYS, bestHand, handRank, handBuff } from '../../shared
 // カジノの「Showdown」(魔術《Showdown》を元にした、ディーラーとの MP の削り合い)
 //
 // 流れ: 札配り(ディーラー) → 宣言 → プレイヤーの行動 → ディーラーの行動 → プレイヤーの行動 …
-// - プレイヤーの行動(どれも攻撃なので MP 1d6 を使う)
+// - プレイヤーの行動(どれも攻撃なので MP 3d6 を使う)
 //   Call:  勝負(Showdown)。終わったら場の札を捨て、ディーラーが札を配り直す
 //   Raise: 公開札を攻撃する。ダメージ13ごとに札が1枚破れ、ディーラーは宣言し直す
 //   Check: ディーラーに通常攻撃する
-// - ディーラーの行動(攻撃なので MP 1d6 を使う)
+// - ディーラーの行動(攻撃なので MP 1d6 を使う。通常攻撃は 2d10 + 役のバフ)
 //   Raise: 自分の札のうち破ったほうがよい札を破り、宣言し直す
 //   Check: プレイヤーに通常攻撃する
 //   ターン終了時に破れた札を引き直す(1枚につき MP 1d8)= The River
@@ -28,8 +28,9 @@ export const DEFAULT_SETTINGS = {
   playerMp: 80,
   dealerMp: 80,
   playerDice: { count: 6, sides: 10 }, // プレイヤーの攻撃のダメージ
-  dealerDice: { count: 6, sides: 10 }, // ディーラーの通常攻撃のダメージ(これに役のバフが加わる)
-  attackCost: { count: 1, sides: 6 }, // 攻撃に使う MP
+  dealerDice: { count: 2, sides: 10 }, // ディーラーの通常攻撃のダメージ(これに役のバフが加わる)
+  playerAttackCost: { count: 3, sides: 6 }, // プレイヤーの攻撃(Call・Raise・Check)に使う MP
+  dealerAttackCost: { count: 1, sides: 6 }, // ディーラーの攻撃(Raise・Check)に使う MP
   rate: 10, // 精算のレート(1MPあたりの万円)
   bluffRate: 30, // ディーラーが実際より強い役を宣言する確率(%)
   dealerRaiseRate: 40, // ディーラーが Raise(自分の札を破る)を選ぶ確率(%)。破る意味のある札がないときは Check
@@ -85,7 +86,8 @@ export async function saveShowdownSettings(db, body) {
     dealerMp: intIn(body?.dealerMp, 1, 999, 'ディーラーの MP'),
     playerDice: dice(body?.playerDice, 'プレイヤーの攻撃'),
     dealerDice: dice(body?.dealerDice, 'ディーラーの攻撃'),
-    attackCost: dice(body?.attackCost, '攻撃の MP'),
+    playerAttackCost: dice(body?.playerAttackCost, 'プレイヤーの攻撃の MP'),
+    dealerAttackCost: dice(body?.dealerAttackCost, 'ディーラーの攻撃の MP'),
     rate: intIn(body?.rate, 0, 10000, 'レート'),
     bluffRate: intIn(body?.bluffRate, 0, 100, '嘘の確率'),
     dealerRaiseRate: intIn(body?.dealerRaiseRate, 0, 100, 'ディーラーの Raise の確率'),
@@ -188,7 +190,10 @@ function createRun(state, settings) {
     else s.dealerMp -= amount
     push({ t: 'cost', who, amount, why, mp: who === 'player' ? s.playerMp : s.dealerMp })
   }
-  const attackCost = (who) => pay(who, total(roll(settings.attackCost.count, settings.attackCost.sides)), '攻撃')
+  const attackCost = (who) => {
+    const c = who === 'player' ? settings.playerAttackCost : settings.dealerAttackCost
+    pay(who, total(roll(c.count, c.sides)), '攻撃')
+  }
 
   const declare = (reason) => {
     s.declared = declareHand(s.cards, settings.bluffRate, s.history ?? undefined)

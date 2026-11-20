@@ -395,7 +395,7 @@ const RESULT_LABELS = { win: 'あなたの勝ち', lose: 'ディーラーの勝�
     <!-- 操作 -->
     <Transition name="fade" mode="out-in">
       <div v-if="game && !finished" key="actions" class="actions">
-        <p class="turn-note">あなたのターン(どの行動も MP {{ dice(settings?.attackCost) }} を使う攻撃です)</p>
+        <p class="turn-note">あなたのターン(どの行動も MP {{ dice(settings?.playerAttackCost) }} を使う攻撃です)</p>
         <button class="play-btn" :disabled="locked" @click="act('call')">
           Call<small>勝負する</small>
         </button>
@@ -439,14 +439,14 @@ const RESULT_LABELS = { win: 'あなたの勝ち', lose: 'ディーラーの勝�
         <li>あなたとディーラーは、それぞれ MP {{ settings?.playerMp }} / {{ settings?.dealerMp }} から始めます。ダメージは MP を減らします。どちらかの MP が0を下回ったら終わり、(あなたの MP − ディーラーの MP)× {{ formatMoney(settings?.rate ?? 0) }}を受け取ります(マイナスなら支払います)。</li>
         <li><strong>札配り</strong>: ディーラーは MP 7d4-4 を使って53枚(Joker 入り)から7枚を引き、役を宣言します(嘘のこともあります)。4枚が公開札、3枚が伏せ札です。</li>
         <li>場に札がある間、ディーラーは宣言した役の倍率に応じて、回避の軽減率 +倍率×7%、攻撃のダメージ +(倍率d13)÷2 と、役の特殊効果を得ます。</li>
-        <li><strong>あなたのターン</strong>(どれも MP {{ dice(settings?.attackCost) }} を使う攻撃):
+        <li><strong>あなたのターン</strong>(どれも MP {{ dice(settings?.playerAttackCost) }} を使う攻撃):
           <ul>
             <li><strong>Call</strong>: 勝負。伏せ札を開き、破れた枠を引き直す前の札で嘘かを確かめます。嘘ならディーラーはあなたの攻撃({{ dice(settings?.playerDice) }})を回避せずに受けます。宣言どおりなら《Showdown》の成功強度で軽減され、さらにディーラーの回避でも軽減されたうえで、宣言した役の 倍率d13 で反撃されます。勝負のあとは場の札を捨て、ディーラーが配り直します。</li>
             <li><strong>Raise</strong>: 公開札を攻撃します({{ dice(settings?.playerDice) }})。札は回避できず、ダメージ13ごとに1枚破れます。</li>
             <li><strong>Check</strong>: ディーラーに通常攻撃({{ dice(settings?.playerDice) }})します。</li>
           </ul>
         </li>
-        <li><strong>ディーラーのターン</strong>: 自分の札を破る(Raise)か、通常攻撃({{ dice(settings?.dealerDice) }}+バフ)をします。ターン終了時に、破れた札を1枚 MP 1d8 で引き直します。</li>
+        <li><strong>ディーラーのターン</strong>(どれも MP {{ dice(settings?.dealerAttackCost) }} を使う): 自分の札を破る(Raise)か、通常攻撃({{ dice(settings?.dealerDice) }}+バフ)をします。ターン終了時に、破れた札を1枚 MP 1d8 で引き直します。</li>
         <li>判定は全員 技能値 {{ settings?.skill }}(ハード {{ Math.floor((settings?.skill ?? 0) / 2) }}以下、イクストリーム {{ Math.floor((settings?.skill ?? 0) / 5) }}以下)。回避の軽減率は、回避側の成功強度が 1段階上以上 100% / 同じ 80% / 1段階下 50% / 2段階下 20% / 3段階以下 0%。</li>
       </ol>
       <table class="payout-table">
