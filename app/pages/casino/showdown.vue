@@ -13,11 +13,7 @@ useHead({ htmlAttrs: { class: 'underground' } })
     <NuxtLink to="/casino" class="back-link">
       <v-icon icon="mdi-arrow-left" size="16" />カジノに戻る
     </NuxtLink>
-    <header class="hero">
-      <span class="hero-tag">裏カジノ</span>
-      <h1 class="page-title">Showdown</h1>
-      <p class="hero-sub">— 招かれた者だけの卓 —</p>
-    </header>
+    <h1 class="page-title">Showdown</h1>
 
     <p v-if="(myPcs ?? []).length === 0" class="notice">遊ぶにはマイページでPCを作成してください</p>
     <template v-else>
@@ -58,37 +54,13 @@ useHead({ htmlAttrs: { class: 'underground' } })
   text-decoration: none;
 }
 
-.hero {
-  margin: 8px 0 20px;
-  padding: 18px 0 14px;
-  text-align: center;
-  border-top: 1px solid var(--color-edge);
-  border-bottom: 1px solid var(--color-edge);
-}
-
-.hero-tag {
-  display: inline-block;
-  padding: 2px 10px;
-  border: 1px solid var(--color-accent);
-  color: var(--color-accent);
-  font-size: 0.7rem;
-  letter-spacing: 0.3em;
-}
-
 .page-title {
-  margin: 10px 0 4px;
-  font-size: 2rem;
-  font-style: italic;
-  letter-spacing: 0.12em;
-  color: var(--color-accent);
-  text-shadow: 0 0 12px rgba(217, 180, 74, 0.45), 2px 2px 0 var(--color-shadow);
-}
-
-.hero-sub {
-  margin: 0;
-  font-size: 0.72rem;
-  letter-spacing: 0.2em;
-  opacity: 0.6;
+  margin: 4px 0 16px;
+  padding-left: 10px;
+  border-left: 5px solid var(--color-accent);
+  color: var(--color-text);
+  font-size: 1.3rem;
+  letter-spacing: 0.08em;
 }
 
 .page :deep(.wallet) {
