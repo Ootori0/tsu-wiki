@@ -1,6 +1,6 @@
 import { getSessionUser } from '../../../utils/session'
 import { isManager } from '../../../utils/permission'
-import { CHINCHIRO_HANDS } from '../../../utils/chinchiro'
+import { CHINCHIRO_HANDS, DAILY_PLAY_LIMIT, MAX_DAILY_PLAY_LIMIT } from '../../../utils/chinchiro'
 import { invalidateCache } from '../../../utils/cache'
 
 export default defineEventHandler(async (event) => {
@@ -12,7 +12,12 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 403, statusMessage: '管理権限(admin/KP)が必要です' })
   }
 
-  const { payouts, dealerPcId, dealerShare } = (await readBody(event)) ?? {}
+  const { payouts, dealerPcId, dealerShare, dailyLimit } = (await readBody(event)) ?? {}
+
+  const limit = Number(dailyLimit ?? DAILY_PLAY_LIMIT)
+  if (!Number.isInteger(limit) || limit < 0 || limit > MAX_DAILY_PLAY_LIMIT) {
+    throw createError({ statusCode: 400, statusMessage: `1日の回数は0〜${MAX_DAILY_PLAY_LIMIT}の整数で指定してください` })
+  }
 
   const share = Number(dealerShare ?? 100)
   if (!Number.isInteger(share) || share < 0 || share > 100) {
@@ -53,6 +58,7 @@ export default defineEventHandler(async (event) => {
     ...statements,
     setting('dealer_pc_id', dealerId === null ? null : String(dealerId)),
     setting('dealer_share', String(share)),
+    setting('daily_limit', String(limit)),
   ])
   invalidateCache('casino:payouts', 'casino:dealer')
 

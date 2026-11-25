@@ -27,7 +27,8 @@ export const DEFAULT_PAYOUTS = {
 export const BET_UNIT = 100 // 掛金は100万円単位(所持金は万円単位)
 export const MAX_ROLLS = 3
 export const LEDGER_BET = 100 // 出納帳のPCの掛金(100万円固定)
-export const DAILY_PLAY_LIMIT = 8 // PCごとの1日のプレイ回数上限(日本時間0時に戻る)
+export const DAILY_PLAY_LIMIT = 8 // PCごとの1日のプレイ回数上限の既定値(日本時間0時に戻る。管理画面で変えられる)
+export const MAX_DAILY_PLAY_LIMIT = 1000
 
 // 日本時間の今日0時を、DBの created_at と同じ形式(UTC 'YYYY-MM-DD HH:MM:SS')で返す
 export function todayStartUtc() {
@@ -90,7 +91,7 @@ export async function loadPayouts(event, db) {
   return payouts
 }
 
-// ディーラー設定: { pcId, pcName, share(%) }。未設定なら pcId は null
+// ディーラー設定と1日の回数上限: { pcId, pcName, share(%), dailyLimit }。未設定なら pcId は null
 export function loadDealer(event, db) {
   return cached(event, 'casino:dealer', () => loadDealerFromDb(db))
 }
@@ -100,14 +101,15 @@ async function loadDealerFromDb(db) {
   const map = Object.fromEntries(results.map((r) => [r.key, r.value]))
   const pcId = map.dealer_pc_id ? Number(map.dealer_pc_id) : null
   const share = map.dealer_share !== undefined && map.dealer_share !== null ? Number(map.dealer_share) : 100
+  const dailyLimit = map.daily_limit !== undefined && map.daily_limit !== null ? Number(map.daily_limit) : DAILY_PLAY_LIMIT
 
   let pcName = null
   if (pcId) {
     const pc = await db.prepare('SELECT name FROM pcs WHERE id = ?').bind(pcId).first()
-    if (!pc) return { pcId: null, pcName: null, share } // ディーラーのPCが削除済み
+    if (!pc) return { pcId: null, pcName: null, share, dailyLimit } // ディーラーのPCが削除済み
     pcName = pc.name
   }
-  return { pcId, pcName, share }
+  return { pcId, pcName, share, dailyLimit }
 }
 
 // プレイヤーの増減に対するディーラーの増減(負けの share% を受け取り、勝ちの share% を支払う)

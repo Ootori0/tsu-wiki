@@ -1,6 +1,6 @@
 import { getSessionUser } from '../../../utils/session'
 import { isAdmin } from '../../../utils/permission'
-import { DAILY_PLAY_LIMIT, countPlaysTodayStatement } from '../../../utils/chinchiro'
+import { countPlaysTodayStatement, loadDealer } from '../../../utils/chinchiro'
 
 export default defineEventHandler(async (event) => {
   const db = event.context.cloudflare.env.tsu_wiki_db
@@ -41,6 +41,6 @@ export default defineEventHandler(async (event) => {
   return {
     games: results.map((r) => ({ ...r, rolls: JSON.parse(r.rolls) })),
     playsToday,
-    dailyLimit: DAILY_PLAY_LIMIT,
+    dailyLimit: (await loadDealer(event, db)).dailyLimit,
   }
 })
