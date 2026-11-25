@@ -1,7 +1,7 @@
 import { getSessionUser } from '../../../utils/session'
 import { isAdmin } from '../../../utils/permission'
 import {
-  BET_UNIT, DAILY_PLAY_LIMIT, LEDGER_BET, loadPayouts, loadDealer, dealerDeltaOf, playChinchiro, countPlaysToday, todayStartUtc,
+  BET_UNIT, LEDGER_BET, loadPayouts, loadDealer, dealerDeltaOf, playChinchiro, countPlaysToday, todayStartUtc,
 } from '../../../utils/chinchiro'
 
 export default defineEventHandler(async (event) => {
@@ -35,13 +35,14 @@ export default defineEventHandler(async (event) => {
   if (!isLedger && pc.money < betNum) {
     throw createError({ statusCode: 409, statusMessage: '所持金が掛金に足りません' })
   }
+  const dealer = await loadDealer(event, db)
+  const dailyLimit = dealer.dailyLimit
   const playsBefore = await countPlaysToday(db, pc.id)
-  if (playsBefore >= DAILY_PLAY_LIMIT) {
-    throw createError({ statusCode: 429, statusMessage: `今日のプレイ回数の上限(${DAILY_PLAY_LIMIT}回)に達しました` })
+  if (playsBefore >= dailyLimit) {
+    throw createError({ statusCode: 429, statusMessage: `今日のプレイ回数の上限(${dailyLimit}回)に達しました` })
   }
 
   const payouts = await loadPayouts(event, db)
-  const dealer = await loadDealer(event, db)
   const { rolls, hand } = playChinchiro()
   const multiplier = payouts[hand]
   const net = Math.round(betNum * multiplier)
@@ -62,7 +63,7 @@ export default defineEventHandler(async (event) => {
           `INSERT INTO balance_checks (money)
            SELECT ? - 1 - COUNT(*) FROM chinchiro_games WHERE pc_id = ? AND created_at >= ?`
         )
-        .bind(DAILY_PLAY_LIMIT, pc.id, todayStartUtc()),
+        .bind(dailyLimit, pc.id, todayStartUtc()),
       db.prepare('DELETE FROM balance_checks'),
       db
         .prepare('UPDATE pcs SET money = money + ?, updated_at = datetime(\'now\') WHERE id = ?')
@@ -99,6 +100,6 @@ export default defineEventHandler(async (event) => {
     money: updated.money,
     // 遊ぶ前の回数に今回の1回を足す(数え直さない。上限はバッチの中で確かめ済み)
     playsToday: playsBefore + 1,
-    dailyLimit: DAILY_PLAY_LIMIT,
+    dailyLimit,
   }
 })
