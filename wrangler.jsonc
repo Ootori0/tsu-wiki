@@ -12,9 +12,7 @@
 		{
 			"binding": "tsu_wiki_db",
 			"database_name": "tsu-wiki-db",
-			"database_id": "41151fde-1c31-4905-8e78-9b51b258d600",
-			// マイグレーションのファイルの場所(wrangler d1 migrations apply が読む)
-			"migrations_dir": "db/migrations"
+			"database_id": "41151fde-1c31-4905-8e78-9b51b258d600"
 		}
 	]
 }
