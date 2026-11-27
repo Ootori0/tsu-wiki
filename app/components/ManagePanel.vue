@@ -90,6 +90,43 @@ const deleteUser = async (id) => {
   if (ok) userDialogOpen.value = false
 }
 
+// --- 期限付きのアカウント作成リンク ---
+const INVITE_HOURS = [
+  { value: 1, label: '1時間' },
+  { value: 24, label: '1日' },
+  { value: 72, label: '3日' },
+  { value: 168, label: '7日' },
+]
+const { data: invites, refresh: refreshInvites } = await useFetch('/api/admin/invites', {
+  immediate: hasTab('アカウント管理'),
+})
+const inviteHours = ref(24)
+const issuedInvite = ref(null) // 発行したばかりのリンク(トークンはこのときしか分からない)
+const formatUtc = (s) =>
+  s ? new Date(`${s.replace(' ', 'T')}Z`).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : ''
+const issueInvite = async () => {
+  await run(async () => {
+    const r = await $fetch('/api/admin/invites', { method: 'POST', body: { hours: inviteHours.value } })
+    issuedInvite.value = { url: `${window.location.origin}/invite?t=${r.token}`, expiresAt: r.expiresAt }
+    await refreshInvites()
+  }, 'リンクを発行しました')
+}
+const copyInvite = async () => {
+  try {
+    await navigator.clipboard.writeText(issuedInvite.value.url)
+    show('リンクをコピーしました')
+  } catch {
+    show('コピーできませんでした。リンクを長押ししてコピーしてください', 'error')
+  }
+}
+const revokeInvite = async (inv) => {
+  if (!confirm('このリンクを無効にしますか?')) return
+  await run(async () => {
+    await $fetch(`/api/admin/invites/${inv.id}`, { method: 'DELETE' })
+    await refreshInvites()
+  }, 'リンクを無効にしました')
+}
+
 // --- 権限・タグ・所属の追加(名前だけのポップアップ) ---
 const NAME_KINDS = {
   permission: { title: '権限の追加', label: '権限名' },
@@ -446,6 +483,30 @@ const savePayouts = async () => {
           </template>
         </AccordionList>
         <button class="add-btn" @click="openUserCreate">＋ アカウントを作成</button>
+      </div>
+
+      <div class="box">
+        <h2 class="box-title">アカウント作成リンク</h2>
+        <p class="item-meta">期限内に1回だけ使えるリンクです。開いた人が ID とパスワードを決めてアカウントを作れます(権限なし)。リンクは発行した直後にしか表示されません。</p>
+        <label class="field-label">期限</label>
+        <select v-model="inviteHours" class="field-input">
+          <option v-for="h in INVITE_HOURS" :key="h.value" :value="h.value">{{ h.label }}</option>
+        </select>
+        <button class="save-btn" @click="issueInvite">リンクを発行</button>
+        <div v-if="issuedInvite" class="invite-issued">
+          <p class="item-meta">{{ formatUtc(issuedInvite.expiresAt) }}まで使えます</p>
+          <p class="invite-url">{{ issuedInvite.url }}</p>
+          <button class="copy-btn" @click="copyInvite"><v-icon icon="mdi-content-copy" size="14" />コピー</button>
+        </div>
+        <div v-for="inv in invites ?? []" :key="inv.id" class="list-row">
+          <span class="invite-status">
+            <template v-if="inv.used_at">使用済み({{ inv.used_by_name ?? '削除済み' }})</template>
+            <template v-else-if="inv.usable">{{ formatUtc(inv.expires_at) }}まで</template>
+            <template v-else>期限切れ</template>
+            <span class="item-meta">発行 {{ formatUtc(inv.created_at) }}</span>
+          </span>
+          <button v-if="!inv.used_at" class="delete-btn" @click="revokeInvite(inv)">{{ inv.usable ? '無効にする' : '削除' }}</button>
+        </div>
       </div>
     </div>
 
@@ -946,6 +1007,43 @@ const savePayouts = async () => {
 
 .user-row-name {
   font-weight: bold;
+}
+
+.invite-issued {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1, 4px);
+  margin: var(--space-3, 12px) 0;
+  padding: var(--space-2, 8px);
+  background: var(--color-accent-soft, #fff7cc);
+}
+
+.copy-btn {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  gap: 4px;
+  min-height: 36px;
+  border: 1px solid #000;
+  background: #000;
+  color: var(--color-accent, #ffd400);
+  padding: 5px 12px;
+  font-size: 0.8rem;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.invite-url {
+  margin: 0;
+  font-size: 0.8rem;
+  word-break: break-all;
+  user-select: all;
+}
+
+.invite-status {
+  display: flex;
+  flex-direction: column;
+  font-size: 0.85rem;
 }
 
 .list-row {

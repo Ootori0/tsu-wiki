@@ -311,3 +311,15 @@ CREATE INDEX idx_showdown_games_dealer_time ON showdown_games(dealer_pc_id, crea
 CREATE INDEX idx_showdown_games_time ON showdown_games(created_at);
 -- 1つのPCが同時に進められる勝負は1つだけ
 CREATE UNIQUE INDEX idx_showdown_games_playing ON showdown_games(pc_id) WHERE status = 'playing';
+
+-- 期限付きのアカウント作成リンク(1リンクで1アカウントだけ作れる。トークンは SHA-256 だけ保存)
+CREATE TABLE invites (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  token_hash TEXT NOT NULL UNIQUE,
+  created_by INTEGER,
+  expires_at TEXT NOT NULL, -- UTC 'YYYY-MM-DD HH:MM:SS'
+  used_at TEXT,
+  used_by INTEGER,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+CREATE INDEX idx_invites_created_at ON invites (created_at);
